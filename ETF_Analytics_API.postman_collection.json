@@ -1,0 +1,105 @@
+{
+  "info": {
+    "name": "ETF Analytics API",
+    "description": "REST API für ETF-Datenanalyse",
+    "version": "1.0.0"
+  },
+  "item": [
+    {
+      "name": "Health",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "test-key"
+          }
+        ],
+        "url": {
+          "raw": "http://localhost:8000/health",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8000",
+          "path": ["health"]
+        }
+      }
+    },
+    {
+      "name": "Get All ETFs",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "test-key"
+          }
+        ],
+        "url": {
+          "raw": "http://localhost:8000/etfs?skip=0&limit=50",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8000",
+          "path": ["etfs"],
+          "query": [
+            {"key": "skip", "value": "0"},
+            {"key": "limit", "value": "50"}
+          ]
+        }
+      }
+    },
+    {
+      "name": "Overlap Analysis",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "test-key"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"etf_ids\": [\n    \"550e8400-e29b-41d4-a716-446655440000\",\n    \"550e8400-e29b-41d4-a716-446655440001\"\n  ]\n}"
+        },
+        "url": {
+          "raw": "http://localhost:8000/analytics/overlap",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8000",
+          "path": ["analytics", "overlap"]
+        }
+      }
+    },
+    {
+      "name": "Portfolio Exposure",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "test-key"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"portfolio\": [\n    {\n      \"etf_id\": \"550e8400-e29b-41d4-a716-446655440000\",\n      \"weight\": 60\n    },\n    {\n      \"etf_id\": \"550e8400-e29b-41d4-a716-446655440001\",\n      \"weight\": 40\n    }\n  ]\n}"
+        },
+        "url": {
+          "raw": "http://localhost:8000/analytics/exposure",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8000",
+          "path": ["analytics", "exposure"]
+        }
+      }
+    }
+  ]
+}
