@@ -7,7 +7,7 @@ from sqlalchemy import text
 
 from app.db.database import get_db, init_db
 from app.models import HealthResponse
-from app.api.routes import etfs, analytics
+from app.api.routes import etfs, analytics, admin
 from app.core.auth import verify_api_key
 from app.schemas import APIKey
 
@@ -54,6 +54,7 @@ async def root():
 
 app.include_router(etfs.router)
 app.include_router(analytics.router)
+app.include_router(admin.router)
 
 if __name__ == "__main__":
     import uvicorn
