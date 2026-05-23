@@ -1,5 +1,5 @@
 from datetime import datetime
-from uuid import UUID
+from uuid import UUID, uuid4
 from sqlalchemy import Column, String, Integer, DateTime, Numeric, Date, Boolean, Text, JSON, ForeignKey, UniqueConstraint, Index
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.ext.declarative import declarative_base
@@ -10,7 +10,7 @@ Base = declarative_base()
 class ETF(Base):
     __tablename__ = "etfs"
 
-    id = Column(PGUUID(as_uuid=True), primary_key=True)
+    id = Column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
     isin = Column(String(12), unique=True, nullable=False, index=True)
     ticker = Column(String(10), nullable=False, index=True)
     name = Column(String(255), nullable=False)
@@ -32,7 +32,7 @@ class ETF(Base):
 class Holding(Base):
     __tablename__ = "holdings"
 
-    id = Column(PGUUID(as_uuid=True), primary_key=True)
+    id = Column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
     etf_id = Column(PGUUID(as_uuid=True), ForeignKey("etfs.id"), nullable=False, index=True)
     date = Column(Date, nullable=False, index=True)
     instrument_isin = Column(String(12), nullable=False)
@@ -52,7 +52,7 @@ class Holding(Base):
 class Allocation(Base):
     __tablename__ = "allocations"
 
-    id = Column(PGUUID(as_uuid=True), primary_key=True)
+    id = Column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
     etf_id = Column(PGUUID(as_uuid=True), ForeignKey("etfs.id"), nullable=False, index=True)
     date = Column(Date, nullable=False)
     type = Column(String(20), nullable=False)
@@ -70,7 +70,7 @@ class Allocation(Base):
 class Performance(Base):
     __tablename__ = "performance"
 
-    id = Column(PGUUID(as_uuid=True), primary_key=True)
+    id = Column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
     etf_id = Column(PGUUID(as_uuid=True), ForeignKey("etfs.id"), nullable=False, index=True)
     date = Column(Date, nullable=False)
     nav = Column(Numeric(12, 4))
@@ -89,7 +89,7 @@ class Performance(Base):
 class APIKey(Base):
     __tablename__ = "api_keys"
 
-    id = Column(PGUUID(as_uuid=True), primary_key=True)
+    id = Column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
     key = Column(String(64), unique=True, nullable=False, index=True)
     name = Column(String(100), nullable=False)
     rate_limit_per_minute = Column(Integer, default=60)
@@ -101,7 +101,7 @@ class APIKey(Base):
 class ETLJob(Base):
     __tablename__ = "etl_jobs"
 
-    id = Column(PGUUID(as_uuid=True), primary_key=True)
+    id = Column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
     job_name = Column(String(100), nullable=False)
     status = Column(String(20))
     started_at = Column(DateTime)
