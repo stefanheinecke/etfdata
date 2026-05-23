@@ -6,23 +6,15 @@
     "dockerContextDir": "backend"
   },
   "deploy": {
-    "startCommand": "./start.sh",
-    "healthcheckUrl": "/health",
+    "startCommand": "/app/start.sh",
+    "healthcheckUrl": "/",
     "healthcheckInterval": 10,
     "restartPolicyMaxRetries": 5
   },
   "env": {
-    "DATABASE_HOST": {
-      "description": "PostgreSQL Host",
-      "value": "postgres"
-    },
     "LOG_LEVEL": {
       "description": "Logging Level",
       "value": "INFO"
-    },
-    "PORT": {
-      "description": "API Port",
-      "value": "8000"
     }
   }
 }
