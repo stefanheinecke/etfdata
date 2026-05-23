@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.db.database import get_db
 from app.core.auth import create_api_key
+from app.services.seed import seed_database
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -30,3 +31,12 @@ def create_key(
         "id": str(db_key.id),
         "rate_limit_per_minute": db_key.rate_limit_per_minute,
     }
+
+
+@router.post("/seed")
+def seed(
+    db: Session = Depends(get_db),
+    _: None = Depends(verify_admin_secret),
+):
+    result = seed_database(db)
+    return {"seeded": result}
