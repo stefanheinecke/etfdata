@@ -40,6 +40,22 @@ def create_key(
     }
 
 
+@router.post("/reset")
+def reset(
+    db: Session = Depends(get_db),
+    _: None = Depends(verify_admin_secret),
+):
+    from app.schemas import ETF, Holding, Allocation, Performance, APIKey as APIKeyModel
+    from app.services.seed import seed_database
+    db.query(Holding).delete()
+    db.query(Allocation).delete()
+    db.query(Performance).delete()
+    db.query(ETF).delete()
+    db.commit()
+    result = seed_database(db)
+    return {"reset": True, "seeded": result}
+
+
 @router.post("/seed")
 def seed(
     db: Session = Depends(get_db),
