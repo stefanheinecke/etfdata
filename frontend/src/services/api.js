@@ -72,22 +72,3 @@ export const adminService = {
   }
 }
 
-
-  pairwiseOverlap(etfA, etfB, date = null) {
-    return api.get(`/analytics/overlap/${etfA}/${etfB}`, { params: { date } })
-  },
-
-  calculateExposure(portfolio, date = null) {
-    return api.post('/analytics/exposure', { portfolio }, { params: { date } })
-  },
-
-  findSimilar(etfId, topN = 5) {
-    return api.get(`/analytics/similar/${etfId}`, { params: { top_n: topN } })
-  }
-}
-
-export const healthService = {
-  checkHealth() {
-    return api.get('/health')
-  }
-}

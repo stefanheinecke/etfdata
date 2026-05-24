@@ -6,6 +6,7 @@
     "dockerContextDir": "."
   },
   "deploy": {
+    "startCommand": "/app/start.sh",
     "healthcheckUrl": "/",
     "healthcheckInterval": 10,
     "restartPolicyMaxRetries": 5
