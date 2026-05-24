@@ -1,6 +1,6 @@
 from datetime import datetime
 from uuid import UUID, uuid4
-from sqlalchemy import Column, String, Integer, DateTime, Numeric, Date, Boolean, Text, JSON, ForeignKey, UniqueConstraint, Index
+from sqlalchemy import Column, String, Integer, BigInteger, DateTime, Numeric, Date, Boolean, Text, JSON, ForeignKey, UniqueConstraint, Index
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
@@ -18,7 +18,7 @@ class ETF(Base):
     domicile = Column(String(2), nullable=False)
     replication_method = Column(String(50))
     ter = Column(Numeric(5, 3))
-    fund_size = Column(Integer)
+    fund_size = Column(BigInteger)
     benchmark = Column(String(255))
     currency = Column(String(3), nullable=False)
     listings = Column(JSON)
