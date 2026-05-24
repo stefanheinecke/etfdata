@@ -1,7 +1,7 @@
 <template>
   <div class="page">
     <div class="page-header">
-      <h1 class="page-title">📖 API Reference</h1>
+      <h1 class="page-title">API Reference</h1>
       <p class="page-subtitle">Complete documentation for all ETF Data API endpoints.</p>
     </div>
 

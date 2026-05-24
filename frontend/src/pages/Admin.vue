@@ -1,13 +1,13 @@
 <template>
   <div class="page">
     <div class="page-header">
-      <h1 class="page-title">⚙ Admin</h1>
+      <h1 class="page-title">Admin</h1>
       <p class="page-subtitle">Manage API keys, seed data and configure your connection settings.</p>
     </div>
 
     <!-- API Key Config -->
     <div class="card" style="margin-bottom:1.5rem">
-      <h2 class="card-title">🔑 API Key (User)</h2>
+      <h2 class="card-title">API Key</h2>
       <p style="font-size:.875rem;color:var(--text-muted);margin-bottom:1rem">
         Your API key is stored locally in the browser and sent with every request.
       </p>
@@ -22,7 +22,7 @@
 
     <!-- Admin credentials -->
     <div class="card" style="margin-bottom:1.5rem">
-      <h2 class="card-title">🛡 Admin Credentials</h2>
+      <h2 class="card-title">Admin Credentials</h2>
       <p style="font-size:.875rem;color:var(--text-muted);margin-bottom:1rem">
         Enter your <code>ADMIN_SECRET</code> from Railway to use admin operations below.
         This is never stored — only used for the current session.
@@ -37,7 +37,7 @@
     <!-- Admin operations -->
     <div class="grid-2" style="margin-bottom:1.5rem">
       <div class="card">
-        <h3 class="card-title">🗄 Create New API Key</h3>
+        <h3 class="card-title">Create New API Key</h3>
         <p style="font-size:.875rem;color:var(--text-muted);margin-bottom:1rem">Generate a new API key. Copy it — it won't be shown again.</p>
         <label class="label">Key Name</label>
         <input class="input" v-model="newKeyName" placeholder="e.g. my-app" style="margin-bottom:.75rem" />
@@ -55,7 +55,7 @@
       </div>
 
       <div class="card">
-        <h3 class="card-title">🌱 Database Management</h3>
+        <h3 class="card-title">Database Management</h3>
         <p style="font-size:.875rem;color:var(--text-muted);margin-bottom:1.25rem">Manage the database schema and sample data.</p>
         <div style="display:flex;flex-direction:column;gap:.75rem">
           <div>
@@ -84,7 +84,7 @@
 
     <!-- Health status -->
     <div class="card">
-      <h3 class="card-title">💚 API Health</h3>
+      <h3 class="card-title">API Health</h3>
       <button class="btn btn-outline" @click="checkHealth" :disabled="healthLoading" style="margin-bottom:1rem">
         {{ healthLoading ? 'Checking...' : 'Check Health' }}
       </button>

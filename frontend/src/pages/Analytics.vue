@@ -1,7 +1,7 @@
 ﻿<template>
   <div class="page">
     <div class="page-header">
-      <h1 class="page-title">🔬 Analytics</h1>
+      <h1 class="page-title">Analytics</h1>
       <p class="page-subtitle">Portfolio overlap analysis, exposure breakdown and ETF similarity search.</p>
     </div>
     <div class="ana-tabs">

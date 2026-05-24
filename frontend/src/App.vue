@@ -10,7 +10,6 @@
         <ul class="nav-links">
           <li v-for="item in navItems" :key="item.id">
             <button :class="['nav-btn', { active: currentPage === item.id }]" @click="currentPage = item.id">
-              <span class="nav-icon">{{ item.icon }}</span>
               {{ item.label }}
             </button>
           </li>
@@ -77,10 +76,10 @@ const apiStatus = ref('checking')
 const apiStatusText = ref('Checking...')
 
 const navItems = [
-  { id: 'home', label: 'Home', icon: '⌂' },
-  { id: 'etfs', label: 'ETFs', icon: '📊' },
-  { id: 'analytics', label: 'Analytics', icon: '🔬' },
-  { id: 'docs', label: 'API Docs', icon: '📖' },
+  { id: 'home', label: 'Home' },
+  { id: 'etfs', label: 'ETFs' },
+  { id: 'analytics', label: 'Analytics' },
+  { id: 'docs', label: 'API Docs' },
 ]
 
 function toggleTheme() {
@@ -138,7 +137,6 @@ onMounted(async () => {
 }
 .nav-btn:hover { background: var(--bg-3); color: var(--green-600); }
 .nav-btn.active { background: var(--green-100); color: var(--green-700); font-weight: 600; }
-.nav-icon { font-size: 1rem; }
 .admin-btn { border: 1px solid var(--border); color: var(--text-2); }
 .admin-btn:hover { border-color: var(--green-400); color: var(--green-700); }
 .theme-toggle {

@@ -1,7 +1,7 @@
 ﻿<template>
   <div class="page">
     <div class="page-header">
-      <h1 class="page-title">📊 ETF Explorer</h1>
+      <h1 class="page-title">ETF Explorer</h1>
       <p class="page-subtitle">Browse all tracked ETFs, inspect holdings, allocations and performance data.</p>
     </div>
     <div v-if="!apiKey" class="error-box" style="margin-bottom:1.5rem">
