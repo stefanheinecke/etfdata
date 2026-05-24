@@ -18,6 +18,23 @@ from app.schemas import ETF, Holding, Allocation
 
 logger = logging.getLogger(__name__)
 
+# Cache country lookups across ETFs so AAPL / MSFT etc. are only fetched once
+_country_cache: dict[str, str] = {}
+
+
+def _lookup_country(symbol: str) -> str:
+    """Return the country for a ticker symbol, cached to minimise API calls."""
+    if symbol in _country_cache:
+        return _country_cache[symbol]
+    try:
+        country = yf.Ticker(symbol).info.get("country", "") or ""
+        time.sleep(0.4)  # light delay between lookups
+    except Exception:
+        country = ""
+    _country_cache[symbol] = country
+    return country
+
+
 # Sector key normalisation (yfinance uses camelCase / snake_case keys)
 _SECTOR_NAMES: dict[str, str] = {
     "realestate": "Real Estate",
@@ -172,6 +189,7 @@ def import_ishares(db: Session, tickers: Optional[list[str]] = None) -> dict:
                         "isin": ident,
                         "name": str(row["Name"]).strip()[:200],
                         "weight": round(pct, 4),
+                        "country": _lookup_country(ident),
                     })
 
             # Sector allocations
