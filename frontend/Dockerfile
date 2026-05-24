@@ -15,10 +15,7 @@ WORKDIR /app
 RUN npm install -g serve
 
 COPY --from=builder /app/dist ./dist
-COPY start.sh .
-
-RUN chmod +x start.sh
 
 EXPOSE 3000
 
-CMD ["./start.sh"]
+CMD ["serve", "-s", "dist", "-l", "3000"]
