@@ -1,5 +1,6 @@
 import os
 from fastapi import APIRouter, Depends, HTTPException, Header
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from typing import List, Optional
@@ -9,6 +10,10 @@ from app.services.seed import seed_database
 from app.services.ishares_import import import_ishares, ISHARES_ETFS
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+
+
+class ImportRequest(BaseModel):
+    tickers: Optional[List[str]] = None
 
 
 def verify_admin_secret(x_admin_secret: str = Header(None)):
@@ -78,13 +83,14 @@ def list_ishares_etfs(_: None = Depends(verify_admin_secret)):
 
 @router.post("/import-ishares")
 def import_ishares_endpoint(
-    tickers: Optional[List[str]] = None,
+    body: ImportRequest = None,
     db: Session = Depends(get_db),
     _: None = Depends(verify_admin_secret),
 ):
     """
     Download real holdings data from iShares.com and import into the database.
-    Pass ?tickers=IVV&tickers=EEM to import a subset, or omit to import all 10.
+    Provide {"tickers": ["IVV", "EEM"]} to import a subset, or omit / send {} to import all.
     """
+    tickers = body.tickers if body else None
     result = import_ishares(db, tickers=tickers)
     return result
