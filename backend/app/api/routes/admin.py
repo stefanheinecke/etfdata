@@ -2,9 +2,11 @@ import os
 from fastapi import APIRouter, Depends, HTTPException, Header
 from sqlalchemy.orm import Session
 
+from typing import List, Optional
 from app.db.database import get_db
 from app.core.auth import create_api_key
 from app.services.seed import seed_database
+from app.services.ishares_import import import_ishares, ISHARES_ETFS
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -63,3 +65,26 @@ def seed(
 ):
     result = seed_database(db)
     return {"seeded": result}
+
+
+@router.get("/import-ishares/etfs")
+def list_ishares_etfs(_: None = Depends(verify_admin_secret)):
+    """List the 10 iShares ETFs available for import."""
+    return [
+        {"ticker": e["ticker"], "name": e["name"], "product_id": e["product_id"]}
+        for e in ISHARES_ETFS
+    ]
+
+
+@router.post("/import-ishares")
+def import_ishares_endpoint(
+    tickers: Optional[List[str]] = None,
+    db: Session = Depends(get_db),
+    _: None = Depends(verify_admin_secret),
+):
+    """
+    Download real holdings data from iShares.com and import into the database.
+    Pass ?tickers=IVV&tickers=EEM to import a subset, or omit to import all 10.
+    """
+    result = import_ishares(db, tickers=tickers)
+    return result
