@@ -6,7 +6,6 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 from app.db.database import get_db
 from app.core.auth import create_api_key
-from app.services.seed import seed_database
 from app.services.ishares_import import import_ishares, ISHARES_ETFS
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -52,31 +51,21 @@ def reset(
     db: Session = Depends(get_db),
     _: None = Depends(verify_admin_secret),
 ):
-    from app.schemas import ETF, Holding, Allocation, Performance, APIKey as APIKeyModel
-    from app.services.seed import seed_database
+    """Delete all ETF data (holdings, allocations, performance, ETFs) from the database."""
+    from app.schemas import ETF, Holding, Allocation, Performance
     db.query(Holding).delete()
     db.query(Allocation).delete()
     db.query(Performance).delete()
     db.query(ETF).delete()
     db.commit()
-    result = seed_database(db)
-    return {"reset": True, "seeded": result}
-
-
-@router.post("/seed")
-def seed(
-    db: Session = Depends(get_db),
-    _: None = Depends(verify_admin_secret),
-):
-    result = seed_database(db)
-    return {"seeded": result}
+    return {"reset": True, "message": "All ETF data deleted. Run /admin/import-ishares to import real data."}
 
 
 @router.get("/import-ishares/etfs")
 def list_ishares_etfs(_: None = Depends(verify_admin_secret)):
-    """List the 10 iShares ETFs available for import."""
+    """List the 13 iShares ETFs available for import."""
     return [
-        {"ticker": e["ticker"], "name": e["name"], "product_id": e["product_id"]}
+        {"ticker": e["ticker"], "name": e["name"], "isin": e["isin"], "yf_symbol": e["yf_symbol"]}
         for e in ISHARES_ETFS
     ]
 
