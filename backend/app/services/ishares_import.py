@@ -21,18 +21,36 @@ logger = logging.getLogger(__name__)
 # Cache country lookups across ETFs so AAPL / MSFT etc. are only fetched once
 _country_cache: dict[str, str] = {}
 
+# yfinance returns full country names; map to ISO-3166-1 alpha-2 codes (VARCHAR(2) in DB)
+_COUNTRY_ISO: dict[str, str] = {
+    "Australia": "AU", "Austria": "AT", "Belgium": "BE", "Bermuda": "BM",
+    "Brazil": "BR", "Canada": "CA", "Cayman Islands": "KY", "Chile": "CL",
+    "China": "CN", "Colombia": "CO", "Czech Republic": "CZ", "Denmark": "DK",
+    "Egypt": "EG", "Finland": "FI", "France": "FR", "Germany": "DE",
+    "Greece": "GR", "Hong Kong": "HK", "Hungary": "HU", "India": "IN",
+    "Indonesia": "ID", "Ireland": "IE", "Israel": "IL", "Italy": "IT",
+    "Japan": "JP", "Luxembourg": "LU", "Malaysia": "MY", "Mexico": "MX",
+    "Netherlands": "NL", "New Zealand": "NZ", "Norway": "NO", "Philippines": "PH",
+    "Poland": "PL", "Portugal": "PT", "Qatar": "QA", "Saudi Arabia": "SA",
+    "Singapore": "SG", "South Africa": "ZA", "South Korea": "KR", "Spain": "ES",
+    "Sweden": "SE", "Switzerland": "CH", "Taiwan": "TW", "Thailand": "TH",
+    "Turkey": "TR", "United Arab Emirates": "AE", "United Kingdom": "GB",
+    "United States": "US", "Vietnam": "VN",
+}
+
 
 def _lookup_country(symbol: str) -> str:
-    """Return the country for a ticker symbol, cached to minimise API calls."""
+    """Return the ISO-2 country code for a ticker symbol, cached to minimise API calls."""
     if symbol in _country_cache:
         return _country_cache[symbol]
     try:
-        country = yf.Ticker(symbol).info.get("country", "") or ""
+        full_name = yf.Ticker(symbol).info.get("country", "") or ""
+        code = _COUNTRY_ISO.get(full_name, "")
         time.sleep(0.4)  # light delay between lookups
     except Exception:
-        country = ""
-    _country_cache[symbol] = country
-    return country
+        code = ""
+    _country_cache[symbol] = code
+    return code
 
 
 # Sector key normalisation (yfinance uses camelCase / snake_case keys)
