@@ -1,183 +1,123 @@
-<template>
-  <div class="analytics">
-    <h2>Analytics Tools</h2>
-
-    <div class="tabs-main">
-      <button
-        @click="selectedAnalytics = 'overlap'"
-        :class="{ active: selectedAnalytics === 'overlap' }"
-        class="tab-btn-main"
-      >Overlap Analysis</button>
-      <button
-        @click="selectedAnalytics = 'exposure'"
-        :class="{ active: selectedAnalytics === 'exposure' }"
-        class="tab-btn-main"
-      >Portfolio Exposure</button>
-      <button
-        @click="selectedAnalytics = 'similarity'"
-        :class="{ active: selectedAnalytics === 'similarity' }"
-        class="tab-btn-main"
-      >Find Similar</button>
+﻿<template>
+  <div class="page">
+    <div class="page-header">
+      <h1 class="page-title">🔬 Analytics</h1>
+      <p class="page-subtitle">Portfolio overlap analysis, exposure breakdown and ETF similarity search.</p>
+    </div>
+    <div class="ana-tabs">
+      <button v-for="t in tabs" :key="t.id" :class="['ana-tab',{active:activeTab===t.id}]" @click="activeTab=t.id">
+        <span>{{ t.icon }}</span> {{ t.label }}
+      </button>
     </div>
 
-    <!-- Overlap Analysis -->
-    <div v-if="selectedAnalytics === 'overlap'" class="panel">
-      <h3>Overlap Analysis</h3>
-      <p class="description">Compare holdings between multiple ETFs</p>
-
-      <div class="form-group">
-        <label>Enter ETF IDs (comma-separated):</label>
-        <input
-          v-model="overlapInput"
-          type="text"
-          placeholder="e.g., uuid1,uuid2,uuid3"
-          class="input"
-        >
-        <button @click="calculateOverlap" class="btn btn-primary">Calculate</button>
-      </div>
-
-      <div v-if="overlapLoading" class="loading">Calculating overlap...</div>
-
-      <div v-if="overlapResult">
-        <h4>Overlap Matrix</h4>
-        <div class="matrix-grid">
-          <div v-for="(pair, key) in overlapResult.matrix" :key="key" class="matrix-item">
-            <div class="matrix-header">{{ pair.etf_a.substring(0, 8) }} ↔ {{ pair.etf_b.substring(0, 8) }}</div>
-            <div class="matrix-stat">
-              <span>Common Holdings:</span>
-              <strong>{{ pair.common_count }}</strong>
-            </div>
-            <div class="matrix-stat">
-              <span>Overlap Score:</span>
-              <strong>{{ pair.overlap_percent }}%</strong>
-            </div>
-            <div class="matrix-stat">
-              <span>Weight Overlap:</span>
-              <strong>{{ pair.weight_overlap }}%</strong>
-            </div>
+    <!-- OVERLAP -->
+    <div v-if="activeTab==='overlap'">
+      <div class="card" style="margin-bottom:1.5rem">
+        <h2 class="card-title">ETF Overlap Analysis</h2>
+        <p style="font-size:.875rem;color:var(--text-muted);margin-bottom:1rem">Select two or more ETFs to calculate their holdings overlap.</p>
+        <div v-if="etfsLoading" class="loading"><div class="spinner"></div> Loading ETFs...</div>
+        <div v-else>
+          <label class="label">Select ETFs (hold Ctrl/Cmd for multiple)</label>
+          <select class="input" multiple v-model="selectedIds" style="height:160px">
+            <option v-for="e in allEtfs" :key="e.id" :value="e.id">{{ e.ticker }} — {{ e.name }}</option>
+          </select>
+          <div style="margin-top:1rem">
+            <button class="btn btn-primary" @click="runOverlap" :disabled="selectedIds.length < 2 || overlapLoading">
+              {{ overlapLoading ? 'Calculating...' : 'Calculate Overlap' }}
+            </button>
+            <span style="font-size:.8rem;color:var(--text-muted);margin-left:.75rem">{{ selectedIds.length }} selected</span>
           </div>
         </div>
-
-        <h4 style="margin-top: 2rem;">Common Holdings (Top 20)</h4>
-        <div class="holdings-table">
-          <div v-for="(holding, idx) in overlapResult.common_holdings" :key="idx" class="holding-row">
-            <span class="isin">{{ holding.isin }}</span>
-            <span class="weight">{{ holding.etf_a_weight }}% / {{ holding.etf_b_weight }}%</span>
+      </div>
+      <div v-if="overlapError" class="error-box" style="margin-bottom:1rem">{{ overlapError }}</div>
+      <div v-if="overlapResult" class="card">
+        <h3 class="card-title">Overlap Matrix</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>ETF A</th><th>ETF B</th><th>Common Holdings</th><th>Overlap %</th></tr></thead>
+            <tbody>
+              <tr v-for="row in overlapRows" :key="row.key">
+                <td>{{ row.a }}</td><td>{{ row.b }}</td><td>{{ row.common }}</td>
+                <td>
+                  <div style="display:flex;align-items:center;gap:.5rem">
+                    <div class="alloc-track" style="width:80px"><div class="alloc-fill" :style="{width:row.pct+'%'}"></div></div>
+                    <strong>{{ row.pct.toFixed(1) }}%</strong>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div style="margin-top:1rem">
+          <h4 class="card-title" style="font-size:.9rem">Common Holdings</h4>
+          <div v-if="overlapResult.common_holdings?.length" style="display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.5rem">
+            <span v-for="h in overlapResult.common_holdings" :key="h.isin" class="badge">{{ h.isin }}</span>
           </div>
+          <p v-else style="font-size:.875rem;color:var(--text-muted)">No common holdings found.</p>
         </div>
       </div>
     </div>
 
-    <!-- Portfolio Exposure -->
-    <div v-if="selectedAnalytics === 'exposure'" class="panel">
-      <h3>Portfolio Exposure</h3>
-      <p class="description">Analyze sector and country exposure of your portfolio</p>
-
-      <div class="portfolio-builder">
-        <h4>Build Portfolio</h4>
-        <div class="portfolio-input">
-          <input
-            v-model="newETFInput"
-            type="text"
-            placeholder="ETF ID"
-            class="input"
-          >
-          <input
-            v-model.number="newWeightInput"
-            type="number"
-            placeholder="Weight %"
-            min="0"
-            max="100"
-            class="input"
-            style="width: 100px;"
-          >
-          <button @click="addToPortfolio" class="btn btn-primary">Add</button>
+    <!-- EXPOSURE -->
+    <div v-if="activeTab==='exposure'">
+      <div class="card" style="margin-bottom:1.5rem">
+        <h2 class="card-title">Portfolio Exposure</h2>
+        <p style="font-size:.875rem;color:var(--text-muted);margin-bottom:1rem">Define a portfolio (ETF ID + weight%) to analyse sector, country and currency exposure.</p>
+        <div v-for="(item,i) in portfolio" :key="i" style="display:flex;gap:.5rem;margin-bottom:.5rem;align-items:center">
+          <select class="input" v-model="item.etf_id" style="flex:2">
+            <option value="">Select ETF...</option>
+            <option v-for="e in allEtfs" :key="e.id" :value="e.id">{{ e.ticker }} — {{ e.name }}</option>
+          </select>
+          <input class="input" type="number" v-model.number="item.weight" placeholder="Weight %" style="flex:1;max-width:120px" min="0" max="100" />
+          <button class="btn btn-outline" @click="portfolio.splice(i,1)" style="flex-shrink:0">✕</button>
         </div>
-
-        <div v-if="portfolio.length > 0" class="portfolio-list">
-          <h4>Portfolio (Total: {{ portfolioTotal }}%)</h4>
-          <div v-for="(item, idx) in portfolio" :key="idx" class="portfolio-item">
-            <span>{{ item.etf_id.substring(0, 8) }}...</span>
-            <span>{{ item.weight }}%</span>
-            <button @click="removeFromPortfolio(idx)" class="btn-remove">×</button>
-          </div>
+        <div style="display:flex;gap:.75rem;margin-top:.75rem">
+          <button class="btn btn-outline" @click="portfolio.push({etf_id:'',weight:0})">+ Add ETF</button>
+          <button class="btn btn-primary" @click="runExposure" :disabled="exposureLoading || !portfolio.some(p=>p.etf_id)">
+            {{ exposureLoading ? 'Calculating...' : 'Analyse Exposure' }}
+          </button>
         </div>
-
-        <button
-          v-if="portfolio.length > 0"
-          @click="calculateExposure"
-          class="btn btn-primary"
-          style="margin-top: 1rem;"
-        >Calculate Exposure</button>
       </div>
-
-      <div v-if="exposureLoading" class="loading">Calculating exposure...</div>
-
-      <div v-if="exposureResult" class="exposure-result">
-        <div class="exposure-section">
-          <h4>Sector Exposure</h4>
-          <div v-for="(weight, sector) in exposureResult.sectors" :key="sector" class="alloc-item">
-            <span>{{ sector }}</span>
-            <div class="progress-bar">
-              <div class="progress-fill" :style="{ width: weight + '%' }"></div>
+      <div v-if="exposureError" class="error-box" style="margin-bottom:1rem">{{ exposureError }}</div>
+      <div v-if="exposureResult" class="grid-3">
+        <div class="card" v-for="group in exposureGroups" :key="group.label">
+          <h3 class="card-title">{{ group.label }}</h3>
+          <div class="alloc-bars">
+            <div v-for="[k,v] in group.entries" :key="k" class="alloc-row">
+              <span class="alloc-label">{{ k }}</span>
+              <div class="alloc-track"><div class="alloc-fill" :style="{width:Math.min(v,100)+'%'}"></div></div>
+              <span class="alloc-pct">{{ Number(v).toFixed(1) }}%</span>
             </div>
-            <span>{{ weight }}%</span>
-          </div>
-        </div>
-
-        <div class="exposure-section">
-          <h4>Country Exposure</h4>
-          <div v-for="(weight, country) in exposureResult.countries" :key="country" class="alloc-item">
-            <span>{{ country }}</span>
-            <div class="progress-bar">
-              <div class="progress-fill" :style="{ width: weight + '%' }"></div>
-            </div>
-            <span>{{ weight }}%</span>
-          </div>
-        </div>
-
-        <div class="exposure-section">
-          <h4>Currency Exposure</h4>
-          <div v-for="(weight, currency) in exposureResult.currencies" :key="currency" class="alloc-item">
-            <span>{{ currency }}</span>
-            <div class="progress-bar">
-              <div class="progress-fill" :style="{ width: weight + '%' }"></div>
-            </div>
-            <span>{{ weight }}%</span>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Find Similar -->
-    <div v-if="selectedAnalytics === 'similarity'" class="panel">
-      <h3>Find Similar ETFs</h3>
-      <p class="description">Find ETFs with similar holdings</p>
-
-      <div class="form-group">
-        <label>Enter ETF ID:</label>
-        <input
-          v-model="similarETFInput"
-          type="text"
-          placeholder="ETF ID"
-          class="input"
-        >
-        <button @click="findSimilar" class="btn btn-primary">Find</button>
+    <!-- SIMILAR -->
+    <div v-if="activeTab==='similar'">
+      <div class="card" style="margin-bottom:1.5rem">
+        <h2 class="card-title">Find Similar ETFs</h2>
+        <p style="font-size:.875rem;color:var(--text-muted);margin-bottom:1rem">Find ETFs most similar to a reference ETF based on holdings overlap.</p>
+        <label class="label">Reference ETF</label>
+        <select class="input" v-model="similarId" style="max-width:400px">
+          <option value="">Select ETF...</option>
+          <option v-for="e in allEtfs" :key="e.id" :value="e.id">{{ e.ticker }} — {{ e.name }}</option>
+        </select>
+        <div style="margin-top:1rem">
+          <button class="btn btn-primary" @click="runSimilar" :disabled="!similarId||similarLoading">
+            {{ similarLoading ? 'Searching...' : 'Find Similar' }}
+          </button>
+        </div>
       </div>
-
-      <div v-if="similarLoading" class="loading">Finding similar ETFs...</div>
-
-      <div v-if="similarResult" class="similar-list">
-        <h4>Similar ETFs</h4>
-        <div v-for="similar in similarResult.similar_etfs" :key="similar.etf_id" class="similar-item">
-          <div class="similar-header">
-            <strong>{{ similar.ticker }}</strong> ({{ similar.provider }})
+      <div v-if="similarError" class="error-box" style="margin-bottom:1rem">{{ similarError }}</div>
+      <div v-if="similarResult?.similar_etfs?.length" class="etf-grid">
+        <div v-for="s in similarResult.similar_etfs" :key="s.etf_id" class="etf-card">
+          <div class="etf-card-top">
+            <span class="etf-ticker">{{ s.ticker || s.etf_id?.slice(0,8) }}</span>
+            <span class="badge">{{ s.overlap_percentage?.toFixed(1) }}% overlap</span>
           </div>
-          <div class="similar-info">{{ similar.name }}</div>
-          <div class="similarity-score">
-            <span>Similarity Score:</span>
-            <strong>{{ similar.similarity_score }}%</strong>
-          </div>
+          <p class="etf-name">{{ s.name || s.etf_id }}</p>
+          <div class="alloc-track" style="margin-top:.75rem"><div class="alloc-fill" :style="{width:(s.overlap_percentage||0)+'%'}"></div></div>
         </div>
       </div>
     </div>
@@ -185,363 +125,94 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
-import { analyticsService, etfService } from '../services/api.js'
+import { ref, computed, onMounted } from 'vue'
+import { etfService, analyticsService } from '../services/api.js'
 
-const selectedAnalytics = ref('overlap')
+const activeTab = ref('overlap')
+const tabs = [
+  {id:'overlap',label:'Overlap Analysis',icon:'🔗'},
+  {id:'exposure',label:'Portfolio Exposure',icon:'🌍'},
+  {id:'similar',label:'Similar ETFs',icon:'🔍'},
+]
+const allEtfs = ref([])
+const etfsLoading = ref(false)
 
 // Overlap
-const overlapInput = ref('')
+const selectedIds = ref([])
 const overlapLoading = ref(false)
 const overlapResult = ref(null)
-
-// Exposure
-const portfolio = ref([])
-const newETFInput = ref('')
-const newWeightInput = ref(0)
-const exposureLoading = ref(false)
-const exposureResult = ref(null)
-
-// Similarity
-const similarETFInput = ref('')
-const similarLoading = ref(false)
-const similarResult = ref(null)
-
-const portfolioTotal = computed(() => {
-  return portfolio.value.reduce((sum, item) => sum + item.weight, 0)
+const overlapError = ref('')
+const overlapRows = computed(() => {
+  if (!overlapResult.value?.matrix) return []
+  const rows = []
+  const m = overlapResult.value.matrix
+  const ids = Object.keys(m)
+  for (let i=0;i<ids.length;i++) for (let j=i+1;j<ids.length;j++) {
+    const a=ids[i],b=ids[j]
+    const ea=allEtfs.value.find(e=>e.id===a),eb=allEtfs.value.find(e=>e.id===b)
+    rows.push({key:a+b,a:ea?.ticker||a.slice(0,8),b:eb?.ticker||b.slice(0,8),common:m[a]?.[b]?.common_count||0,pct:m[a]?.[b]?.overlap_percentage||0})
+  }
+  return rows
 })
 
-const calculateOverlap = async () => {
-  const etfIds = overlapInput.value
-    .split(',')
-    .map(id => id.trim())
-    .filter(id => id.length > 0)
+// Exposure
+const portfolio = ref([{etf_id:'',weight:50},{etf_id:'',weight:50}])
+const exposureLoading = ref(false)
+const exposureResult = ref(null)
+const exposureError = ref('')
+const exposureGroups = computed(() => {
+  if (!exposureResult.value) return []
+  const r = exposureResult.value
+  return [
+    {label:'Sectors',entries:Object.entries(r.sectors||{}).sort((a,b)=>b[1]-a[1]).slice(0,8)},
+    {label:'Countries',entries:Object.entries(r.countries||{}).sort((a,b)=>b[1]-a[1]).slice(0,8)},
+    {label:'Currencies',entries:Object.entries(r.currencies||{}).sort((a,b)=>b[1]-a[1])},
+  ].filter(g=>g.entries.length)
+})
 
-  if (etfIds.length < 2) {
-    alert('Please enter at least 2 ETF IDs')
-    return
-  }
+// Similar
+const similarId = ref('')
+const similarLoading = ref(false)
+const similarResult = ref(null)
+const similarError = ref('')
 
-  overlapLoading.value = true
-  try {
-    const response = await analyticsService.calculateOverlap(etfIds)
-    overlapResult.value = response.data
-  } catch (error) {
-    alert(error.response?.data?.detail || error.message)
-  } finally {
-    overlapLoading.value = false
-  }
+async function loadETFs() {
+  etfsLoading.value=true
+  try { const r=await etfService.getETFs(0,50); allEtfs.value=r.data } catch(e){console.error(e)} finally{etfsLoading.value=false}
 }
-
-const addToPortfolio = () => {
-  if (!newETFInput.value || newWeightInput.value <= 0) {
-    alert('Enter valid ETF ID and weight')
-    return
-  }
-
-  portfolio.value.push({
-    etf_id: newETFInput.value,
-    weight: newWeightInput.value
-  })
-
-  newETFInput.value = ''
-  newWeightInput.value = 0
+async function runOverlap() {
+  overlapLoading.value=true; overlapError.value=''; overlapResult.value=null
+  try { const r=await analyticsService.calculateOverlap(selectedIds.value); overlapResult.value=r.data }
+  catch(e){overlapError.value=e.response?.data?.detail||e.message} finally{overlapLoading.value=false}
 }
-
-const removeFromPortfolio = (idx) => {
-  portfolio.value.splice(idx, 1)
+async function runExposure() {
+  exposureLoading.value=true; exposureError.value=''; exposureResult.value=null
+  const p=portfolio.value.filter(x=>x.etf_id)
+  try { const r=await analyticsService.calculateExposure(p); exposureResult.value=r.data }
+  catch(e){exposureError.value=e.response?.data?.detail||e.message} finally{exposureLoading.value=false}
 }
-
-const calculateExposure = async () => {
-  exposureLoading.value = true
-  try {
-    const response = await analyticsService.calculateExposure(portfolio.value)
-    exposureResult.value = response.data
-  } catch (error) {
-    alert(error.response?.data?.detail || error.message)
-  } finally {
-    exposureLoading.value = false
-  }
+async function runSimilar() {
+  similarLoading.value=true; similarError.value=''; similarResult.value=null
+  try { const r=await analyticsService.findSimilar(similarId.value); similarResult.value=r.data }
+  catch(e){similarError.value=e.response?.data?.detail||e.message} finally{similarLoading.value=false}
 }
-
-const findSimilar = async () => {
-  if (!similarETFInput.value) {
-    alert('Enter an ETF ID')
-    return
-  }
-
-  similarLoading.value = true
-  try {
-    const response = await analyticsService.findSimilar(similarETFInput.value)
-    similarResult.value = response.data
-  } catch (error) {
-    alert(error.response?.data?.detail || error.message)
-  } finally {
-    similarLoading.value = false
-  }
-}
+onMounted(loadETFs)
 </script>
 
 <style scoped>
-.analytics {
-  background: white;
-  border-radius: 8px;
-  padding: 2rem;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-h2 {
-  margin-bottom: 1.5rem;
-}
-
-.tabs-main {
-  display: flex;
-  gap: 1rem;
-  margin-bottom: 2rem;
-  border-bottom: 2px solid #ddd;
-}
-
-.tab-btn-main {
-  background: none;
-  border: none;
-  padding: 0.75rem 1.5rem;
-  cursor: pointer;
-  border-bottom: 3px solid transparent;
-  color: #666;
-  font-weight: 500;
-  transition: all 0.3s;
-}
-
-.tab-btn-main.active {
-  color: #667eea;
-  border-bottom-color: #667eea;
-}
-
-.panel {
-  animation: slideIn 0.3s ease-in-out;
-}
-
-@keyframes slideIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.description {
-  color: #666;
-  margin: 0.5rem 0 1.5rem 0;
-}
-
-.form-group {
-  margin-bottom: 1.5rem;
-}
-
-label {
-  display: block;
-  margin-bottom: 0.5rem;
-  font-weight: 600;
-}
-
-.input {
-  width: 100%;
-  padding: 0.75rem;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 1rem;
-  font-family: monospace;
-}
-
-.btn {
-  padding: 0.75rem 1.5rem;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 1rem;
-  transition: background-color 0.3s;
-}
-
-.btn-primary {
-  background: #667eea;
-  color: white;
-}
-
-.btn-primary:hover {
-  background: #5568d3;
-}
-
-.btn-remove {
-  background: none;
-  border: none;
-  color: #d32f2f;
-  font-size: 1.5rem;
-  cursor: pointer;
-  padding: 0;
-}
-
-.loading {
-  text-align: center;
-  padding: 1rem;
-  color: #667eea;
-  font-weight: bold;
-}
-
-h4 {
-  margin-top: 1.5rem;
-  margin-bottom: 1rem;
-}
-
-.matrix-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 1rem;
-  margin-bottom: 1rem;
-}
-
-.matrix-item {
-  background: #f9f9f9;
-  padding: 1rem;
-  border-radius: 4px;
-  border-left: 4px solid #667eea;
-}
-
-.matrix-header {
-  font-weight: 600;
-  margin-bottom: 0.75rem;
-  color: #667eea;
-}
-
-.matrix-stat {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 0.5rem;
-  font-size: 0.95rem;
-}
-
-.holdings-table {
-  display: grid;
-  gap: 0.5rem;
-  max-height: 300px;
-  overflow-y: auto;
-}
-
-.holding-row {
-  display: flex;
-  justify-content: space-between;
-  padding: 0.75rem;
-  background: #f5f5f5;
-  border-radius: 4px;
-  font-size: 0.9rem;
-}
-
-.isin {
-  font-family: monospace;
-  font-weight: 500;
-}
-
-.weight {
-  color: #667eea;
-  font-weight: 600;
-}
-
-.portfolio-builder {
-  background: #f9f9f9;
-  padding: 1rem;
-  border-radius: 4px;
-  margin-bottom: 1rem;
-}
-
-.portfolio-input {
-  display: flex;
-  gap: 0.5rem;
-  margin-bottom: 1rem;
-}
-
-.portfolio-input .input {
-  flex: 1;
-}
-
-.portfolio-list {
-  margin-top: 1rem;
-}
-
-.portfolio-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0.75rem;
-  background: white;
-  border-radius: 4px;
-  margin-bottom: 0.5rem;
-  font-family: monospace;
-}
-
-.exposure-result {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 2rem;
-}
-
-.exposure-section {
-  background: #f9f9f9;
-  padding: 1rem;
-  border-radius: 4px;
-}
-
-.alloc-item {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  margin-bottom: 1rem;
-}
-
-.alloc-item > span:first-child {
-  min-width: 80px;
-}
-
-.progress-bar {
-  flex: 1;
-  height: 24px;
-  background: #e0e0e0;
-  border-radius: 4px;
-  overflow: hidden;
-}
-
-.progress-fill {
-  height: 100%;
-  background: linear-gradient(90deg, #667eea, #764ba2);
-}
-
-.similar-list {
-  display: grid;
-  gap: 1rem;
-}
-
-.similar-item {
-  background: #f9f9f9;
-  padding: 1rem;
-  border-radius: 4px;
-  border-left: 4px solid #667eea;
-}
-
-.similar-header {
-  margin-bottom: 0.5rem;
-}
-
-.similar-info {
-  color: #666;
-  font-size: 0.95rem;
-  margin-bottom: 0.5rem;
-}
-
-.similarity-score {
-  display: flex;
-  justify-content: space-between;
-  font-weight: 600;
-  color: #667eea;
-}
+.ana-tabs{display:flex;gap:.5rem;margin-bottom:1.5rem;flex-wrap:wrap}
+.ana-tab{background:none;border:1px solid var(--border);cursor:pointer;padding:.5rem 1.1rem;border-radius:8px;font-size:.875rem;font-weight:500;color:var(--text-muted);transition:all .15s;display:flex;align-items:center;gap:.35rem;font-family:inherit}
+.ana-tab:hover{border-color:var(--green-400);color:var(--green-700);background:var(--bg-3)}
+.ana-tab.active{background:var(--green-500);border-color:var(--green-500);color:#fff}
+.etf-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:1rem}
+.etf-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1.25rem;box-shadow:var(--shadow)}
+.etf-card-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem}
+.etf-ticker{font-size:1rem;font-weight:700;color:var(--green-600)}
+.etf-name{font-size:.875rem;color:var(--text-muted)}
+.alloc-bars{display:flex;flex-direction:column;gap:.5rem}
+.alloc-row{display:flex;align-items:center;gap:.75rem}
+.alloc-label{width:100px;font-size:.8rem;color:var(--text-2);flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.alloc-track{flex:1;height:8px;background:var(--border);border-radius:4px;overflow:hidden}
+.alloc-fill{height:100%;background:var(--green-500);border-radius:4px;transition:width .4s}
+.alloc-pct{width:45px;text-align:right;font-size:.8rem;font-weight:600;color:var(--text)}
 </style>
