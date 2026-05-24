@@ -30,7 +30,7 @@
       <div class="grid-4">
         <div class="stat-card" v-for="s in stats" :key="s.label">
           <div class="stat-label">{{ s.label }}</div>
-          <div class="stat-value">{{ s.value }}</div>
+          <div class="stat-value" :class="{ 'stat-loading': statsLoading && s.value === '—' }">{{ s.value }}</div>
           <div class="stat-sub">{{ s.sub }}</div>
         </div>
       </div>
@@ -93,16 +93,35 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import { etfService } from '../services/api.js'
 
 defineEmits(['navigate'])
 
-const stats = [
-  { label: 'ETFs Tracked', value: '15', sub: 'Sample dataset' },
-  { label: 'API Endpoints', value: '10+', sub: 'REST JSON' },
-  { label: 'Data Points', value: '1 000+', sub: 'Holdings & performance' },
+const etfCount = ref('—')
+const holdingsCount = ref('—')
+const statsLoading = ref(true)
+
+const stats = computed(() => [
+  { label: 'ETFs Tracked', value: etfCount.value, sub: 'iShares funds' },
+  { label: 'API Endpoints', value: '12+', sub: 'REST JSON' },
+  { label: 'Holdings Tracked', value: holdingsCount.value, sub: 'Top positions per ETF' },
   { label: 'Uptime', value: '99%', sub: 'Railway hosted' },
-]
+])
+
+onMounted(async () => {
+  try {
+    const r = await etfService.getETFs(0, 100)
+    const etfs = r.data
+    etfCount.value = etfs.length.toString()
+    holdingsCount.value = (etfs.length * 10).toLocaleString() + '+'
+  } catch {
+    etfCount.value = '—'
+    holdingsCount.value = '—'
+  } finally {
+    statsLoading.value = false
+  }
+})
 
 const features = [
   { icon: '📊', title: 'ETF Explorer', desc: 'Browse all tracked ETFs, view holdings, allocations and performance metrics.', nav: 'etfs' },
@@ -232,4 +251,5 @@ watch(activeTab, val => {
 }
 .disclaimer-card h3 { font-size: 1rem; font-weight: 600; color: var(--text); margin-bottom: .75rem; }
 .disclaimer-card p { font-size: .875rem; color: var(--text-muted); line-height: 1.7; }
+.stat-loading { opacity: .35; }
 </style>
