@@ -12,12 +12,10 @@ SECTORS = [
 ]
 COUNTRIES = ["US", "DE", "FR", "GB", "JP", "CH", "NL", "SE", "CA", "AU"]
 
-ISINS = [
-    "IE00B4L5Y983", "IE00B0M63284", "IE00BJ0KDQ92",
-    "IE00B8GKDB10", "IE00BK1PV551", "IE00BHBXQ580",
-    "IE00BOXW3913", "IE00B1FZS798", "IE00BX5RQT88",
-    "IE00B0M6HP67", "IE00BD3QHZ91", "IE00BMDBMM74",
-    "IE00B1BNRP29", "IE00BFXNM860", "IE00B579F325"
+# Shared pool of 60 stocks — ETFs pick subsets so overlap is guaranteed
+STOCK_POOL = [
+    {"isin": f"US{str(i).zfill(10)}", "name": f"Stock {i}", "country": COUNTRIES[i % len(COUNTRIES)], "sector": SECTORS[i % len(SECTORS)]}
+    for i in range(1, 61)
 ]
 
 
@@ -35,8 +33,15 @@ def seed_database(db: Session) -> dict:
 
 
 def _generate_etfs(db: Session) -> int:
+    isins = [
+        "IE00B4L5Y983", "IE00B0M63284", "IE00BJ0KDQ92",
+        "IE00B8GKDB10", "IE00BK1PV551", "IE00BHBXQ580",
+        "IE00BOXW3913", "IE00B1FZS798", "IE00BX5RQT88",
+        "IE00B0M6HP67", "IE00BD3QHZ91", "IE00BMDBMM74",
+        "IE00B1BNRP29", "IE00BFXNM860", "IE00B579F325"
+    ]
     created = 0
-    for i, isin in enumerate(ISINS):
+    for i, isin in enumerate(isins):
         if db.query(ETF).filter(ETF.isin == isin).first():
             continue
         provider = random.choice(PROVIDERS)
@@ -65,16 +70,18 @@ def _generate_holdings(db: Session) -> int:
     for etf in db.query(ETF).all():
         if db.query(Holding).filter(Holding.etf_id == etf.id, Holding.date == today).first():
             continue
-        for j in range(random.randint(20, 50)):
+        # Each ETF holds a random subset of 30 stocks from the shared pool of 60
+        selected = random.sample(STOCK_POOL, 30)
+        for stock in selected:
             db.add(Holding(
                 id=uuid4(),
                 etf_id=etf.id,
                 date=today,
-                instrument_isin=f"DE000{random.randint(100000, 999999)}",
-                instrument_name=f"Stock {j + 1}",
-                weight=Decimal(str(round(random.uniform(0.1, 15), 2))),
-                country=random.choice(COUNTRIES),
-                sector=random.choice(SECTORS),
+                instrument_isin=stock["isin"],
+                instrument_name=stock["name"],
+                weight=Decimal(str(round(random.uniform(0.5, 10), 2))),
+                country=stock["country"],
+                sector=stock["sector"],
             ))
             created += 1
     db.commit()
