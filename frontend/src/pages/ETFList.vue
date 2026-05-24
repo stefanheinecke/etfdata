@@ -9,29 +9,72 @@
     </div>
     <div class="card" style="margin-bottom:1.5rem">
       <div class="filters">
-        <div><label class="label">Provider</label>
-          <select class="input" v-model="filterProvider" @change="loadETFs">
-            <option value="">All providers</option>
-            <option v-for="p in providers" :key="p" :value="p">{{ p }}</option>
+        <div>
+          <label class="label">Search</label>
+          <input class="input" v-model="search" placeholder="Ticker or name…" />
+        </div>
+        <div>
+          <label class="label">Provider</label>
+          <select class="input" v-model="filterProvider">
+            <option value="">All</option>
+            <option v-for="p in filterOptions.providers" :key="p" :value="p">{{ p }}</option>
           </select>
         </div>
-        <div><label class="label">Limit</label>
-          <select class="input" v-model="limit" @change="loadETFs">
-            <option :value="10">10</option><option :value="25">25</option><option :value="50">50</option>
+        <div>
+          <label class="label">Domicile</label>
+          <select class="input" v-model="filterDomicile">
+            <option value="">All</option>
+            <option v-for="d in filterOptions.domiciles" :key="d" :value="d">{{ d }}</option>
           </select>
         </div>
-        <div style="display:flex;align-items:flex-end">
+        <div>
+          <label class="label">Currency</label>
+          <select class="input" v-model="filterCurrency">
+            <option value="">All</option>
+            <option v-for="c in filterOptions.currencies" :key="c" :value="c">{{ c }}</option>
+          </select>
+        </div>
+        <div>
+          <label class="label">Replication</label>
+          <select class="input" v-model="filterReplication">
+            <option value="">All</option>
+            <option v-for="r in filterOptions.replications" :key="r" :value="r">{{ r }}</option>
+          </select>
+        </div>
+        <div>
+          <label class="label">Sort by</label>
+          <div style="display:flex;gap:.35rem">
+            <select class="input" v-model="sortKey" style="flex:1">
+              <option value="ticker">Ticker</option>
+              <option value="name">Name</option>
+              <option value="ter">TER</option>
+              <option value="fund_size">Fund Size</option>
+              <option value="domicile">Domicile</option>
+              <option value="currency">Currency</option>
+              <option value="replication_method">Replication</option>
+              <option value="benchmark">Benchmark</option>
+            </select>
+            <button class="btn btn-outline sort-dir-btn" @click="sortDir = sortDir === 'asc' ? 'desc' : 'asc'" :title="sortDir === 'asc' ? 'Ascending' : 'Descending'">
+              {{ sortDir === 'asc' ? '↑' : '↓' }}
+            </button>
+          </div>
+        </div>
+        <div style="display:flex;align-items:flex-end;gap:.5rem">
           <button class="btn btn-primary" @click="loadETFs" :disabled="loading">
             <span v-if="loading" class="spinner" style="width:14px;height:14px;border-width:2px"></span>
-            {{ loading ? 'Loading...' : 'Refresh' }}
+            {{ loading ? 'Loading…' : 'Refresh' }}
           </button>
+          <button class="btn btn-outline" @click="resetFilters" title="Clear filters">✕</button>
         </div>
+      </div>
+      <div v-if="filteredETFs.length !== allETFs.length" style="margin-top:.75rem;font-size:.8rem;color:var(--text-muted)">
+        Showing {{ filteredETFs.length }} of {{ allETFs.length }} ETFs
       </div>
     </div>
     <div v-if="error" class="error-box" style="margin-bottom:1.5rem">{{ error }}</div>
     <div v-if="loading" class="loading"><div class="spinner"></div> Loading ETFs...</div>
-    <div v-else-if="etfs.length" class="etf-grid">
-      <div v-for="etf in etfs" :key="etf.id" class="etf-card" @click="openETF(etf)">
+    <div v-else-if="filteredETFs.length" class="etf-grid">
+      <div v-for="etf in filteredETFs" :key="etf.id" class="etf-card" @click="openETF(etf)">
         <div class="etf-card-top">
           <div><span class="etf-ticker">{{ etf.ticker }}</span><span class="badge" style="margin-left:.5rem">{{ etf.provider }}</span></div>
           <span class="etf-ter">TER {{ etf.ter }}%</span>
@@ -106,18 +149,71 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { etfService } from '../services/api.js'
-const etfs = ref([])
+
+const allETFs = ref([])
 const loading = ref(false)
 const error = ref('')
-const filterProvider = ref('')
-const limit = ref(50)
-const providers = ['Vanguard', 'iShares', 'UBS']
 const apiKey = ref(localStorage.getItem('api_key') || '')
+
+// Filters
+const search = ref('')
+const filterProvider = ref('')
+const filterDomicile = ref('')
+const filterCurrency = ref('')
+const filterReplication = ref('')
+
+// Sort
+const sortKey = ref('ticker')
+const sortDir = ref('asc')
+
+// Derive unique filter option lists from loaded data
+const filterOptions = computed(() => {
+  const uniq = (arr) => [...new Set(arr.filter(Boolean))].sort()
+  return {
+    providers:    uniq(allETFs.value.map(e => e.provider)),
+    domiciles:    uniq(allETFs.value.map(e => e.domicile)),
+    currencies:   uniq(allETFs.value.map(e => e.currency)),
+    replications: uniq(allETFs.value.map(e => e.replication_method)),
+  }
+})
+
+const filteredETFs = computed(() => {
+  let list = allETFs.value
+
+  const q = search.value.trim().toLowerCase()
+  if (q) list = list.filter(e => e.ticker?.toLowerCase().includes(q) || e.name?.toLowerCase().includes(q))
+  if (filterProvider.value)    list = list.filter(e => e.provider === filterProvider.value)
+  if (filterDomicile.value)    list = list.filter(e => e.domicile === filterDomicile.value)
+  if (filterCurrency.value)    list = list.filter(e => e.currency === filterCurrency.value)
+  if (filterReplication.value) list = list.filter(e => e.replication_method === filterReplication.value)
+
+  const key = sortKey.value
+  const dir = sortDir.value === 'asc' ? 1 : -1
+  return [...list].sort((a, b) => {
+    const av = a[key] ?? ''
+    const bv = b[key] ?? ''
+    if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * dir
+    return String(av).localeCompare(String(bv)) * dir
+  })
+})
+
+function resetFilters() {
+  search.value = ''
+  filterProvider.value = ''
+  filterDomicile.value = ''
+  filterCurrency.value = ''
+  filterReplication.value = ''
+  sortKey.value = 'ticker'
+  sortDir.value = 'asc'
+}
+
+// Modal
 const selectedETF = ref(null)
 const detailTab = ref('Overview')
 const detailLoading = ref(false)
 const holdings = ref([])
 const allocations = ref([])
+
 const etfStats = computed(() => {
   const e = selectedETF.value; if (!e) return []
   return [
@@ -133,32 +229,43 @@ const allocationGroups = computed(() => {
   allocations.value.forEach(a => { if (!map[a.type]) map[a.type]=[]; map[a.type].push(a) })
   return Object.entries(map).map(([type,items]) => ({type,items:items.sort((a,b)=>b.weight-a.weight)}))
 })
+
 function formatSize(n) {
   if (n>=1e9) return (n/1e9).toFixed(1)+'B'
   if (n>=1e6) return (n/1e6).toFixed(0)+'M'
   return n.toLocaleString()
 }
+
 async function loadETFs() {
   loading.value=true; error.value=''
-  try { const r=await etfService.getETFs(0,limit.value,filterProvider.value||null); etfs.value=r.data }
-  catch(e) { error.value=e.response?.data?.detail||e.message }
-  finally { loading.value=false }
+  try {
+    const r = await etfService.getETFs(0, 100)
+    allETFs.value = r.data
+  } catch(e) {
+    error.value = e.response?.data?.detail || e.message
+  } finally {
+    loading.value = false
+  }
 }
+
 function openETF(etf) { selectedETF.value=etf; detailTab.value='Overview'; holdings.value=[]; allocations.value=[] }
+
 async function loadDetail(tab) {
-  if (!selectedETF.value||tab==='Overview') return
+  if (!selectedETF.value || tab==='Overview') return
   detailLoading.value=true
   try {
     if (tab==='Holdings') { const r=await etfService.getHoldings(selectedETF.value.id); holdings.value=r.data }
     else if (tab==='Allocations') { const r=await etfService.getAllocations(selectedETF.value.id); allocations.value=r.data }
   } catch(e){console.error(e)} finally{detailLoading.value=false}
 }
+
 onMounted(loadETFs)
 </script>
 
 <style scoped>
 .filters{display:flex;gap:1rem;flex-wrap:wrap;align-items:flex-end}
-.filters>div{flex:1;min-width:140px}
+.filters>div{flex:1;min-width:150px}
+.sort-dir-btn{padding:.45rem .65rem;font-size:1rem;line-height:1;flex-shrink:0}
 .etf-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1rem}
 .etf-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1.25rem;cursor:pointer;transition:all .2s;box-shadow:var(--shadow)}
 .etf-card:hover{border-color:var(--green-400);box-shadow:var(--shadow-md);transform:translateY(-2px)}
