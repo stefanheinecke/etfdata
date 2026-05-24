@@ -7,6 +7,7 @@ the Yahoo Finance funds API, which is publicly accessible.
 """
 
 import logging
+import time
 from datetime import date
 from typing import Optional
 
@@ -128,7 +129,9 @@ def import_ishares(db: Session, tickers: Optional[list[str]] = None) -> dict:
     as_of = date.today()
     results = []
 
-    for meta in targets:
+    for i, meta in enumerate(targets):
+        if i > 0:
+            time.sleep(2)  # avoid Yahoo Finance rate limiting
         result: dict = {
             "ticker": meta["ticker"],
             "status": "ok",
@@ -138,8 +141,21 @@ def import_ishares(db: Session, tickers: Optional[list[str]] = None) -> dict:
         }
         try:
             logger.info("Fetching yfinance data for %s (%s) ...", meta["ticker"], meta["yf_symbol"])
-            yf_ticker = yf.Ticker(meta["yf_symbol"])
-            funds = yf_ticker.funds_data
+            # Retry up to 3 times with exponential backoff on rate-limit errors
+            funds = None
+            for attempt in range(3):
+                try:
+                    funds = yf.Ticker(meta["yf_symbol"]).funds_data
+                    break
+                except Exception as e:
+                    if "rate" in str(e).lower() or "429" in str(e) or "too many" in str(e).lower():
+                        wait = 10 * (2 ** attempt)
+                        logger.warning("Rate limited on %s, retrying in %ds …", meta["ticker"], wait)
+                        time.sleep(wait)
+                    else:
+                        raise
+            if funds is None:
+                raise RuntimeError("Failed to fetch data after 3 attempts (rate limited)")
 
             # Holdings
             top_h = funds.top_holdings  # DataFrame: index=Symbol, cols=[Name, Holding Percent]
