@@ -3,7 +3,7 @@
   "build": {
     "builder": "DOCKERFILE",
     "dockerfilePath": "backend/Dockerfile",
-    "dockerContextDir": "backend"
+    "dockerContextDir": "."
   },
   "deploy": {
     "startCommand": "/app/start.sh",
