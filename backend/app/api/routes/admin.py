@@ -17,6 +17,13 @@ def verify_admin_secret(x_admin_secret: str = Header(None)):
         raise HTTPException(status_code=403, detail="Invalid admin secret")
 
 
+@router.post("/init-db")
+def init_db_endpoint(_: None = Depends(verify_admin_secret)):
+    from app.db.database import init_db
+    init_db()
+    return {"status": "ok", "message": "Database tables created"}
+
+
 @router.post("/api-keys")
 def create_key(
     name: str,
