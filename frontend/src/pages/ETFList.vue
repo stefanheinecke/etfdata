@@ -103,7 +103,7 @@
         </div>
         <div class="modal-tabs">
           <button v-for="t in ['Overview','Holdings','Allocations','Performance']" :key="t"
-            :class="['code-tab',{active:detailTab===t}]" @click="detailTab=t;loadDetail(t)">{{ t }}</button>
+            :class="['modal-tab',{active:detailTab===t}]" @click="detailTab=t;loadDetail(t)">{{ t }}</button>
         </div>
         <div v-if="detailTab==='Overview'" class="grid-4" style="margin-top:1rem">
           <div class="stat-card" v-for="s in etfStats" :key="s.label">
@@ -359,7 +359,10 @@ onMounted(loadETFs)
 .modal-title{font-size:1.2rem;font-weight:700;color:var(--text)}
 .modal-close{background:none;border:none;font-size:1.2rem;cursor:pointer;color:var(--text-muted);padding:.25rem .5rem;border-radius:6px;transition:all .15s}
 .modal-close:hover{background:var(--bg-3);color:var(--text)}
-.modal-tabs{display:flex;gap:.25rem;padding-bottom:1rem;border-bottom:1px solid var(--border)}
+.modal-tabs{display:flex;gap:.25rem;border-bottom:2px solid var(--border);margin-bottom:1.25rem}
+.modal-tab{background:none;border:none;border-bottom:2px solid transparent;margin-bottom:-2px;cursor:pointer;padding:.55rem 1.1rem;font-size:.875rem;font-weight:500;color:var(--text-muted);border-radius:6px 6px 0 0;transition:color .15s,border-color .15s,background .15s;font-family:inherit}
+.modal-tab:hover{color:var(--text);background:var(--bg-2)}
+.modal-tab.active{color:var(--green-600);border-bottom-color:var(--green-500);font-weight:600}
 .alloc-bars{display:flex;flex-direction:column;gap:.5rem}
 .alloc-row{display:flex;align-items:center;gap:.75rem}
 .alloc-label{width:120px;font-size:.8rem;color:var(--text-2);flex-shrink:0}
