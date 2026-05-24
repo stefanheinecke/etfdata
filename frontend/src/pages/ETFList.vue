@@ -102,7 +102,7 @@
           <button class="modal-close" @click="selectedETF = null">X</button>
         </div>
         <div class="modal-tabs">
-          <button v-for="t in ['Overview','Holdings','Allocations']" :key="t"
+          <button v-for="t in ['Overview','Holdings','Allocations','Performance']" :key="t"
             :class="['code-tab',{active:detailTab===t}]" @click="detailTab=t;loadDetail(t)">{{ t }}</button>
         </div>
         <div v-if="detailTab==='Overview'" class="grid-4" style="margin-top:1rem">
@@ -141,13 +141,29 @@
           </div>
           <div v-else class="empty-state"><p>No allocation data available.</p></div>
         </div>
+        <div v-if="detailTab==='Performance'">
+          <div v-if="detailLoading" class="loading"><div class="spinner"></div> Loading...</div>
+          <div v-else-if="performance.length">
+            <div class="perf-kpi" style="margin-top:1rem">
+              <div class="perf-stat" v-for="s in perfStats" :key="s.label">
+                <div class="stat-label">{{ s.label }}</div>
+                <div class="stat-value" style="font-size:1.1rem" :style="{color:s.color}">{{ s.value }}</div>
+              </div>
+            </div>
+            <div style="margin-top:1.25rem;position:relative;height:220px">
+              <canvas ref="chartCanvas"></canvas>
+            </div>
+          </div>
+          <div v-else class="empty-state"><p>No performance data. Re-run the import to fetch 1-year price history.</p></div>
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
+import { Chart } from 'chart.js/auto'
 import { etfService } from '../services/api.js'
 
 const allETFs = ref([])
@@ -213,6 +229,9 @@ const detailTab = ref('Overview')
 const detailLoading = ref(false)
 const holdings = ref([])
 const allocations = ref([])
+const performance = ref([])
+const chartCanvas = ref(null)
+let chartInstance = null
 
 const etfStats = computed(() => {
   const e = selectedETF.value; if (!e) return []
@@ -229,6 +248,56 @@ const allocationGroups = computed(() => {
   allocations.value.forEach(a => { if (!map[a.type]) map[a.type]=[]; map[a.type].push(a) })
   return Object.entries(map).map(([type,items]) => ({type,items:items.sort((a,b)=>b.weight-a.weight)}))
 })
+
+const perfStats = computed(() => {
+  const data = performance.value
+  if (!data.length) return []
+  const last = data[data.length - 1]
+  const current = parseFloat(last.close_price)
+  function pctReturn(daysAgo) {
+    const cutoff = new Date(last.date)
+    cutoff.setDate(cutoff.getDate() - daysAgo)
+    const cutoffStr = cutoff.toISOString().slice(0, 10)
+    const entry = [...data].reverse().find(p => p.date <= cutoffStr)
+    if (!entry) return null
+    const base = parseFloat(entry.close_price)
+    return ((current - base) / base * 100).toFixed(2)
+  }
+  const fmt = v => v !== null ? `${parseFloat(v) >= 0 ? '+' : ''}${v}%` : '—'
+  const clr = v => v !== null ? (parseFloat(v) >= 0 ? 'var(--green-600)' : '#ef4444') : ''
+  const [m1,m3,m6,y1] = [30,90,180,365].map(pctReturn)
+  return [
+    { label: 'Current Price', value: `${current.toFixed(2)} ${last.currency}`, color: 'var(--text)' },
+    { label: '1 Month',  value: fmt(m1), color: clr(m1) },
+    { label: '3 Months', value: fmt(m3), color: clr(m3) },
+    { label: '6 Months', value: fmt(m6), color: clr(m6) },
+    { label: '1 Year',   value: fmt(y1), color: clr(y1) },
+  ]
+})
+
+async function renderChart() {
+  await nextTick()
+  if (!chartCanvas.value || !performance.value.length) return
+  if (chartInstance) { chartInstance.destroy(); chartInstance = null }
+  const labels = performance.value.map(p => p.date)
+  const prices = performance.value.map(p => parseFloat(p.close_price))
+  chartInstance = new Chart(chartCanvas.value, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{ data: prices, borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,0.08)',
+        fill: true, tension: 0.3, pointRadius: 0, borderWidth: 2 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { maxTicksLimit: 8, font: { size: 11 } }, grid: { display: false } },
+        y: { ticks: { font: { size: 11 } } }
+      }
+    }
+  })
+}
 
 function formatSize(n) {
   if (n>=1e9) return (n/1e9).toFixed(1)+'B'
@@ -248,7 +317,11 @@ async function loadETFs() {
   }
 }
 
-function openETF(etf) { selectedETF.value=etf; detailTab.value='Overview'; holdings.value=[]; allocations.value=[] }
+function openETF(etf) {
+  selectedETF.value=etf; detailTab.value='Overview'
+  holdings.value=[]; allocations.value=[]; performance.value=[]
+  if (chartInstance) { chartInstance.destroy(); chartInstance = null }
+}
 
 async function loadDetail(tab) {
   if (!selectedETF.value || tab==='Overview') return
@@ -256,6 +329,10 @@ async function loadDetail(tab) {
   try {
     if (tab==='Holdings') { const r=await etfService.getHoldings(selectedETF.value.id); holdings.value=r.data }
     else if (tab==='Allocations') { const r=await etfService.getAllocations(selectedETF.value.id); allocations.value=r.data }
+    else if (tab==='Performance') {
+      const r=await etfService.getPerformance(selectedETF.value.id); performance.value=r.data
+      renderChart()
+    }
   } catch(e){console.error(e)} finally{detailLoading.value=false}
 }
 
@@ -289,4 +366,6 @@ onMounted(loadETFs)
 .alloc-track{flex:1;height:8px;background:var(--border);border-radius:4px;overflow:hidden}
 .alloc-fill{height:100%;background:var(--green-500);border-radius:4px;transition:width .4s}
 .alloc-pct{width:45px;text-align:right;font-size:.8rem;font-weight:600;color:var(--text)}
+.perf-kpi{display:flex;gap:.75rem;flex-wrap:wrap}
+.perf-stat{flex:1;min-width:110px;background:var(--bg-2);border:1px solid var(--border);border-radius:var(--radius);padding:.65rem 1rem}
 </style>

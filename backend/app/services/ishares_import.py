@@ -14,7 +14,7 @@ from typing import Optional
 import yfinance as yf
 from sqlalchemy.orm import Session
 
-from app.schemas import ETF, Holding, Allocation
+from app.schemas import ETF, Holding, Allocation, Performance
 
 logger = logging.getLogger(__name__)
 
@@ -135,15 +135,55 @@ def _upsert_holdings(etf: ETF, holdings: list[dict], as_of: date, db: Session) -
     return len(holdings)
 
 
-def _upsert_allocations(etf: ETF, sector_weights: dict[str, float], as_of: date, db: Session) -> int:
+def _upsert_allocations(
+    etf: ETF,
+    sector_weights: dict[str, float],
+    holdings_data: list[dict],
+    as_of: date,
+    db: Session,
+) -> int:
     db.query(Allocation).filter_by(etf_id=etf.id, date=as_of).delete()
     count = 0
+
+    # Sector allocations from yfinance funds_data
     for raw_key, weight in sector_weights.items():
         bucket = _SECTOR_NAMES.get(raw_key, raw_key.replace("_", " ").title())
         pct = round(float(weight) * 100, 4)
         if pct > 0:
             db.add(Allocation(etf_id=etf.id, date=as_of, type="sector", bucket=bucket, weight=pct))
             count += 1
+
+    # Country allocations derived from top-10 holdings
+    country_totals: dict[str, float] = {}
+    for h in holdings_data:
+        c = h.get("country") or ""
+        if c:
+            country_totals[c] = country_totals.get(c, 0.0) + float(h["weight"])
+    for country, weight in country_totals.items():
+        if weight > 0:
+            db.add(Allocation(etf_id=etf.id, date=as_of, type="country", bucket=country, weight=round(weight, 4)))
+            count += 1
+
+    return count
+
+
+def _upsert_performance(etf: ETF, ticker_obj: "yf.Ticker", db: Session) -> int:
+    hist = ticker_obj.history(period="1y")
+    if hist is None or hist.empty:
+        return 0
+    db.query(Performance).filter_by(etf_id=etf.id).delete()
+    count = 0
+    for idx, row in hist.iterrows():
+        close = float(row["Close"])
+        if close <= 0:
+            continue
+        db.add(Performance(
+            etf_id=etf.id,
+            date=idx.date(),
+            close_price=round(close, 4),
+            currency=etf.currency,
+        ))
+        count += 1
     return count
 
 
@@ -172,15 +212,18 @@ def import_ishares(db: Session, tickers: Optional[list[str]] = None) -> dict:
             "status": "ok",
             "holdings": 0,
             "allocations": 0,
+            "performance": 0,
             "error": None,
         }
         try:
             logger.info("Fetching yfinance data for %s (%s) ...", meta["ticker"], meta["yf_symbol"])
             # Retry up to 3 times with exponential backoff on rate-limit errors
+            ticker_obj = None
             funds = None
             for attempt in range(3):
                 try:
-                    funds = yf.Ticker(meta["yf_symbol"]).funds_data
+                    ticker_obj = yf.Ticker(meta["yf_symbol"])
+                    funds = ticker_obj.funds_data
                     break
                 except Exception as e:
                     if "rate" in str(e).lower() or "429" in str(e) or "too many" in str(e).lower():
@@ -222,11 +265,14 @@ def import_ishares(db: Session, tickers: Optional[list[str]] = None) -> dict:
                 result["status"] = "warn"
                 result["error"] = "No holdings returned by yfinance"
 
-            if sector_w:
-                result["allocations"] = _upsert_allocations(etf, sector_w, as_of, db)
+            result["allocations"] = _upsert_allocations(etf, sector_w, holdings, as_of, db)
+
+            if ticker_obj:
+                result["performance"] = _upsert_performance(etf, ticker_obj, db)
 
             db.commit()
-            logger.info("%s: %d holdings, %d allocations", meta["ticker"], result["holdings"], result["allocations"])
+            logger.info("%s: %d holdings, %d allocations, %d perf rows",
+                        meta["ticker"], result["holdings"], result["allocations"], result["performance"])
 
         except Exception as exc:
             db.rollback()
