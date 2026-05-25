@@ -217,26 +217,31 @@ def import_ishares(db: Session, tickers: Optional[list[str]] = None) -> dict:
         }
         try:
             logger.info("Fetching yfinance data for %s (%s) ...", meta["ticker"], meta["yf_symbol"])
-            # Retry up to 3 times with exponential backoff on rate-limit errors
-            ticker_obj = None
-            funds = None
+            # Retry up to 3 times with exponential backoff on rate-limit errors.
+            # funds_data is lazy — the actual HTTP fetch happens when .top_holdings /
+            # .sector_weightings are accessed, so we retry those accesses too.
+            ticker_obj = yf.Ticker(meta["yf_symbol"])
+
+            top_h = None
+            sector_w: dict = {}
             for attempt in range(3):
                 try:
-                    ticker_obj = yf.Ticker(meta["yf_symbol"])
                     funds = ticker_obj.funds_data
+                    top_h = funds.top_holdings        # triggers HTTP fetch
+                    sector_w = funds.sector_weightings or {}
                     break
                 except Exception as e:
-                    if "rate" in str(e).lower() or "429" in str(e) or "too many" in str(e).lower():
+                    err_str = str(e).lower()
+                    if "rate" in err_str or "429" in err_str or "too many" in err_str or "failed" in err_str:
                         wait = 10 * (2 ** attempt)
                         logger.warning("Rate limited on %s, retrying in %ds …", meta["ticker"], wait)
                         time.sleep(wait)
+                        ticker_obj = yf.Ticker(meta["yf_symbol"])  # fresh object on retry
                     else:
-                        raise
-            if funds is None:
-                raise RuntimeError("Failed to fetch data after 3 attempts (rate limited)")
+                        logger.warning("Could not fetch funds data for %s: %s", meta["ticker"], e)
+                        break  # non-retryable error — skip holdings/sectors, still do performance
 
             # Holdings
-            top_h = funds.top_holdings  # DataFrame: index=Symbol, cols=[Name, Holding Percent]
             holdings: list[dict] = []
             if top_h is not None and not top_h.empty:
                 for sym, row in top_h.iterrows():
@@ -253,9 +258,6 @@ def import_ishares(db: Session, tickers: Optional[list[str]] = None) -> dict:
                         "country": _lookup_country(ident),
                     })
 
-            # Sector allocations
-            sector_w = funds.sector_weightings or {}
-
             # Upsert ETF record
             etf = _upsert_etf(meta, db)
 
@@ -266,9 +268,7 @@ def import_ishares(db: Session, tickers: Optional[list[str]] = None) -> dict:
                 result["error"] = "No holdings returned by yfinance"
 
             result["allocations"] = _upsert_allocations(etf, sector_w, holdings, as_of, db)
-
-            if ticker_obj:
-                result["performance"] = _upsert_performance(etf, ticker_obj, db)
+            result["performance"] = _upsert_performance(etf, ticker_obj, db)
 
             db.commit()
             logger.info("%s: %d holdings, %d allocations, %d perf rows",
