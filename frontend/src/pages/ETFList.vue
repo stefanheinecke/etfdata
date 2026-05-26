@@ -131,12 +131,15 @@
             <div v-for="group in allocationGroups" :key="group.type" style="margin-top:1.25rem">
               <h4 style="font-size:.8rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.75rem">{{ group.type }}</h4>
               <div class="alloc-bars">
-                <div v-for="a in group.items" :key="a.bucket" class="alloc-row">
-                  <span class="alloc-label">{{ a.bucket }}</span>
+                <div v-for="a in group.visible" :key="a.bucket" class="alloc-row">
+                  <span class="alloc-label">{{ a.label }}</span>
                   <div class="alloc-track"><div class="alloc-fill" :style="{width:Math.min(a.weight,100)+'%'}"></div></div>
                   <span class="alloc-pct">{{ Number(a.weight).toFixed(1) }}%</span>
                 </div>
               </div>
+              <button v-if="group.items.length > 5" class="show-more-btn" @click="toggleGroup(group.type)">
+                {{ expandedGroups.has(group.type) ? 'Show less ↑' : `Show ${group.items.length - 5} more ↓` }}
+              </button>
             </div>
           </div>
           <div v-else class="empty-state"><p>No allocation data available.</p></div>
@@ -229,6 +232,26 @@ const detailTab = ref('Overview')
 const detailLoading = ref(false)
 const holdings = ref([])
 const allocations = ref([])
+
+const COUNTRY_NAMES = {
+  AF:'Afghanistan',AL:'Albania',DZ:'Algeria',AR:'Argentina',AU:'Australia',
+  AT:'Austria',BE:'Belgium',BM:'Bermuda',BR:'Brazil',CA:'Canada',KY:'Cayman Islands',
+  CL:'Chile',CN:'China',CO:'Colombia',CZ:'Czech Republic',DK:'Denmark',EG:'Egypt',
+  FI:'Finland',FR:'France',DE:'Germany',GR:'Greece',HK:'Hong Kong',HU:'Hungary',
+  IN:'India',ID:'Indonesia',IE:'Ireland',IL:'Israel',IT:'Italy',JP:'Japan',
+  LU:'Luxembourg',MY:'Malaysia',MX:'Mexico',NL:'Netherlands',NZ:'New Zealand',
+  NO:'Norway',PH:'Philippines',PL:'Poland',PT:'Portugal',QA:'Qatar',SA:'Saudi Arabia',
+  SG:'Singapore',ZA:'South Africa',KR:'South Korea',ES:'Spain',SE:'Sweden',
+  CH:'Switzerland',TW:'Taiwan',TH:'Thailand',TR:'Turkey',AE:'United Arab Emirates',
+  GB:'United Kingdom',US:'United States',VN:'Vietnam',
+}
+
+const expandedGroups = ref(new Set())
+function toggleGroup(type) {
+  const s = new Set(expandedGroups.value)
+  s.has(type) ? s.delete(type) : s.add(type)
+  expandedGroups.value = s
+}
 const performance = ref([])
 const chartCanvas = ref(null)
 let chartInstance = null
@@ -246,7 +269,13 @@ const etfStats = computed(() => {
 const allocationGroups = computed(() => {
   const map = {}
   allocations.value.forEach(a => { if (!map[a.type]) map[a.type]=[]; map[a.type].push(a) })
-  return Object.entries(map).map(([type,items]) => ({type,items:items.sort((a,b)=>b.weight-a.weight)}))
+  return Object.entries(map).map(([type, items]) => {
+    const sorted = items
+      .map(a => ({ ...a, label: type === 'country' ? (COUNTRY_NAMES[a.bucket] || a.bucket) : a.bucket }))
+      .sort((a, b) => b.weight - a.weight)
+    const expanded = expandedGroups.value.has(type)
+    return { type, items: sorted, visible: expanded ? sorted : sorted.slice(0, 5) }
+  })
 })
 
 const perfStats = computed(() => {
@@ -320,6 +349,7 @@ async function loadETFs() {
 function openETF(etf) {
   selectedETF.value=etf; detailTab.value='Overview'
   holdings.value=[]; allocations.value=[]; performance.value=[]
+  expandedGroups.value = new Set()
   if (chartInstance) { chartInstance.destroy(); chartInstance = null }
 }
 
@@ -365,10 +395,12 @@ onMounted(loadETFs)
 .modal-tab.active{color:var(--green-600);border-bottom-color:var(--green-500);font-weight:600}
 .alloc-bars{display:flex;flex-direction:column;gap:.5rem}
 .alloc-row{display:flex;align-items:center;gap:.75rem}
-.alloc-label{width:120px;font-size:.8rem;color:var(--text-2);flex-shrink:0}
+.alloc-label{width:150px;font-size:.8rem;color:var(--text-2);flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .alloc-track{flex:1;height:8px;background:var(--border);border-radius:4px;overflow:hidden}
 .alloc-fill{height:100%;background:var(--green-500);border-radius:4px;transition:width .4s}
 .alloc-pct{width:45px;text-align:right;font-size:.8rem;font-weight:600;color:var(--text)}
+.show-more-btn{margin-top:.5rem;background:none;border:none;cursor:pointer;font-size:.8rem;color:var(--green-600);padding:.25rem 0;font-family:inherit;font-weight:500}
+.show-more-btn:hover{text-decoration:underline}
 .perf-kpi{display:flex;gap:.75rem;flex-wrap:wrap}
 .perf-stat{flex:1;min-width:110px;background:var(--bg-2);border:1px solid var(--border);border-radius:var(--radius);padding:.65rem 1rem}
 </style>
