@@ -24,15 +24,7 @@ class AnalyticsService:
                 query = query.filter(Holding.date == latest_date)
 
             holdings = query.all()
-            # Only include real ISINs (12 chars, 2-letter country prefix) in overlap
-            # comparison.  Ticker-based identifiers (e.g. "TRU") are exchange-scoped
-            # and the same ticker can refer to different companies on different
-            # exchanges, causing false positives.
-            holdings_data[str(etf_id)] = {
-                h.instrument_isin: float(h.weight)
-                for h in holdings
-                if len(h.instrument_isin) == 12 and h.instrument_isin[:2].isalpha()
-            }
+            holdings_data[str(etf_id)] = {h.instrument_isin: float(h.weight) for h in holdings}
 
         matrix = {}
         common_holdings = []
