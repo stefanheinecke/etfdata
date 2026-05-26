@@ -2,6 +2,7 @@ import os
 from fastapi import APIRouter, Depends, HTTPException, Header
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
+from uuid import UUID
 
 from typing import List, Optional
 from app.db.database import get_db
@@ -83,3 +84,36 @@ def import_ishares_endpoint(
     tickers = body.tickers if body else None
     result = import_ishares(db, tickers=tickers)
     return result
+
+
+@router.delete("/etfs/{etf_id}", status_code=204)
+def delete_etf(
+    etf_id: UUID,
+    db: Session = Depends(get_db),
+    _: None = Depends(verify_admin_secret),
+):
+    """Delete a single ETF and all its holdings, allocations and performance data."""
+    from app.schemas import ETF
+    etf = db.query(ETF).filter(ETF.id == etf_id).first()
+    if not etf:
+        raise HTTPException(status_code=404, detail="ETF not found")
+    db.delete(etf)
+    db.commit()
+
+
+@router.delete("/etfs", status_code=200)
+def delete_etfs(
+    etf_ids: List[UUID],
+    db: Session = Depends(get_db),
+    _: None = Depends(verify_admin_secret),
+):
+    """Delete multiple ETFs by ID list. Returns count of deleted records."""
+    from app.schemas import ETF
+    deleted = 0
+    for etf_id in etf_ids:
+        etf = db.query(ETF).filter(ETF.id == etf_id).first()
+        if etf:
+            db.delete(etf)
+            deleted += 1
+    db.commit()
+    return {"deleted": deleted}

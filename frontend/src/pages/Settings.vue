@@ -47,38 +47,47 @@
     </div>
 
     <div class="settings-section">
-      <h3>ETF Management</h3>
+      <h3>ETF Management <span class="admin-badge">Admin</span></h3>
 
-      <div v-if="etfLoadError" class="error-msg">{{ etfLoadError }}</div>
-
-      <div v-if="etfList.length === 0 && !etfLoadError" class="hint">Loading ETFs...</div>
-
-      <div v-if="etfList.length > 0">
-        <div class="etf-list-header">
-          <label class="select-all-label">
-            <input type="checkbox" :checked="allSelected" @change="toggleAll"> Select all
-          </label>
-          <span class="etf-count">{{ etfList.length }} ETF(s)</span>
+      <div class="setting-item">
+        <label>Admin Secret:</label>
+        <div class="setting-value">
+          <input v-model="adminSecret" type="password" class="input" placeholder="Enter admin secret to unlock">
+          <button @click="unlockAdmin" class="btn btn-secondary">Unlock</button>
         </div>
+      </div>
 
-        <div class="etf-list">
-          <div v-for="etf in etfList" :key="etf.id" class="etf-row">
-            <input type="checkbox" :value="etf.id" v-model="selectedIds">
-            <span class="etf-ticker">{{ etf.ticker }}</span>
-            <span class="etf-name">{{ etf.name }}</span>
-            <span class="etf-provider">{{ etf.provider }}</span>
+      <div v-if="adminUnlocked">
+        <div v-if="etfLoadError" class="error-msg">{{ etfLoadError }}</div>
+        <div v-else-if="etfList.length === 0" class="hint">Loading ETFs...</div>
+
+        <div v-if="etfList.length > 0">
+          <div class="etf-list-header">
+            <label class="select-all-label">
+              <input type="checkbox" :checked="allSelected" @change="toggleAll"> Select all
+            </label>
+            <span class="etf-count">{{ etfList.length }} ETF(s)</span>
           </div>
-        </div>
 
-        <div class="etf-actions">
-          <button
-            class="btn btn-danger"
-            :disabled="selectedIds.length === 0 || deleting"
-            @click="deleteSelected"
-          >
-            {{ deleting ? 'Deleting...' : `Delete Selected (${selectedIds.length})` }}
-          </button>
-          <span v-if="deleteMsg" :class="deleteMsgClass">{{ deleteMsg }}</span>
+          <div class="etf-list">
+            <div v-for="etf in etfList" :key="etf.id" class="etf-row">
+              <input type="checkbox" :value="etf.id" v-model="selectedIds">
+              <span class="etf-ticker">{{ etf.ticker }}</span>
+              <span class="etf-name">{{ etf.name }}</span>
+              <span class="etf-provider">{{ etf.provider }}</span>
+            </div>
+          </div>
+
+          <div class="etf-actions">
+            <button
+              class="btn btn-danger"
+              :disabled="selectedIds.length === 0 || deleting"
+              @click="deleteSelected"
+            >
+              {{ deleting ? 'Deleting...' : `Delete Selected (${selectedIds.length})` }}
+            </button>
+            <span v-if="deleteMsg" :class="deleteMsgClass">{{ deleteMsg }}</span>
+          </div>
         </div>
       </div>
     </div>
@@ -104,7 +113,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { healthService, etfService } from '../services/api.js'
+import { healthService, etfService, adminService } from '../services/api.js'
 
 const apiUrl = ref(import.meta.env.VITE_API_URL || 'http://localhost:8000')
 const apiKey = ref(localStorage.getItem('api_key') || '')
@@ -141,10 +150,11 @@ const checkHealth = async () => {
 
 onMounted(() => {
   checkHealth()
-  loadETFs()
 })
 
 // -- ETF management --
+const adminSecret = ref('')
+const adminUnlocked = ref(false)
 const etfList = ref([])
 const selectedIds = ref([])
 const etfLoadError = ref('')
@@ -164,7 +174,22 @@ function toggleAll() {
   }
 }
 
+async function unlockAdmin() {
+  if (!adminSecret.value) return
+  adminUnlocked.value = false
+  etfLoadError.value = ''
+  try {
+    const r = await etfService.getETFs(0, 200)
+    etfList.value = r.data
+    adminUnlocked.value = true
+    deleteMsg.value = ''
+  } catch (err) {
+    etfLoadError.value = 'Failed to load ETFs: ' + (err.response?.data?.detail || err.message)
+  }
+}
+
 async function loadETFs() {
+  if (!adminUnlocked.value) return
   etfLoadError.value = ''
   try {
     const r = await etfService.getETFs(0, 200)
@@ -185,13 +210,15 @@ async function deleteSelected() {
   deleting.value = true
   deleteMsg.value = ''
   try {
-    const r = await etfService.deleteETFs(selectedIds.value)
+    const r = await adminService.deleteETFs(adminSecret.value, selectedIds.value)
     deleteMsg.value = `Deleted ${r.data.deleted} ETF(s).`
     deleteMsgClass.value = 'success-msg'
     selectedIds.value = []
     await loadETFs()
   } catch (err) {
-    deleteMsg.value = 'Error: ' + (err.response?.data?.detail || err.message)
+    deleteMsg.value = err.response?.status === 403
+      ? 'Invalid admin secret.'
+      : 'Error: ' + (err.response?.data?.detail || err.message)
     deleteMsgClass.value = 'error-msg'
   } finally {
     deleting.value = false
@@ -375,6 +402,19 @@ label {
 .error-msg {
   color: #d32f2f;
   font-size: 0.9rem;
+}
+
+.admin-badge {
+  display: inline-block;
+  background: #d32f2f;
+  color: white;
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 0.1rem 0.4rem;
+  border-radius: 3px;
+  vertical-align: middle;
+  margin-left: 0.4rem;
+  letter-spacing: 0.04em;
 }
 
 .info-grid {

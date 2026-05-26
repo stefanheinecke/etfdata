@@ -75,6 +75,12 @@ export const adminService = {
   },
   reset(adminSecret) {
     return api.post('/admin/reset', null, { headers: { 'x-admin-secret': adminSecret } })
+  },
+  deleteETFs(adminSecret, etfIds) {
+    return api.delete('/admin/etfs', {
+      data: etfIds,
+      headers: { 'x-admin-secret': adminSecret }
+    })
   }
 }
 
