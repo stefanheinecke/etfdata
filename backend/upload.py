@@ -89,17 +89,25 @@ def main() -> None:
     ticker_col    = col_map.get("ticker")
     name_col      = col_map.get("name")
     weight_col    = col_map.get("weight (%)") or col_map.get("weight(%)")
-    location_col  = col_map.get("location")    # iShares CSVs include full country name here
+    isin_col      = col_map.get("isin")          # globally unique -- preferred identifier
+    location_col  = col_map.get("location")      # iShares CSVs include full country name here
     assetcls_col  = col_map.get("asset class")
     sector_col    = col_map.get("sector")
+
+    # ID column: prefer ISIN (globally unique across exchanges) over ticker
+    id_col = isin_col if isin_col else ticker_col
+    if isin_col:
+        print(f"Using ISIN column '{isin_col}' as instrument identifier (globally unique)")
+    else:
+        print("No ISIN column found - using Ticker as identifier (may duplicate cross-exchange listings)")
 
     missing = [n for n, c in [("Ticker", ticker_col), ("Name", name_col), ("Weight (%)", weight_col)] if c is None]
     if missing:
         sys.exit(f"ERROR: CSV is missing required columns: {missing}\nFound: {list(df.columns)}")
 
-    # Drop rows without a ticker or weight
-    df = df.dropna(subset=[ticker_col, weight_col])
-    df = df[df[ticker_col].astype(str).str.strip() != ""]
+    # Drop rows without an identifier or weight
+    df = df.dropna(subset=[id_col, weight_col])
+    df = df[df[id_col].astype(str).str.strip() != ""]
 
     # Filter to Equity rows only; keep excluded rows for the summary report
     if assetcls_col:
@@ -115,16 +123,17 @@ def main() -> None:
     else:
         print("No Location column found - ISO2 codes looked up via yfinance (slower)")
 
-    # Deduplicate by ticker: same ticker on multiple exchanges -> sum weights, keep first name/location
+    # Deduplicate by ISIN (or ticker if no ISIN): same security on multiple exchanges
+    # -> sum weights, keep first occurrence of other fields
     before_dedup = len(df)
     agg = {weight_col: 'sum'}
-    for c in [name_col, location_col, sector_col, assetcls_col]:
-        if c and c in df.columns and c != ticker_col:
+    for c in [ticker_col, name_col, location_col, sector_col, assetcls_col]:
+        if c and c in df.columns and c != id_col:
             agg[c] = 'first'
-    df = df.groupby(ticker_col, as_index=False).agg(agg)
+    df = df.groupby(id_col, as_index=False).agg(agg)
     dupes = before_dedup - len(df)
     if dupes:
-        print(f"Deduplicated {dupes} duplicate ticker row(s) (weights summed)")
+        print(f"Deduplicated {dupes} duplicate row(s) (same ISIN on multiple exchanges, weights summed)")
 
     # -- Connect to DB --
     engine = create_engine(db_url, echo=False, poolclass=NullPool, pool_pre_ping=True)
@@ -155,14 +164,15 @@ def main() -> None:
         unmapped_locations: dict[str, float] = {}  # full name -> weight sum for unmapped countries
 
         for _, row in df.iterrows():
-            sym    = str(row[ticker_col]).strip()[:12]
-            name   = str(row[name_col]).strip()[:255] if name_col else sym
+            ident  = str(row[id_col]).strip()[:12]       # ISIN (preferred) or ticker
+            sym    = str(row[ticker_col]).strip() if ticker_col and pd.notna(row.get(ticker_col, '')) else ident
+            name   = str(row[name_col]).strip()[:255] if name_col else ident
             weight = float(row[weight_col])
             if weight <= 0:
                 skipped += 1
                 continue
 
-            # Prefer the Location column (full name -> ISO2) over a yfinance network call
+            # Country lookup uses ticker symbol (not ISIN) for yfinance compatibility
             if args.no_country:
                 country = ""
             elif location_col and pd.notna(row[location_col]):
@@ -183,14 +193,14 @@ def main() -> None:
             db.add(Holding(
                 etf_id=etf.id,
                 date=as_of,
-                instrument_isin=sym,
+                instrument_isin=ident,
                 instrument_name=name,
-                weight=round(weight, 4),
+                weight=float(round(weight, 4)),
                 sector=sector,
                 country=country,
             ))
             inserted += 1
-            print(f"  {sym:12s}  {weight:7.4f}%  {country or '??':4s}  {sector}")
+            print(f"  {ident:12s}  {sym:8s}  {weight:7.4f}%  {country or '??':4s}  {sector}")
 
             # Accumulate allocation totals
             bucket = country if country else "Other"
@@ -198,9 +208,26 @@ def main() -> None:
             if sector_col and sector:
                 sector_totals[sector] = sector_totals.get(sector, 0.0) + weight
 
-        # -- Cash allocation from excluded non-equity rows --
-        # Non-equity rows (cash, futures, etc.) are excluded from allocations entirely.
-        # Normalize remaining equity weights to sum to 100%.
+        # -- Cash: aggregate all non-equity rows into a single holding + sector allocation --
+        cash_weight = 0.0
+        if not excluded_df.empty:
+            cash_weight = pd.to_numeric(excluded_df[weight_col], errors='coerce').fillna(0).sum()
+
+        if cash_weight > 0:
+            db.add(Holding(
+                etf_id=etf.id,
+                date=as_of,
+                instrument_isin="CASH",
+                instrument_name="Cash & Equivalents",
+                weight=float(round(cash_weight, 4)),
+                sector="Cash",
+                country="",
+            ))
+            inserted += 1
+            sector_totals["Cash"]  = sector_totals.get("Cash", 0.0) + cash_weight
+            country_totals["Cash"] = country_totals.get("Cash", 0.0) + cash_weight
+
+        # Normalize: both country and sector include cash, so both normalize to 100%.
         country_total_raw = sum(country_totals.values())
         sector_total_raw  = sum(sector_totals.values())
         if country_total_raw > 0:
@@ -214,14 +241,14 @@ def main() -> None:
             db.add(Allocation(
                 etf_id=etf.id, date=as_of,
                 type="country", bucket=country,
-                weight=round(weight, 4),
+                weight=float(round(weight, 4)),
             ))
             alloc_count += 1
         for sector, weight in sector_totals.items():
             db.add(Allocation(
                 etf_id=etf.id, date=as_of,
                 type="sector", bucket=sector,
-                weight=round(weight, 4),
+                weight=float(round(weight, 4)),
             ))
             alloc_count += 1
 
@@ -250,17 +277,16 @@ def main() -> None:
         elif not sector_col:
             print("\n-- Sector allocations: no 'Sector' column found in CSV --")
 
-        # Excluded (non-Equity) rows — now counted as Cash & Equivalents
-        if not excluded_df.empty:
-            excl_weight = pd.to_numeric(excluded_df[weight_col], errors='coerce').fillna(0)
-            excl_total  = excl_weight.sum()
-            print(f"\n-- Non-Equity rows ({excl_total:.4f}%) excluded (not stored) --")
+        # Cash detail
+        if cash_weight > 0:
+            print(f"\n-- Cash & Equivalents ({cash_weight:.4f}% total, stored as holding + sector allocation) --")
             for _, row in excluded_df.iterrows():
                 sym  = str(row[ticker_col]).strip()[:12]
                 name = str(row[name_col]).strip()[:50] if name_col else ""
                 cls  = str(row[assetcls_col]).strip() if assetcls_col else "?"
                 w    = pd.to_numeric(row[weight_col], errors='coerce') or 0.0
-                print(f"  {sym:12s}  {w:7.4f}%  [{cls}]  {name}")
+                if w > 0:
+                    print(f"  {sym:12s}  {w:7.4f}%  [{cls}]  {name}")
 
     except Exception as exc:
         db.rollback()
