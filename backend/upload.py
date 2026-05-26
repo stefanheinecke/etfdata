@@ -109,11 +109,22 @@ def main() -> None:
         print(f"Loaded {len(df)} Equity rows from {args.csv} ({len(excluded_df)} non-Equity rows excluded)")
     else:
         excluded_df = pd.DataFrame()
-        print(f"Loaded {len(df)} rows from {args.csv} (no 'Asset Class' column found — all rows kept)")
+        print(f"Loaded {len(df)} rows from {args.csv} (no 'Asset Class' column found - all rows kept)")
     if location_col:
-        print(f"Location column '{location_col}' found — ISO2 codes read from CSV (fast)")
+        print(f"Location column '{location_col}' found - ISO2 codes read from CSV (fast)")
     else:
-        print("No Location column found — ISO2 codes looked up via yfinance (slower)")
+        print("No Location column found - ISO2 codes looked up via yfinance (slower)")
+
+    # Deduplicate by ticker: same ticker on multiple exchanges -> sum weights, keep first name/location
+    before_dedup = len(df)
+    agg = {weight_col: 'sum'}
+    for c in [name_col, location_col, sector_col, assetcls_col]:
+        if c and c in df.columns and c != ticker_col:
+            agg[c] = 'first'
+    df = df.groupby(ticker_col, as_index=False).agg(agg)
+    dupes = before_dedup - len(df)
+    if dupes:
+        print(f"Deduplicated {dupes} duplicate ticker row(s) (weights summed)")
 
     # -- Connect to DB --
     engine = create_engine(db_url, echo=False, poolclass=NullPool, pool_pre_ping=True)
@@ -151,7 +162,7 @@ def main() -> None:
                 skipped += 1
                 continue
 
-            # Prefer the Location column (full name → ISO2) over a yfinance network call
+            # Prefer the Location column (full name -> ISO2) over a yfinance network call
             if args.no_country:
                 country = ""
             elif location_col and pd.notna(row[location_col]):
@@ -219,12 +230,12 @@ def main() -> None:
         total_country_pct = sum(country_totals.values())
         total_sector_pct  = sum(sector_totals.values())
 
-        print(f"\nDone — inserted {inserted} holdings, {alloc_count} allocations, skipped {skipped} (weight ≤ 0).")
+        print(f"\nDone - inserted {inserted} holdings, {alloc_count} allocations, skipped {skipped} (weight <= 0).")
 
         # Country summary
-        print(f"\n── Country allocations ({total_country_pct:.2f}% total) ──")
+        print(f"\n-- Country allocations ({total_country_pct:.2f}% total) --")
         for c, w in sorted(country_totals.items(), key=lambda x: -x[1]):
-            flag = " ← UNKNOWN" if c == "Other" else ""
+            flag = " <- UNKNOWN" if c == "Other" else ""
             print(f"  {c:4s}  {w:7.4f}%{flag}")
         if unmapped_locations:
             print(f"\n  Unmapped location names bucketed as 'Other' (add to _COUNTRY_ISO to fix):")
@@ -233,17 +244,17 @@ def main() -> None:
 
         # Sector summary
         if sector_totals:
-            print(f"\n── Sector allocations ({total_sector_pct:.2f}% total) ──")
+            print(f"\n-- Sector allocations ({total_sector_pct:.2f}% total) --")
             for s, w in sorted(sector_totals.items(), key=lambda x: -x[1]):
                 print(f"  {w:7.4f}%  {s}")
         elif not sector_col:
-            print("\n── Sector allocations: no 'Sector' column found in CSV ──")
+            print("\n-- Sector allocations: no 'Sector' column found in CSV --")
 
         # Excluded (non-Equity) rows — now counted as Cash & Equivalents
         if not excluded_df.empty:
             excl_weight = pd.to_numeric(excluded_df[weight_col], errors='coerce').fillna(0)
             excl_total  = excl_weight.sum()
-            print(f"\n── Non-Equity rows ({excl_total:.4f}%) counted as Cash & Equivalents ──")
+            print(f"\n-- Non-Equity rows ({excl_total:.4f}%) excluded (not stored) --")
             for _, row in excluded_df.iterrows():
                 sym  = str(row[ticker_col]).strip()[:12]
                 name = str(row[name_col]).strip()[:50] if name_col else ""
