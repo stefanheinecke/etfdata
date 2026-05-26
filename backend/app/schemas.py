@@ -38,7 +38,6 @@ class Holding(Base):
     instrument_isin = Column(String(12), nullable=False)
     instrument_name = Column(String(255), nullable=False)
     weight = Column(Numeric(8, 4), nullable=False)
-    exchange = Column(String(20), nullable=False, server_default="")
     country = Column(String(2), index=True)
     sector = Column(String(100), index=True)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -46,7 +45,7 @@ class Holding(Base):
     etf = relationship("ETF", back_populates="holdings")
 
     __table_args__ = (
-        UniqueConstraint("etf_id", "date", "instrument_isin", "exchange", name="idx_holdings_unique"),
+        UniqueConstraint("etf_id", "date", "instrument_isin", name="idx_holdings_unique"),
         Index("idx_holdings_etf_date", "etf_id", "date"),
     )
 
