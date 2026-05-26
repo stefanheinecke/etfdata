@@ -28,20 +28,21 @@ from sqlalchemy.pool import NullPool
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__)))
 from app.schemas import ETF, Performance
+from app.services.ishares_import import ISHARES_ETFS
 
 
 # ---------------------------------------------------------------------------
 # yfinance metadata fetch
 # ---------------------------------------------------------------------------
 
-def _fetch_yf_meta(ticker: str) -> dict:
+def _fetch_yf_meta(yf_symbol: str) -> dict:
     """
-    Return metadata dict from yfinance .info.
+    Return metadata dict from yfinance .info using the correct exchange-suffixed symbol.
     Keys: name, currency, ter (%), fund_size (int), ticker_obj
     """
     try:
         import yfinance as yf
-        t = yf.Ticker(ticker)
+        t = yf.Ticker(yf_symbol)
         info = t.info or {}
         ter_raw = info.get("totalExpenseRatio")          # decimal, e.g. 0.002 = 0.20%
         ter_pct = round(float(ter_raw) * 100, 4) if ter_raw else None
@@ -54,7 +55,7 @@ def _fetch_yf_meta(ticker: str) -> dict:
             "ticker_obj": t,
         }
     except Exception as exc:
-        print(f"  yfinance lookup failed ({exc})")
+        print(f"  yfinance lookup failed for '{yf_symbol}' ({exc})")
         return {}
 
 
@@ -96,6 +97,9 @@ def main() -> None:
                         help="ETF ticker symbol (e.g. SWDA, IEDY)")
     parser.add_argument("--isin", required=True,
                         help="ETF's own ISIN (e.g. IE00B4L5Y983)")
+    parser.add_argument("--yf-symbol", default=None, dest="yf_symbol",
+                        help="Yahoo Finance symbol with exchange suffix (e.g. SWDA.L, CSSPX.SW). "
+                             "Auto-resolved from built-in list; only needed for unlisted ETFs.")
     parser.add_argument("--csv", required=True,
                         help="Path to the iShares holdings CSV file")
     parser.add_argument("--db", default=None,
@@ -128,20 +132,30 @@ def main() -> None:
     if not db_url:
         sys.exit("ERROR: Provide --db or set DATABASE_PUBLIC_URL environment variable.")
 
+    # -- Resolve yfinance symbol and any known defaults from ISHARES_ETFS --
+    ticker_upper = args.ticker.strip().upper()
+    known = next((e for e in ISHARES_ETFS if e["ticker"] == ticker_upper), None)
+    yf_symbol = args.yf_symbol or (known["yf_symbol"] if known else args.ticker)
+    known_ter       = known["ter"]       if known else None
+    known_benchmark = known["benchmark"] if known else None
+    print(f"Using yfinance symbol: {yf_symbol}")
+
     # -- Fetch metadata from yfinance --
     print(f"Fetching metadata for {args.ticker} from yfinance ...")
-    yf_meta = _fetch_yf_meta(args.ticker)
+    yf_meta = _fetch_yf_meta(yf_symbol)
 
     name       = args.name      or yf_meta.get("name")      or args.ticker
     currency   = args.currency  or yf_meta.get("currency")  or "USD"
-    ter        = args.ter       if args.ter is not None      else yf_meta.get("ter")
+    # CLI flag > yfinance > known list fallback
+    ter        = args.ter       if args.ter is not None      else (yf_meta.get("ter") or known_ter)
     fund_size  = args.fund_size if args.fund_size is not None else yf_meta.get("fund_size")
+    benchmark  = args.benchmark or known_benchmark
 
     print(f"  name:        {name}")
     print(f"  currency:    {currency}")
     print(f"  ter:         {ter}%"       if ter        else "  ter:         (not found)")
     print(f"  fund_size:   {fund_size:,}" if fund_size  else "  fund_size:   (not found)")
-    print(f"  benchmark:   {args.benchmark}" if args.benchmark else "  benchmark:   (not provided - pass --benchmark)")
+    print(f"  benchmark:   {benchmark}" if benchmark else "  benchmark:   (not provided - pass --benchmark)")
     print(f"  replication: {args.replication_method}")
 
     # -- Connect to DB --
@@ -159,8 +173,8 @@ def main() -> None:
                 existing.ter           = Decimal(str(ter))
             if fund_size is not None:
                 existing.fund_size     = fund_size
-            if args.benchmark:
-                existing.benchmark     = args.benchmark
+            if benchmark:
+                existing.benchmark     = benchmark
             if currency:
                 existing.currency      = currency[:3].upper()
             db.commit()
@@ -177,7 +191,7 @@ def main() -> None:
                 replication_method=args.replication_method,
                 ter=Decimal(str(ter)) if ter is not None else None,
                 fund_size=fund_size,
-                benchmark=args.benchmark,
+                benchmark=benchmark,
                 currency=currency[:3].upper(),
             )
             db.add(etf)
