@@ -47,6 +47,43 @@
     </div>
 
     <div class="settings-section">
+      <h3>ETF Management</h3>
+
+      <div v-if="etfLoadError" class="error-msg">{{ etfLoadError }}</div>
+
+      <div v-if="etfList.length === 0 && !etfLoadError" class="hint">Loading ETFs...</div>
+
+      <div v-if="etfList.length > 0">
+        <div class="etf-list-header">
+          <label class="select-all-label">
+            <input type="checkbox" :checked="allSelected" @change="toggleAll"> Select all
+          </label>
+          <span class="etf-count">{{ etfList.length }} ETF(s)</span>
+        </div>
+
+        <div class="etf-list">
+          <div v-for="etf in etfList" :key="etf.id" class="etf-row">
+            <input type="checkbox" :value="etf.id" v-model="selectedIds">
+            <span class="etf-ticker">{{ etf.ticker }}</span>
+            <span class="etf-name">{{ etf.name }}</span>
+            <span class="etf-provider">{{ etf.provider }}</span>
+          </div>
+        </div>
+
+        <div class="etf-actions">
+          <button
+            class="btn btn-danger"
+            :disabled="selectedIds.length === 0 || deleting"
+            @click="deleteSelected"
+          >
+            {{ deleting ? 'Deleting...' : `Delete Selected (${selectedIds.length})` }}
+          </button>
+          <span v-if="deleteMsg" :class="deleteMsgClass">{{ deleteMsg }}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-section">
       <h3>About</h3>
       <div class="about-text">
         <p><strong>ETF Analytics API</strong> - v1.0.0</p>
@@ -66,8 +103,8 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import { healthService } from '../services/api.js'
+import { ref, computed, onMounted } from 'vue'
+import { healthService, etfService } from '../services/api.js'
 
 const apiUrl = ref(import.meta.env.VITE_API_URL || 'http://localhost:8000')
 const apiKey = ref(localStorage.getItem('api_key') || '')
@@ -102,7 +139,64 @@ const checkHealth = async () => {
   }
 }
 
-onMounted(checkHealth)
+onMounted(() => {
+  checkHealth()
+  loadETFs()
+})
+
+// -- ETF management --
+const etfList = ref([])
+const selectedIds = ref([])
+const etfLoadError = ref('')
+const deleting = ref(false)
+const deleteMsg = ref('')
+const deleteMsgClass = ref('success-msg')
+
+const allSelected = computed(
+  () => etfList.value.length > 0 && selectedIds.value.length === etfList.value.length
+)
+
+function toggleAll() {
+  if (allSelected.value) {
+    selectedIds.value = []
+  } else {
+    selectedIds.value = etfList.value.map(e => e.id)
+  }
+}
+
+async function loadETFs() {
+  etfLoadError.value = ''
+  try {
+    const r = await etfService.getETFs(0, 200)
+    etfList.value = r.data
+  } catch (err) {
+    etfLoadError.value = 'Failed to load ETFs: ' + (err.response?.data?.detail || err.message)
+  }
+}
+
+async function deleteSelected() {
+  if (!selectedIds.value.length) return
+  const names = etfList.value
+    .filter(e => selectedIds.value.includes(e.id))
+    .map(e => e.ticker)
+    .join(', ')
+  if (!confirm(`Delete ${selectedIds.value.length} ETF(s): ${names}?\n\nThis also removes all holdings and allocations.`)) return
+
+  deleting.value = true
+  deleteMsg.value = ''
+  try {
+    const r = await etfService.deleteETFs(selectedIds.value)
+    deleteMsg.value = `Deleted ${r.data.deleted} ETF(s).`
+    deleteMsgClass.value = 'success-msg'
+    selectedIds.value = []
+    await loadETFs()
+  } catch (err) {
+    deleteMsg.value = 'Error: ' + (err.response?.data?.detail || err.message)
+    deleteMsgClass.value = 'error-msg'
+  } finally {
+    deleting.value = false
+  }
+}
 </script>
 
 <style scoped>
@@ -187,6 +281,100 @@ label {
 
 .btn-secondary:hover {
   background: #777;
+}
+
+.btn-danger {
+  background: #d32f2f;
+  color: white;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: #b71c1c;
+}
+
+.btn-danger:disabled {
+  background: #e57373;
+  cursor: not-allowed;
+}
+
+.etf-list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.select-all-label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.etf-count {
+  font-size: 0.85rem;
+  color: #999;
+}
+
+.etf-list {
+  border: 1px solid #eee;
+  border-radius: 4px;
+  max-height: 300px;
+  overflow-y: auto;
+  margin-bottom: 1rem;
+}
+
+.etf-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 0.75rem;
+  border-bottom: 1px solid #f5f5f5;
+}
+
+.etf-row:last-child {
+  border-bottom: none;
+}
+
+.etf-row:hover {
+  background: #fafafa;
+}
+
+.etf-ticker {
+  font-family: monospace;
+  font-weight: 600;
+  width: 70px;
+  flex-shrink: 0;
+}
+
+.etf-name {
+  flex: 1;
+  font-size: 0.9rem;
+}
+
+.etf-provider {
+  font-size: 0.8rem;
+  color: #999;
+  width: 80px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.etf-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.success-msg {
+  color: #388e3c;
+  font-size: 0.9rem;
+}
+
+.error-msg {
+  color: #d32f2f;
+  font-size: 0.9rem;
 }
 
 .info-grid {

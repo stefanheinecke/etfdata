@@ -117,3 +117,31 @@ async def get_performance(
 
     performance = query.order_by(Performance.date).all()
     return [p for p in performance]
+
+@router.delete("/{etf_id}", status_code=204)
+async def delete_etf(
+    etf_id: UUID,
+    db: Session = Depends(get_db),
+    api_key: APIKey = Depends(verify_api_key)
+):
+    etf = db.query(ETF).filter(ETF.id == etf_id).first()
+    if not etf:
+        raise HTTPException(status_code=404, detail="ETF not found")
+    db.delete(etf)
+    db.commit()
+
+@router.delete("", status_code=200)
+async def delete_etfs(
+    etf_ids: List[UUID],
+    db: Session = Depends(get_db),
+    api_key: APIKey = Depends(verify_api_key)
+):
+    """Delete multiple ETFs by ID list. Returns count of deleted records."""
+    deleted = 0
+    for etf_id in etf_ids:
+        etf = db.query(ETF).filter(ETF.id == etf_id).first()
+        if etf:
+            db.delete(etf)
+            deleted += 1
+    db.commit()
+    return {"deleted": deleted}
