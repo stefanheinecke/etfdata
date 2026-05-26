@@ -47,52 +47,6 @@
     </div>
 
     <div class="settings-section">
-      <h3>ETF Management <span class="admin-badge">Admin</span></h3>
-
-      <div class="setting-item">
-        <label>Admin Secret:</label>
-        <div class="setting-value">
-          <input v-model="adminSecret" type="password" class="input" placeholder="Enter admin secret to unlock">
-          <button @click="unlockAdmin" class="btn btn-secondary">Unlock</button>
-        </div>
-      </div>
-
-      <div v-if="adminUnlocked">
-        <div v-if="etfLoadError" class="error-msg">{{ etfLoadError }}</div>
-        <div v-else-if="etfList.length === 0" class="hint">Loading ETFs...</div>
-
-        <div v-if="etfList.length > 0">
-          <div class="etf-list-header">
-            <label class="select-all-label">
-              <input type="checkbox" :checked="allSelected" @change="toggleAll"> Select all
-            </label>
-            <span class="etf-count">{{ etfList.length }} ETF(s)</span>
-          </div>
-
-          <div class="etf-list">
-            <div v-for="etf in etfList" :key="etf.id" class="etf-row">
-              <input type="checkbox" :value="etf.id" v-model="selectedIds">
-              <span class="etf-ticker">{{ etf.ticker }}</span>
-              <span class="etf-name">{{ etf.name }}</span>
-              <span class="etf-provider">{{ etf.provider }}</span>
-            </div>
-          </div>
-
-          <div class="etf-actions">
-            <button
-              class="btn btn-danger"
-              :disabled="selectedIds.length === 0 || deleting"
-              @click="deleteSelected"
-            >
-              {{ deleting ? 'Deleting...' : `Delete Selected (${selectedIds.length})` }}
-            </button>
-            <span v-if="deleteMsg" :class="deleteMsgClass">{{ deleteMsg }}</span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="settings-section">
       <h3>About</h3>
       <div class="about-text">
         <p><strong>ETF Analytics API</strong> - v1.0.0</p>
@@ -112,8 +66,8 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import { healthService, etfService, adminService } from '../services/api.js'
+import { ref, onMounted } from 'vue'
+import { healthService } from '../services/api.js'
 
 const apiUrl = ref(import.meta.env.VITE_API_URL || 'http://localhost:8000')
 const apiKey = ref(localStorage.getItem('api_key') || '')
@@ -151,79 +105,6 @@ const checkHealth = async () => {
 onMounted(() => {
   checkHealth()
 })
-
-// -- ETF management --
-const adminSecret = ref('')
-const adminUnlocked = ref(false)
-const etfList = ref([])
-const selectedIds = ref([])
-const etfLoadError = ref('')
-const deleting = ref(false)
-const deleteMsg = ref('')
-const deleteMsgClass = ref('success-msg')
-
-const allSelected = computed(
-  () => etfList.value.length > 0 && selectedIds.value.length === etfList.value.length
-)
-
-function toggleAll() {
-  if (allSelected.value) {
-    selectedIds.value = []
-  } else {
-    selectedIds.value = etfList.value.map(e => e.id)
-  }
-}
-
-async function unlockAdmin() {
-  if (!adminSecret.value) return
-  adminUnlocked.value = false
-  etfLoadError.value = ''
-  try {
-    const r = await etfService.getETFs(0, 200)
-    etfList.value = r.data
-    adminUnlocked.value = true
-    deleteMsg.value = ''
-  } catch (err) {
-    etfLoadError.value = 'Failed to load ETFs: ' + (err.response?.data?.detail || err.message)
-  }
-}
-
-async function loadETFs() {
-  if (!adminUnlocked.value) return
-  etfLoadError.value = ''
-  try {
-    const r = await etfService.getETFs(0, 200)
-    etfList.value = r.data
-  } catch (err) {
-    etfLoadError.value = 'Failed to load ETFs: ' + (err.response?.data?.detail || err.message)
-  }
-}
-
-async function deleteSelected() {
-  if (!selectedIds.value.length) return
-  const names = etfList.value
-    .filter(e => selectedIds.value.includes(e.id))
-    .map(e => e.ticker)
-    .join(', ')
-  if (!confirm(`Delete ${selectedIds.value.length} ETF(s): ${names}?\n\nThis also removes all holdings and allocations.`)) return
-
-  deleting.value = true
-  deleteMsg.value = ''
-  try {
-    const r = await adminService.deleteETFs(adminSecret.value, selectedIds.value)
-    deleteMsg.value = `Deleted ${r.data.deleted} ETF(s).`
-    deleteMsgClass.value = 'success-msg'
-    selectedIds.value = []
-    await loadETFs()
-  } catch (err) {
-    deleteMsg.value = err.response?.status === 403
-      ? 'Invalid admin secret.'
-      : 'Error: ' + (err.response?.data?.detail || err.message)
-    deleteMsgClass.value = 'error-msg'
-  } finally {
-    deleting.value = false
-  }
-}
 </script>
 
 <style scoped>

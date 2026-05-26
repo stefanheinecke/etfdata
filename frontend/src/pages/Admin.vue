@@ -82,6 +82,42 @@
       </div>
     </div>
 
+    <!-- ETF Management -->
+    <div class="card" style="margin-bottom:1.5rem">
+      <h2 class="card-title">ETF Management</h2>
+      <p style="font-size:.875rem;color:var(--text-muted);margin-bottom:1rem">
+        Select ETFs to permanently delete them along with all their holdings and allocations.
+      </p>
+      <button class="btn btn-outline" @click="loadETFs" :disabled="!adminSecret || etfLoading" style="margin-bottom:1rem">
+        {{ etfLoading ? 'Loading...' : 'Load ETF List' }}
+      </button>
+      <div v-if="etfError" class="error-box" style="margin-bottom:.75rem">{{ etfError }}</div>
+
+      <div v-if="etfList.length > 0">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem">
+          <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer;font-weight:600">
+            <input type="checkbox" :checked="allEtfsSelected" @change="toggleAllEtfs"> Select all
+          </label>
+          <span style="font-size:.85rem;color:var(--text-muted)">{{ etfList.length }} ETF(s)</span>
+        </div>
+        <div class="etf-list">
+          <div v-for="etf in etfList" :key="etf.id" class="etf-row">
+            <input type="checkbox" :value="etf.id" v-model="selectedEtfIds">
+            <span class="etf-ticker">{{ etf.ticker }}</span>
+            <span class="etf-name">{{ etf.name }}</span>
+            <span class="etf-provider">{{ etf.provider }}</span>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:1rem;margin-top:.75rem">
+          <button class="btn btn-danger" :disabled="selectedEtfIds.length === 0 || deleteEtfLoading" @click="deleteSelectedEtfs">
+            {{ deleteEtfLoading ? 'Deleting...' : `Delete Selected (${selectedEtfIds.length})` }}
+          </button>
+          <span v-if="deleteEtfResult" class="success-msg">{{ deleteEtfResult }}</span>
+          <span v-if="deleteEtfError" class="error-box">{{ deleteEtfError }}</span>
+        </div>
+      </div>
+    </div>
+
     <!-- Health status -->
     <div class="card">
       <h3 class="card-title">API Health</h3>
@@ -119,8 +155,8 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
-import { healthService, adminService } from '../services/api.js'
+import { ref, computed } from 'vue'
+import { healthService, adminService, etfService } from '../services/api.js'
 
 const apiKey = ref(localStorage.getItem('api_key') || '')
 const showKey = ref(false)
@@ -193,6 +229,52 @@ async function checkHealth() {
   catch(e) { console.error(e) }
   finally { healthLoading.value = false }
 }
+
+// ETF management
+const etfList = ref([])
+const selectedEtfIds = ref([])
+const etfLoading = ref(false)
+const etfError = ref('')
+const deleteEtfLoading = ref(false)
+const deleteEtfResult = ref('')
+const deleteEtfError = ref('')
+
+const allEtfsSelected = computed(
+  () => etfList.value.length > 0 && selectedEtfIds.value.length === etfList.value.length
+)
+
+function toggleAllEtfs() {
+  selectedEtfIds.value = allEtfsSelected.value ? [] : etfList.value.map(e => e.id)
+}
+
+async function loadETFs() {
+  etfLoading.value = true; etfError.value = ''; etfList.value = []; selectedEtfIds.value = []
+  try {
+    const r = await etfService.getETFs(0, 200)
+    etfList.value = r.data
+  } catch(e) {
+    etfError.value = e.response?.data?.detail || e.message
+  } finally {
+    etfLoading.value = false
+  }
+}
+
+async function deleteSelectedEtfs() {
+  if (!selectedEtfIds.value.length) return
+  const names = etfList.value.filter(e => selectedEtfIds.value.includes(e.id)).map(e => e.ticker).join(', ')
+  if (!confirm(`Delete ${selectedEtfIds.value.length} ETF(s): ${names}?\n\nThis removes all holdings and allocations.`)) return
+  deleteEtfLoading.value = true; deleteEtfResult.value = ''; deleteEtfError.value = ''
+  try {
+    const r = await adminService.deleteETFs(adminSecret.value, selectedEtfIds.value)
+    deleteEtfResult.value = `Deleted ${r.data.deleted} ETF(s).`
+    selectedEtfIds.value = []
+    await loadETFs()
+  } catch(e) {
+    deleteEtfError.value = e.response?.status === 403 ? 'Invalid admin secret.' : (e.response?.data?.detail || e.message)
+  } finally {
+    deleteEtfLoading.value = false
+  }
+}
 </script>
 
 <style scoped>
@@ -207,4 +289,11 @@ async function checkHealth() {
 .disclaimer-card { background: var(--bg-3); border: 1px solid var(--green-200); border-radius: var(--radius); padding: 1.5rem; }
 .disclaimer-card h3 { font-size: 1rem; font-weight: 600; color: var(--text); margin-bottom: .75rem; }
 .disclaimer-card p { font-size: .875rem; color: var(--text-muted); line-height: 1.7; }
+.etf-list { border: 1px solid var(--border); border-radius: var(--radius); max-height: 280px; overflow-y: auto; margin-bottom: .75rem; }
+.etf-row { display: flex; align-items: center; gap: .75rem; padding: .5rem .75rem; border-bottom: 1px solid var(--border); }
+.etf-row:last-child { border-bottom: none; }
+.etf-row:hover { background: var(--bg-2); }
+.etf-ticker { font-family: monospace; font-weight: 600; width: 70px; flex-shrink: 0; }
+.etf-name { flex: 1; font-size: .875rem; }
+.etf-provider { font-size: .8rem; color: var(--text-muted); width: 80px; text-align: right; flex-shrink: 0; }
 </style>
