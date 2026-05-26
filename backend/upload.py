@@ -189,6 +189,13 @@ def main() -> None:
 
         # -- Cash allocation from excluded non-equity rows --
         # Non-equity rows (cash, futures, etc.) are excluded from allocations entirely.
+        # Normalize remaining equity weights to sum to 100%.
+        country_total_raw = sum(country_totals.values())
+        sector_total_raw  = sum(sector_totals.values())
+        if country_total_raw > 0:
+            country_totals = {k: v / country_total_raw * 100 for k, v in country_totals.items()}
+        if sector_total_raw > 0:
+            sector_totals  = {k: v / sector_total_raw  * 100 for k, v in sector_totals.items()}
 
         # -- Allocations --
         alloc_count = 0

@@ -357,7 +357,7 @@ async function loadDetail(tab) {
   if (!selectedETF.value || tab==='Overview') return
   detailLoading.value=true
   try {
-    if (tab==='Holdings') { const r=await etfService.getHoldings(selectedETF.value.id); holdings.value=r.data }
+    if (tab==='Holdings') { const r=await etfService.getHoldings(selectedETF.value.id); holdings.value=r.data.slice().sort((a,b)=>b.weight-a.weight) }
     else if (tab==='Allocations') { const r=await etfService.getAllocations(selectedETF.value.id); allocations.value=r.data }
     else if (tab==='Performance') {
       const r=await etfService.getPerformance(selectedETF.value.id); performance.value=r.data
