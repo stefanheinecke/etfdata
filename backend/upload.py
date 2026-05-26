@@ -93,6 +93,7 @@ def main() -> None:
     location_col  = col_map.get("location")      # iShares CSVs include full country name here
     assetcls_col  = col_map.get("asset class")
     sector_col    = col_map.get("sector")
+    exchange_col  = col_map.get("exchange")       # e.g. 'New York Stock Exchange', 'Johannesburg Stock Exchange'
 
     # ID column: prefer ISIN (globally unique across exchanges) over ticker
     id_col = isin_col if isin_col else ticker_col
@@ -123,17 +124,20 @@ def main() -> None:
     else:
         print("No Location column found - ISO2 codes looked up via yfinance (slower)")
 
-    # Deduplicate by ISIN (or ticker if no ISIN): same security on multiple exchanges
-    # -> sum weights, keep first occurrence of other fields
+    # Dedup key: (ISIN, exchange) keeps TRU/NYSE and TRU/JSE separate;
+    # falls back to ISIN-only (merging) when no exchange column is present.
+    dedup_keys = [id_col, exchange_col] if exchange_col else [id_col]
     before_dedup = len(df)
     agg = {weight_col: 'sum'}
     for c in [ticker_col, name_col, location_col, sector_col, assetcls_col]:
-        if c and c in df.columns and c != id_col:
+        if c and c in df.columns and c not in dedup_keys:
             agg[c] = 'first'
-    df = df.groupby(id_col, as_index=False).agg(agg)
+    df = df.groupby(dedup_keys, as_index=False).agg(agg)
     dupes = before_dedup - len(df)
+    if exchange_col:
+        print(f"Exchange column '{exchange_col}' found - holdings kept separate per exchange")
     if dupes:
-        print(f"Deduplicated {dupes} duplicate row(s) (same ISIN on multiple exchanges, weights summed)")
+        print(f"Deduplicated {dupes} exact duplicate row(s) (same ISIN + exchange, weights summed)")
 
     # -- Connect to DB --
     engine = create_engine(db_url, echo=False, poolclass=NullPool, pool_pre_ping=True)
