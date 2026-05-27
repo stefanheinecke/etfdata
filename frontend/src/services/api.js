@@ -51,6 +51,9 @@ export const analyticsService = {
   },
   findSimilar(etfId, topN = 5) {
     return api.get(`/analytics/similar/${etfId}`, { params: { top_n: topN } })
+  },
+  getRiskMetrics(rfRate = 0.04) {
+    return api.get('/analytics/risk-metrics', { params: { rf_rate: rfRate } })
   }
 }
 
