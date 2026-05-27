@@ -102,7 +102,7 @@
           <button class="modal-close" @click="selectedETF = null">X</button>
         </div>
         <div class="modal-tabs">
-          <button v-for="t in ['Overview','Holdings','Allocations','Performance']" :key="t"
+          <button v-for="t in ['Overview','Holdings','Allocations','Performance','Risk']" :key="t"
             :class="['modal-tab',{active:detailTab===t}]" @click="detailTab=t;loadDetail(t)">{{ t }}</button>
         </div>
         <div v-if="detailTab==='Overview'" class="grid-4" style="margin-top:1rem">
@@ -158,6 +158,28 @@
             </div>
           </div>
           <div v-else class="empty-state"><p>No performance data. Re-run the import to fetch 1-year price history.</p></div>
+        </div>
+        <div v-if="detailTab==='Risk'">
+          <div v-if="detailLoading" class="loading"><div class="spinner"></div> Loading...</div>
+          <div v-else-if="etfRisk" style="margin-top:1rem">
+            <div class="perf-kpi">
+              <div class="perf-stat" v-for="s in riskStats" :key="s.label">
+                <div class="stat-label">{{ s.label }}</div>
+                <div class="stat-value" style="font-size:1.15rem;font-weight:700" :style="{color:s.color}">{{ s.value }}</div>
+              </div>
+            </div>
+            <p style="margin-top:1rem;font-size:.75rem;color:var(--text-muted)">
+              Annualised from {{ etfRisk.data_points }} daily price observations &nbsp;·&nbsp;
+              Risk-free rate: 4% &nbsp;·&nbsp;
+              HHI based on {{ etfRisk.num_holdings.toLocaleString() }} holdings
+            </p>
+            <div style="margin-top:.5rem;font-size:.72rem;color:var(--text-muted);opacity:.7;display:flex;flex-wrap:wrap;gap:.2rem 1.25rem">
+              <span><span style="color:#16a34a">■</span>&nbsp;Volatility &lt;12% &nbsp;·&nbsp; Sharpe ≥1 &nbsp;·&nbsp; Drawdown &gt;−10% &nbsp;·&nbsp; HHI &lt;500</span>
+              <span><span style="color:#ca8a04">■</span>&nbsp;Volatility 12–22% &nbsp;·&nbsp; Sharpe 0–1 &nbsp;·&nbsp; Drawdown −10 to −20% &nbsp;·&nbsp; HHI 500–2 000</span>
+              <span><span style="color:#ef4444">■</span>&nbsp;Volatility &gt;22% &nbsp;·&nbsp; Sharpe &lt;0 &nbsp;·&nbsp; Drawdown &lt;−20% &nbsp;·&nbsp; HHI &gt;2 000</span>
+            </div>
+          </div>
+          <div v-else class="empty-state"><p>No price history available to compute risk metrics.</p></div>
         </div>
       </div>
     </div>
@@ -253,6 +275,26 @@ function toggleGroup(type) {
   expandedGroups.value = s
 }
 const performance = ref([])
+const etfRisk = ref(null)
+
+const riskStats = computed(() => {
+  const r = etfRisk.value
+  if (!r) return []
+  const fmtPct = v => v !== null ? `${v >= 0 ? '+' : ''}${v.toFixed(2)}%` : '\u2014'
+  const signClr  = v => v === null ? 'var(--text)' : v >= 0 ? '#16a34a' : '#ef4444'
+  const volClr   = v => v === null ? 'var(--text)' : v < 12 ? '#16a34a' : v < 22 ? '#ca8a04' : '#ef4444'
+  const sharpeClr = v => v === null ? 'var(--text)' : v >= 1 ? '#16a34a' : v >= 0 ? '#ca8a04' : '#ef4444'
+  const ddClr    = v => v === null ? 'var(--text)' : v > -10 ? '#16a34a' : v > -20 ? '#ca8a04' : '#ef4444'
+  const hhiClr   = v => v === null ? 'var(--text)' : v < 500 ? '#16a34a' : v < 2000 ? '#ca8a04' : '#ef4444'
+  return [
+    { label: '1Y Return (ann.)',  value: fmtPct(r.ann_return),   color: signClr(r.ann_return) },
+    { label: 'Volatility (ann.)', value: fmtPct(r.volatility),   color: volClr(r.volatility) },
+    { label: 'Sharpe Ratio',      value: r.sharpe_ratio !== null ? r.sharpe_ratio.toFixed(2) : '\u2014', color: sharpeClr(r.sharpe_ratio) },
+    { label: 'Max Drawdown',      value: fmtPct(r.max_drawdown), color: ddClr(r.max_drawdown) },
+    { label: 'HHI',               value: r.hhi !== null ? Number(r.hhi).toFixed(0) : '\u2014', color: hhiClr(r.hhi) },
+    { label: '# Holdings',        value: r.num_holdings.toLocaleString(), color: 'var(--text)' },
+  ]
+})
 const chartCanvas = ref(null)
 let chartInstance = null
 
@@ -348,7 +390,7 @@ async function loadETFs() {
 
 function openETF(etf) {
   selectedETF.value=etf; detailTab.value='Overview'
-  holdings.value=[]; allocations.value=[]; performance.value=[]
+  holdings.value=[]; allocations.value=[]; performance.value=[]; etfRisk.value=null
   expandedGroups.value = new Set()
   if (chartInstance) { chartInstance.destroy(); chartInstance = null }
 }
@@ -363,6 +405,7 @@ async function loadDetail(tab) {
       const r=await etfService.getPerformance(selectedETF.value.id); performance.value=r.data
       renderChart()
     }
+    else if (tab==='Risk') { const r=await etfService.getETFRiskMetrics(selectedETF.value.id); etfRisk.value=r.data }
   } catch(e){console.error(e)} finally{detailLoading.value=false}
 }
 

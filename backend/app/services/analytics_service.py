@@ -1,5 +1,5 @@
 from datetime import date
-from typing import List, Dict
+from typing import List, Dict, Optional
 from decimal import Decimal
 from uuid import UUID
 from sqlalchemy.orm import Session
@@ -139,11 +139,18 @@ class AnalyticsService:
         return {"similar_etfs": similar_etfs}
 
     @staticmethod
-    def calculate_risk_metrics(db: Session, rf_annual: float = 0.04) -> list:
-        """Compute annualized volatility, Sharpe ratio, max drawdown, and HHI for every ETF."""
+    def calculate_risk_metrics(db: Session, rf_annual: float = 0.04, etf_id: Optional[UUID] = None) -> list:
+        """Compute annualized volatility, Sharpe ratio, max drawdown, and HHI for every ETF.
+        Pass etf_id to compute for a single ETF only.
+        """
         import math
 
-        etfs = db.query(ETF).order_by(ETF.ticker).all()
+        query = db.query(ETF)
+        if etf_id:
+            query = query.filter(ETF.id == etf_id)
+        else:
+            query = query.order_by(ETF.ticker)
+        etfs = query.all()
         results = []
 
         for etf in etfs:

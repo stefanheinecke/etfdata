@@ -31,6 +31,9 @@ export const etfService = {
   getPerformance(etfId, fromDate = null, toDate = null) {
     return api.get(`/etfs/${etfId}/performance`, { params: { from_date: fromDate, to_date: toDate } })
   },
+  getETFRiskMetrics(etfId, rfRate = 0.04) {
+    return api.get(`/etfs/${etfId}/risk-metrics`, { params: { rf_rate: rfRate } })
+  },
   deleteETF(etfId) {
     return api.delete(`/etfs/${etfId}`)
   },

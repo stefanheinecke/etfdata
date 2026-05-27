@@ -117,3 +117,16 @@ async def get_performance(
 
     performance = query.order_by(Performance.date).all()
     return [p for p in performance]
+
+@router.get("/{etf_id}/risk-metrics")
+async def get_etf_risk_metrics(
+    etf_id: UUID,
+    rf_rate: float = 0.04,
+    db: Session = Depends(get_db),
+    api_key: APIKey = Depends(verify_api_key)
+):
+    from app.services.analytics_service import AnalyticsService
+    result = AnalyticsService.calculate_risk_metrics(db, rf_rate, etf_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="ETF not found")
+    return result[0]

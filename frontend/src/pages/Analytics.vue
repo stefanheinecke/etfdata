@@ -196,12 +196,12 @@
 import { ref, computed, onMounted } from 'vue'
 import { etfService, analyticsService } from '../services/api.js'
 
-const activeTab = ref('overlap')
+const activeTab = ref('risk')
 const tabs = [
+  {id:'risk',label:'Risk Metrics',icon:'📉'},
   {id:'overlap',label:'Overlap Analysis',icon:'🔗'},
   {id:'exposure',label:'Portfolio Exposure',icon:'🌍'},
   {id:'similar',label:'Similar ETFs',icon:'🔍'},
-  {id:'risk',label:'Risk Metrics',icon:'📉'},
 ]
 const allEtfs = ref([])
 const etfsLoading = ref(false)
@@ -315,6 +315,7 @@ async function loadRisk() {
     riskLoading.value = false
   }
 }
+onMounted(() => { loadETFs(); loadRisk() })
 </script>
 
 <style scoped>
