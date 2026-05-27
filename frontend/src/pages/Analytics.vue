@@ -315,6 +315,9 @@ async function loadRisk() {
     riskLoading.value = false
   }
 }
+</script>
+
+<style scoped>
 .risk-table{width:100%;border-collapse:collapse;font-size:.875rem}
 .risk-table thead tr{background:var(--bg-3)}
 .risk-table th,.risk-table td{padding:.6rem 1rem;text-align:left;border-bottom:1px solid var(--border)}
