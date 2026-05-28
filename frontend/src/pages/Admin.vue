@@ -87,6 +87,35 @@
       </div>
     </div>
 
+    <!-- Import ETF -->
+    <div class="card" style="margin-bottom:1.5rem">
+      <h2 class="card-title">Import ETF</h2>
+      <p style="font-size:.875rem;color:var(--text-muted);margin-bottom:1rem">
+        Register or refresh an iShares ETF. Metadata and 1-year performance are fetched automatically via yfinance.
+        Upload the holdings CSV from the iShares product page (optional for known tickers in the built-in list).
+      </p>
+      <div class="grid-2" style="margin-bottom:.75rem">
+        <div>
+          <label class="label">Ticker</label>
+          <input class="input" v-model="importTicker" placeholder="e.g. SWDA" style="text-transform:uppercase" />
+        </div>
+        <div>
+          <label class="label">ISIN</label>
+          <input class="input" v-model="importIsin" placeholder="e.g. IE00B4L5Y983" style="text-transform:uppercase" />
+        </div>
+      </div>
+      <label class="label">Holdings CSV <span style="font-weight:400;color:var(--text-muted)">(optional for known tickers)</span></label>
+      <input type="file" accept=".csv" class="input" style="margin-bottom:.75rem" @change="e => importCsvFile = e.target.files[0]" />
+      <button class="btn btn-primary" @click="importETF" :disabled="!adminVerified || !importTicker || !importIsin || importLoading" style="width:100%">
+        {{ importLoading ? 'Importing…' : 'Import ETF' }}
+      </button>
+      <div v-if="importError" class="error-box" style="margin-top:.75rem">{{ importError }}</div>
+      <div v-if="importResult" class="success-msg" style="margin-top:.75rem">
+        ✓ {{ importResult.name }} ({{ importResult.ticker }}) imported — {{ importResult.holdings }} holdings, {{ importResult.allocations }} allocations.
+      </div>
+      <div v-if="importLogs.length" style="margin-top:.75rem;background:#f8f9fa;border-radius:6px;padding:.75rem;font-family:monospace;font-size:.8rem;white-space:pre-wrap;max-height:200px;overflow-y:auto;">{{ importLogs.join('\n') }}</div>
+    </div>
+
     <!-- ETF Management -->
     <div class="card" style="margin-bottom:1.5rem">
       <h2 class="card-title">ETF Management</h2>
@@ -184,6 +213,14 @@ const resetLoading = ref(false)
 const dbResult = ref('')
 const dbError = ref('')
 
+const importTicker = ref('')
+const importIsin = ref('')
+const importCsvFile = ref(null)
+const importLoading = ref(false)
+const importError = ref('')
+const importResult = ref(null)
+const importLogs = ref([])
+
 const healthLoading = ref(false)
 const healthResult = ref(null)
 
@@ -219,6 +256,24 @@ async function createKey() {
     createdKey.value = r.data.api_key
   } catch(e) { createError.value = e.response?.data?.detail || e.message }
   finally { createLoading.value = false }
+}
+
+async function importETF() {
+  importLoading.value = true; importError.value = ''; importResult.value = null; importLogs.value = []
+  try {
+    const r = await adminService.importETF(
+      adminSecret.value,
+      importTicker.value.trim().toUpperCase(),
+      importIsin.value.trim().toUpperCase(),
+      importCsvFile.value || null,
+    )
+    importResult.value = r.data
+    importLogs.value = r.data.logs || []
+  } catch(e) {
+    importError.value = e.response?.data?.detail || e.message
+    importLogs.value = e.response?.data?.logs || []
+  }
+  finally { importLoading.value = false }
 }
 
 async function initDb() {

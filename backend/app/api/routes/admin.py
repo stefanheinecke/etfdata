@@ -1,5 +1,5 @@
 import os
-from fastapi import APIRouter, Depends, HTTPException, Header
+from fastapi import APIRouter, Depends, HTTPException, Header, UploadFile, File
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from uuid import UUID
@@ -27,6 +27,27 @@ def verify_admin_secret(x_admin_secret: str = Header(None)):
 @router.get("/verify")
 def verify_endpoint(_: None = Depends(verify_admin_secret)):
     return {"status": "ok"}
+
+
+@router.post("/import-etf")
+def import_etf_endpoint(
+    ticker: str,
+    isin: str,
+    csv_file: Optional[UploadFile] = File(None),
+    db: Session = Depends(get_db),
+    _: None = Depends(verify_admin_secret),
+):
+    """Register or update an iShares ETF and upload its holdings CSV."""
+    from app.services.etf_import_service import import_etf
+    csv_bytes = csv_file.file.read() if csv_file else None
+    logs: list = []
+    try:
+        result = import_etf(ticker, isin, csv_bytes, db, logs)
+        return {"status": "ok", "logs": logs, **result}
+    except (ValueError, RuntimeError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {exc}")
 
 
 @router.post("/init-db")

@@ -70,6 +70,14 @@ export const adminService = {
   verify(adminSecret) {
     return api.get('/admin/verify', { headers: { 'x-admin-secret': adminSecret } })
   },
+  importETF(adminSecret, ticker, isin, csvFile = null) {
+    const form = new FormData()
+    if (csvFile) form.append('csv_file', csvFile)
+    return api.post('/admin/import-etf', form, {
+      params: { ticker, isin },
+      headers: { 'x-admin-secret': adminSecret },
+    })
+  },
   createApiKey(adminSecret, name, rateLimit = 60) {
     return api.post(`/admin/api-keys`, null, {
       params: { name, rate_limit_per_minute: rateLimit },
