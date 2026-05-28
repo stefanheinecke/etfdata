@@ -67,6 +67,9 @@ export const healthService = {
 }
 
 export const adminService = {
+  verify(adminSecret) {
+    return api.get('/admin/verify', { headers: { 'x-admin-secret': adminSecret } })
+  },
   createApiKey(adminSecret, name, rateLimit = 60) {
     return api.post(`/admin/api-keys`, null, {
       params: { name, rate_limit_per_minute: rateLimit },

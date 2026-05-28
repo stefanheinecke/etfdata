@@ -29,9 +29,14 @@
       </p>
       <label class="label">Admin Secret</label>
       <div class="key-row">
-        <input :type="showAdmin ? 'text' : 'password'" class="input" v-model="adminSecret" placeholder="Your ADMIN_SECRET..." />
+        <input :type="showAdmin ? 'text' : 'password'" class="input" v-model="adminSecret" @input="adminVerified = false; verifyError = ''" placeholder="Your ADMIN_SECRET..." />
         <button class="btn btn-outline" @click="showAdmin=!showAdmin">{{ showAdmin ? 'Hide' : 'Show' }}</button>
+        <button class="btn btn-primary" @click="verifySecret" :disabled="!adminSecret || verifyLoading">
+          {{ verifyLoading ? 'Verifying...' : adminVerified ? '✓ Verified' : 'Verify' }}
+        </button>
       </div>
+      <div v-if="verifyError" class="error-box" style="margin-top:.5rem">{{ verifyError }}</div>
+      <div v-if="adminVerified" class="success-msg" style="margin-top:.5rem">✓ Admin secret verified — operations unlocked.</div>
     </div>
 
     <!-- Admin operations -->
@@ -43,7 +48,7 @@
         <input class="input" v-model="newKeyName" placeholder="e.g. my-app" style="margin-bottom:.75rem" />
         <label class="label">Rate Limit (req/min)</label>
         <input class="input" type="number" v-model.number="newKeyRateLimit" style="margin-bottom:.75rem" />
-        <button class="btn btn-primary" @click="createKey" :disabled="!adminSecret || !newKeyName || createLoading">
+        <button class="btn btn-primary" @click="createKey" :disabled="!adminVerified || !newKeyName || createLoading">
           {{ createLoading ? 'Creating...' : 'Create API Key' }}
         </button>
         <div v-if="createError" class="error-box" style="margin-top:.75rem">{{ createError }}</div>
@@ -59,19 +64,19 @@
         <p style="font-size:.875rem;color:var(--text-muted);margin-bottom:1.25rem">Manage the database schema and sample data.</p>
         <div style="display:flex;flex-direction:column;gap:.75rem">
           <div>
-            <button class="btn btn-outline" style="width:100%" @click="initDb" :disabled="!adminSecret || initLoading">
+            <button class="btn btn-outline" style="width:100%" @click="initDb" :disabled="!adminVerified || initLoading">
               {{ initLoading ? 'Running...' : '⚡ Init DB (create tables)' }}
             </button>
             <p style="font-size:.75rem;color:var(--text-muted);margin-top:.3rem">Creates missing tables without deleting data.</p>
           </div>
           <div>
-            <button class="btn btn-outline" style="width:100%" @click="seedDb" :disabled="!adminSecret || seedLoading">
+            <button class="btn btn-outline" style="width:100%" @click="seedDb" :disabled="!adminVerified || seedLoading">
               {{ seedLoading ? 'Seeding...' : '🌱 Seed (add missing data)' }}
             </button>
             <p style="font-size:.75rem;color:var(--text-muted);margin-top:.3rem">Inserts sample ETFs and holdings if not already present.</p>
           </div>
           <div>
-            <button class="btn btn-danger" style="width:100%" @click="confirmReset" :disabled="!adminSecret || resetLoading">
+            <button class="btn btn-danger" style="width:100%" @click="confirmReset" :disabled="!adminVerified || resetLoading">
               {{ resetLoading ? 'Resetting...' : '🗑 Reset & Reseed (wipes all ETF data)' }}
             </button>
             <p style="font-size:.75rem;color:var(--text-muted);margin-top:.3rem">Deletes all ETF data and reseeds fresh sample data.</p>
@@ -88,7 +93,7 @@
       <p style="font-size:.875rem;color:var(--text-muted);margin-bottom:1rem">
         Select ETFs to permanently delete them along with all their holdings and allocations.
       </p>
-      <button class="btn btn-outline" @click="loadETFs" :disabled="!adminSecret || etfLoading" style="margin-bottom:1rem">
+      <button class="btn btn-outline" @click="loadETFs" :disabled="!adminVerified || etfLoading" style="margin-bottom:1rem">
         {{ etfLoading ? 'Loading...' : 'Load ETF List' }}
       </button>
       <div v-if="etfError" class="error-box" style="margin-bottom:.75rem">{{ etfError }}</div>
@@ -163,6 +168,9 @@ const showKey = ref(false)
 const keySaved = ref(false)
 const adminSecret = ref('')
 const showAdmin = ref(false)
+const adminVerified = ref(false)
+const verifyLoading = ref(false)
+const verifyError = ref('')
 
 const newKeyName = ref('my-key')
 const newKeyRateLimit = ref(60)
@@ -190,6 +198,18 @@ function saveKey() {
 function useAsApiKey() {
   apiKey.value = createdKey.value
   saveKey()
+}
+
+async function verifySecret() {
+  verifyLoading.value = true; verifyError.value = ''
+  try {
+    await adminService.verify(adminSecret.value)
+    adminVerified.value = true
+  } catch(e) {
+    adminVerified.value = false
+    verifyError.value = e.response?.status === 403 ? 'Invalid admin secret.' : (e.response?.data?.detail || e.message)
+  }
+  finally { verifyLoading.value = false }
 }
 
 async function createKey() {

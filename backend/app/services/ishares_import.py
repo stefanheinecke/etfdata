@@ -78,20 +78,39 @@ _SECTOR_NAMES: dict[str, str] = {
 # For European ETFs the exchange suffix is required (SWDA.L, CSSPX.SW, etc.).
 ISHARES_ETFS: list[dict] = [
     # US-listed ETFs
-    {"yf_symbol": "IVV", "ticker": "IVV", "name": "iShares Core S&P 500 ETF", "isin": "US4642872000", "currency": "USD", "domicile": "US", "ter": 0.03, "replication_method": "Physical", "benchmark": "S&P 500 Index"},
-    {"yf_symbol": "IWM", "ticker": "IWM", "name": "iShares Russell 2000 ETF", "isin": "US4642876555", "currency": "USD", "domicile": "US", "ter": 0.19, "replication_method": "Physical", "benchmark": "Russell 2000 Index"},
-    {"yf_symbol": "IWF", "ticker": "IWF", "name": "iShares Russell 1000 Growth ETF", "isin": "US4642876308", "currency": "USD", "domicile": "US", "ter": 0.19, "replication_method": "Physical", "benchmark": "Russell 1000 Growth Index"},
-    {"yf_symbol": "IWD", "ticker": "IWD", "name": "iShares Russell 1000 Value ETF", "isin": "US4642876316", "currency": "USD", "domicile": "US", "ter": 0.19, "replication_method": "Physical", "benchmark": "Russell 1000 Value Index"},
-    {"yf_symbol": "IJH", "ticker": "IJH", "name": "iShares Core S&P Mid-Cap ETF", "isin": "US4642874329", "currency": "USD", "domicile": "US", "ter": 0.05, "replication_method": "Physical", "benchmark": "S&P MidCap 400 Index"},
-    {"yf_symbol": "IJR", "ticker": "IJR", "name": "iShares Core S&P Small-Cap ETF", "isin": "US46428V7X74", "currency": "USD", "domicile": "US", "ter": 0.06, "replication_method": "Physical", "benchmark": "S&P SmallCap 600 Index"},
-    {"yf_symbol": "EFA", "ticker": "EFA", "name": "iShares MSCI EAFE ETF", "isin": "US4642874659", "currency": "USD", "domicile": "US", "ter": 0.32, "replication_method": "Physical", "benchmark": "MSCI EAFE Index"},
-    {"yf_symbol": "EEM", "ticker": "EEM", "name": "iShares MSCI Emerging Markets ETF", "isin": "US4642864657", "currency": "USD", "domicile": "US", "ter": 0.68, "replication_method": "Physical", "benchmark": "MSCI Emerging Markets Index"},
-    {"yf_symbol": "AGG", "ticker": "AGG", "name": "iShares Core U.S. Aggregate Bond ETF", "isin": "US4642872422", "currency": "USD", "domicile": "US", "ter": 0.03, "replication_method": "Physical", "benchmark": "Bloomberg U.S. Aggregate Bond Index"},
-    {"yf_symbol": "LQD", "ticker": "LQD", "name": "iShares iBoxx $ Investment Grade Corporate Bond ETF", "isin": "US4642881041", "currency": "USD", "domicile": "US", "ter": 0.14, "replication_method": "Physical", "benchmark": "Markit iBoxx USD Liquid Investment Grade Index"},
-    # European UCITS ETFs - Yahoo Finance exchange suffixes required
-    {"yf_symbol": "SWDA.L", "ticker": "SWDA", "name": "iShares Core MSCI World UCITS ETF USD (Acc)", "isin": "IE00B4L5Y983", "currency": "USD", "domicile": "IE", "ter": 0.20, "replication_method": "Physical", "benchmark": "MSCI World Index"},
-    {"yf_symbol": "CSSPX.SW", "ticker": "CSSPX", "name": "iShares Core S&P 500 UCITS ETF USD (Acc)", "isin": "IE00B5BMR087", "currency": "USD", "domicile": "IE", "ter": 0.07, "replication_method": "Physical", "benchmark": "S&P 500 Index"},
-    {"yf_symbol": "IEDY.L", "ticker": "IEDY", "name": "iShares Emerging Markets Dividend UCITS ETF", "isin": "IE00B652H904", "currency": "USD", "domicile": "IE", "ter": 0.65, "replication_method": "Physical", "benchmark": "Dow Jones Emerging Markets Select Dividend Index"},
+    # Download URL pattern: https://www.ishares.com/us/products/{id}/{TICKER}/1467271812596.ajax?tab=all&fileType=csv
+    {"yf_symbol": "IVV", "ticker": "IVV", "name": "iShares Core S&P 500 ETF", "isin": "US4642872000", "currency": "USD", "domicile": "US", "ter": 0.03, "replication_method": "Physical", "benchmark": "S&P 500 Index",
+     "holdings_url": "https://www.ishares.com/us/products/239726/ISHARES_CORE_SP_500_ETF/1467271812596.ajax?tab=all&fileType=csv"},
+    {"yf_symbol": "IWM", "ticker": "IWM", "name": "iShares Russell 2000 ETF", "isin": "US4642876555", "currency": "USD", "domicile": "US", "ter": 0.19, "replication_method": "Physical", "benchmark": "Russell 2000 Index",
+     "holdings_url": "https://www.ishares.com/us/products/239710/ISHARES_RUSSELL_2000_ETF/1467271812596.ajax?tab=all&fileType=csv"},
+    {"yf_symbol": "IWF", "ticker": "IWF", "name": "iShares Russell 1000 Growth ETF", "isin": "US4642876308", "currency": "USD", "domicile": "US", "ter": 0.19, "replication_method": "Physical", "benchmark": "Russell 1000 Growth Index",
+     "holdings_url": "https://www.ishares.com/us/products/239706/ISHARES_RUSSELL_1000_GROWTH_ETF/1467271812596.ajax?tab=all&fileType=csv"},
+    {"yf_symbol": "IWD", "ticker": "IWD", "name": "iShares Russell 1000 Value ETF", "isin": "US4642876316", "currency": "USD", "domicile": "US", "ter": 0.19, "replication_method": "Physical", "benchmark": "Russell 1000 Value Index",
+     "holdings_url": "https://www.ishares.com/us/products/239708/ISHARES_RUSSELL_1000_VALUE_ETF/1467271812596.ajax?tab=all&fileType=csv"},
+    {"yf_symbol": "IJH", "ticker": "IJH", "name": "iShares Core S&P Mid-Cap ETF", "isin": "US4642874329", "currency": "USD", "domicile": "US", "ter": 0.05, "replication_method": "Physical", "benchmark": "S&P MidCap 400 Index",
+     "holdings_url": "https://www.ishares.com/us/products/239763/ISHARES_CORE_SP_MIDCAP_ETF/1467271812596.ajax?tab=all&fileType=csv"},
+    {"yf_symbol": "IJR", "ticker": "IJR", "name": "iShares Core S&P Small-Cap ETF", "isin": "US46428V7X74", "currency": "USD", "domicile": "US", "ter": 0.06, "replication_method": "Physical", "benchmark": "S&P SmallCap 600 Index",
+     "holdings_url": "https://www.ishares.com/us/products/239774/ISHARES_CORE_SP_SMALLCAP_ETF/1467271812596.ajax?tab=all&fileType=csv"},
+    {"yf_symbol": "EFA", "ticker": "EFA", "name": "iShares MSCI EAFE ETF", "isin": "US4642874659", "currency": "USD", "domicile": "US", "ter": 0.32, "replication_method": "Physical", "benchmark": "MSCI EAFE Index",
+     "holdings_url": "https://www.ishares.com/us/products/239623/ISHARES_MSCI_EAFE_ETF/1467271812596.ajax?tab=all&fileType=csv"},
+    {"yf_symbol": "EEM", "ticker": "EEM", "name": "iShares MSCI Emerging Markets ETF", "isin": "US4642864657", "currency": "USD", "domicile": "US", "ter": 0.68, "replication_method": "Physical", "benchmark": "MSCI Emerging Markets Index",
+     "holdings_url": "https://www.ishares.com/us/products/239637/ISHARES_MSCI_EMERGING_MARKETS_ETF/1467271812596.ajax?tab=all&fileType=csv"},
+    {"yf_symbol": "AGG", "ticker": "AGG", "name": "iShares Core U.S. Aggregate Bond ETF", "isin": "US4642872422", "currency": "USD", "domicile": "US", "ter": 0.03, "replication_method": "Physical", "benchmark": "Bloomberg U.S. Aggregate Bond Index",
+     "holdings_url": "https://www.ishares.com/us/products/239458/ISHARES_CORE_TOTAL_US_BOND_MARKET_ETF/1467271812596.ajax?tab=all&fileType=csv"},
+    {"yf_symbol": "LQD", "ticker": "LQD", "name": "iShares iBoxx $ Investment Grade Corporate Bond ETF", "isin": "US4642881041", "currency": "USD", "domicile": "US", "ter": 0.14, "replication_method": "Physical", "benchmark": "Markit iBoxx USD Liquid Investment Grade Index",
+     "holdings_url": "https://www.ishares.com/us/products/239566/ISHARES_IBOXX_INVESTMENT_GRADE_CORPORATE_BOND_ETF/1467271812596.ajax?tab=all&fileType=csv"},
+    # European UCITS ETFs
+    # Download URL pattern: https://www.ishares.com/uk/individual/en/products/{id}/{SLUG}/1467271812596.ajax?tab=all&fileType=csv
+    {"yf_symbol": "SWDA.L", "ticker": "SWDA", "name": "iShares Core MSCI World UCITS ETF USD (Acc)", "isin": "IE00B4L5Y983", "currency": "USD", "domicile": "IE", "ter": 0.20, "replication_method": "Physical", "benchmark": "MSCI World Index",
+     "holdings_url": "https://www.ishares.com/uk/individual/en/products/251882/ISHARES_CORE_MSCI_WORLD_UCITS_ETF_USD_ACC/1467271812596.ajax?tab=all&fileType=csv"},
+    {"yf_symbol": "CSSPX.SW", "ticker": "CSSPX", "name": "iShares Core S&P 500 UCITS ETF USD (Acc)", "isin": "IE00B5BMR087", "currency": "USD", "domicile": "IE", "ter": 0.07, "replication_method": "Physical", "benchmark": "S&P 500 Index",
+     "holdings_url": "https://www.ishares.com/uk/individual/en/products/253743/ISHARES_CORE_SP_500_UCITS_ETF_USD_ACC/1467271812596.ajax?tab=all&fileType=csv"},
+    {"yf_symbol": "CSNDX.SW", "ticker": "CSNDX", "name": "iShares Core NASDAQ 100 UCITS ETF USD (Acc)", "isin": "IE00B53SZB19", "currency": "USD", "domicile": "IE", "ter": 0.33, "replication_method": "Physical", "benchmark": "NASDAQ-100 Index",
+     "holdings_url": "https://www.ishares.com/uk/individual/en/products/253741/ISHARES_NASDAQ_100_UCITS_ETF/1467271812596.ajax?tab=all&fileType=csv"},
+    {"yf_symbol": "CSNKY.L", "ticker": "CSNKY", "name": "iShares Core MSCI Japan IMI UCITS ETF USD (Acc)", "isin": "IE00B52MJD48", "currency": "USD", "domicile": "IE", "ter": 0.15, "replication_method": "Physical", "benchmark": "MSCI Japan IMI Index",
+     "holdings_url": "https://www.ishares.com/uk/individual/en/products/264659/ISHARES_CORE_MSCI_JAPAN_IMI_UCITS_ETF/1467271812596.ajax?tab=all&fileType=csv"},
+    {"yf_symbol": "IEDY.L", "ticker": "IEDY", "name": "iShares Emerging Markets Dividend UCITS ETF", "isin": "IE00B652H904", "currency": "USD", "domicile": "IE", "ter": 0.65, "replication_method": "Physical", "benchmark": "Dow Jones Emerging Markets Select Dividend Index",
+     "holdings_url": "https://www.ishares.com/uk/individual/en/products/264139/ISHARES_EM_DIVIDEND_UCITS_ETF/1467271812596.ajax?tab=all&fileType=csv"},
 ]
 
 

@@ -6,13 +6,28 @@ Also uploads 1 year of daily performance data.  All metadata can be
 overridden via flags; sensible iShares defaults are applied.
 
 Usage:
-    python add_etf.py --ticker SWDA --isin IE00B4L5Y983 --csv SWDA_holdings.csv \\
+    # Known ticker — downloads holdings CSV automatically, no --csv needed:
+    python add_etf.py --ticker SWDA --isin IE00B4L5Y983 \\
         --db "postgresql://user:pass@host:5432/railway"
 
-    # Override auto-fetched / default fields:
-    python add_etf.py --ticker IEDY --isin IE00B0M63177 --csv SEDY_holdings.csv \\
+    # Unknown ticker — provide a direct download URL:
+    python add_etf.py --ticker CSNKY --isin IE00B52MJD48 \\
+        --download-url "https://www.ishares.com/uk/individual/en/products/{id}/{SLUG}/1467271812596.ajax?tab=all&fileType=csv" \\
+        --db "postgresql://..."
+
+    # Use a pre-downloaded local CSV:
+    python add_etf.py --ticker IEDY --isin IE00B652H904 --csv IEDY_holdings.csv \\
+        --db "postgresql://..."
+
+    # Override auto-fetched fields:
+    python add_etf.py --ticker IEDY --isin IE00B0M63177 \\
         --name "iShares MSCI EM UCITS ETF" --ter 0.18 --benchmark "MSCI Emerging Markets" \\
         --db "postgresql://..."
+
+How to find the iShares download URL:
+    1. Open the ETF product page on ishares.com
+    2. Right-click the "Download" button next to Holdings
+    3. Copy the link address — it matches the pattern above
 """
 
 import argparse
@@ -29,6 +44,60 @@ from sqlalchemy.pool import NullPool
 sys.path.insert(0, os.path.join(os.path.dirname(__file__)))
 from app.schemas import ETF, Performance
 from app.services.ishares_import import ISHARES_ETFS
+
+
+# ---------------------------------------------------------------------------
+# Holdings CSV download
+# ---------------------------------------------------------------------------
+
+def _download_holdings(url: str, ticker: str, save_path: str = None) -> str:
+    """
+    Download an iShares holdings CSV from *url* using browser-like headers.
+    Saves the file to *save_path* if given, otherwise to
+    {TICKER}_holdings_{today}.csv in the current working directory.
+    Returns the path to the saved file.
+    """
+    import requests
+
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/124.0.0.0 Safari/537.36"
+        ),
+        "Accept": "text/csv,application/csv,text/plain,*/*",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Referer": "https://www.ishares.com/",
+    }
+
+    print(f"Downloading holdings CSV ...")
+    print(f"  URL: {url}")
+    try:
+        resp = requests.get(url, headers=headers, timeout=30)
+    except requests.RequestException as exc:
+        raise RuntimeError(f"Network error: {exc}")
+
+    if resp.status_code != 200:
+        raise RuntimeError(f"HTTP {resp.status_code} — download failed.")
+
+    # iShares sometimes returns an HTML login/cookie wall instead of CSV
+    content_type = resp.headers.get("Content-Type", "")
+    text_start = resp.content[:200].decode("utf-8", errors="ignore").lstrip()
+    if "html" in content_type.lower() or text_start.lower().startswith("<!doctype"):
+        raise RuntimeError(
+            "iShares returned an HTML page instead of a CSV.\n"
+            "  The URL may require an active browser session or has changed.\n"
+            "  → Open the URL in a browser, download the file manually, then pass --csv <file>."
+        )
+
+    if save_path is None:
+        save_path = f"{ticker.upper()}_holdings_{date.today().isoformat()}.csv"
+
+    with open(save_path, "wb") as fh:
+        fh.write(resp.content)
+
+    print(f"  Saved {len(resp.content):,} bytes → {save_path}")
+    return save_path
 
 
 # ---------------------------------------------------------------------------
@@ -100,8 +169,15 @@ def main() -> None:
     parser.add_argument("--yf-symbol", default=None, dest="yf_symbol",
                         help="Yahoo Finance symbol with exchange suffix (e.g. SWDA.L, CSSPX.SW). "
                              "Auto-resolved from built-in list; only needed for unlisted ETFs.")
-    parser.add_argument("--csv", required=True,
-                        help="Path to the iShares holdings CSV file")
+    parser.add_argument("--csv", default=None,
+                        help="Path to the iShares holdings CSV file. "
+                             "If omitted the file is downloaded automatically "
+                             "(requires --download-url or a known ticker in the built-in list).")
+    parser.add_argument("--download-url", default=None, dest="download_url",
+                        help="Direct URL to the iShares holdings CSV download page. "
+                             "Auto-resolved from built-in list for known tickers; "
+                             "only needed for unlisted ETFs. "
+                             "URL pattern (UK): https://www.ishares.com/uk/individual/en/products/{id}/{SLUG}/1467271812596.ajax?tab=all&fileType=csv")
     parser.add_argument("--db", default=None,
                         help="DATABASE_URL (overrides DATABASE_PUBLIC_URL env var)")
 
@@ -138,7 +214,24 @@ def main() -> None:
     yf_symbol = args.yf_symbol or (known["yf_symbol"] if known else args.ticker)
     known_ter       = known["ter"]       if known else None
     known_benchmark = known["benchmark"] if known else None
+    known_url       = known.get("holdings_url") if known else None
     print(f"Using yfinance symbol: {yf_symbol}")
+
+    # -- Resolve holdings CSV (download if --csv not provided) --
+    csv_path = args.csv
+    if csv_path is None:
+        download_url = args.download_url or known_url
+        if download_url is None:
+            sys.exit(
+                "ERROR: No holdings CSV provided.\n"
+                "  Pass --csv <file> to use a local file, or\n"
+                "  pass --download-url <url> to download from iShares, or\n"
+                "  add the ticker to the built-in ISHARES_ETFS list with a holdings_url."
+            )
+        try:
+            csv_path = _download_holdings(download_url, args.ticker)
+        except RuntimeError as exc:
+            sys.exit(f"ERROR downloading holdings: {exc}")
 
     # -- Fetch metadata from yfinance --
     print(f"Fetching metadata for {args.ticker} from yfinance ...")
@@ -218,11 +311,11 @@ def main() -> None:
         db.close()
 
     # -- Upload holdings via upload.py --
-    print(f"\nUploading holdings from {args.csv} ...")
+    print(f"\nUploading holdings from {csv_path} ...")
     upload_script = os.path.join(os.path.dirname(__file__), "upload.py")
     cmd = [
         sys.executable, upload_script,
-        "--csv", args.csv,
+        "--csv", csv_path,
         "--ticker", args.ticker,
         "--db", db_url,
     ]
