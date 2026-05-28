@@ -104,6 +104,16 @@
           <input class="input" v-model="importIsin" placeholder="e.g. IE00B4L5Y983" style="text-transform:uppercase" />
         </div>
       </div>
+      <div class="grid-2" style="margin-bottom:.75rem">
+        <div>
+          <label class="label">Name <span style="font-weight:400;color:var(--text-muted)">(optional — overrides yfinance)</span></label>
+          <input class="input" v-model="importName" placeholder="e.g. iShares Core FTSE 100 UCITS ETF" />
+        </div>
+        <div>
+          <label class="label">TER % <span style="font-weight:400;color:var(--text-muted)">(optional — overrides yfinance)</span></label>
+          <input class="input" type="number" step="0.01" v-model.number="importTer" placeholder="e.g. 0.07" />
+        </div>
+      </div>
       <label class="label">Holdings CSV <span style="font-weight:400;color:var(--text-muted)">(optional for known tickers)</span></label>
       <input type="file" accept=".csv" class="input" style="margin-bottom:.75rem" @change="e => importCsvFile = e.target.files[0]" />
       <button class="btn btn-primary" @click="importETF" :disabled="!adminVerified || !importTicker || !importIsin || importLoading" style="width:100%">
@@ -215,6 +225,8 @@ const dbError = ref('')
 
 const importTicker = ref('')
 const importIsin = ref('')
+const importName = ref('')
+const importTer = ref(null)
 const importCsvFile = ref(null)
 const importLoading = ref(false)
 const importError = ref('')
@@ -266,6 +278,8 @@ async function importETF() {
       importTicker.value.trim().toUpperCase(),
       importIsin.value.trim().toUpperCase(),
       importCsvFile.value || null,
+      importName.value.trim() || null,
+      importTer.value != null && importTer.value !== '' ? importTer.value : null,
     )
     importResult.value = r.data
     importLogs.value = r.data.logs || []

@@ -33,6 +33,8 @@ def verify_endpoint(_: None = Depends(verify_admin_secret)):
 def import_etf_endpoint(
     ticker: str,
     isin: str,
+    name: Optional[str] = None,
+    ter: Optional[float] = None,
     csv_file: Optional[UploadFile] = File(None),
     db: Session = Depends(get_db),
     _: None = Depends(verify_admin_secret),
@@ -42,7 +44,7 @@ def import_etf_endpoint(
     csv_bytes = csv_file.file.read() if csv_file else None
     logs: list = []
     try:
-        result = import_etf(ticker, isin, csv_bytes, db, logs)
+        result = import_etf(ticker, isin, csv_bytes, db, logs, name_override=name, ter_override=ter)
         return {"status": "ok", "logs": logs, **result}
     except (ValueError, RuntimeError) as exc:
         raise HTTPException(status_code=400, detail=str(exc))

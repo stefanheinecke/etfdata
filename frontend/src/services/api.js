@@ -70,11 +70,14 @@ export const adminService = {
   verify(adminSecret) {
     return api.get('/admin/verify', { headers: { 'x-admin-secret': adminSecret } })
   },
-  importETF(adminSecret, ticker, isin, csvFile = null) {
+  importETF(adminSecret, ticker, isin, csvFile = null, name = null, ter = null) {
     const form = new FormData()
     if (csvFile) form.append('csv_file', csvFile)
+    const params = { ticker, isin }
+    if (name) params.name = name
+    if (ter != null) params.ter = ter
     return api.post('/admin/import-etf', form, {
-      params: { ticker, isin },
+      params,
       headers: { 'x-admin-secret': adminSecret },
     })
   },

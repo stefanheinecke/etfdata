@@ -202,6 +202,8 @@ def import_etf(
     csv_bytes: bytes | None,
     db,
     logs: list,
+    name_override: str | None = None,
+    ter_override: float | None = None,
 ) -> dict:
     """
     Full ETF import pipeline (metadata + performance + holdings) in-process.
@@ -268,9 +270,9 @@ def import_etf(
     # ---- yfinance metadata ----
     logs.append(f"Fetching metadata from yfinance ({yf_symbol})...")
     yf_meta   = _fetch_yf_meta(yf_symbol, logs)
-    name      = yf_meta.get("name") or ticker
+    name      = name_override or yf_meta.get("name") or ticker
     currency  = yf_meta.get("currency") or "USD"
-    ter       = yf_meta.get("ter") if yf_meta.get("ter") is not None else known_ter
+    ter       = ter_override if ter_override is not None else (yf_meta.get("ter") if yf_meta.get("ter") is not None else known_ter)
     fund_size = yf_meta.get("fund_size")
     benchmark = known_bench
     logs.append(f"  name={name}, currency={currency}, ter={ter}%, benchmark={benchmark}")
