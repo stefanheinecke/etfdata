@@ -81,9 +81,11 @@ export const adminService = {
       headers: { 'x-admin-secret': adminSecret },
     })
   },
-  createApiKey(adminSecret, name, rateLimit = 60) {
+  createApiKey(adminSecret, name, rateLimit = 60, email = null) {
+    const params = { name, rate_limit_per_minute: rateLimit }
+    if (email) params.email = email
     return api.post(`/admin/api-keys`, null, {
-      params: { name, rate_limit_per_minute: rateLimit },
+      params,
       headers: { 'x-admin-secret': adminSecret }
     })
   },

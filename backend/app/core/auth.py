@@ -36,13 +36,14 @@ async def verify_api_key(
 
     return api_key
 
-def create_api_key(db: Session, name: str, rate_limit_per_minute: int = 60):
+def create_api_key(db: Session, name: str, rate_limit_per_minute: int = 60, email: str = None):
     raw_key = generate_api_key()
     hashed_key = hash_api_key(raw_key)
 
     db_key = APIKey(
         key=hashed_key,
         name=name,
+        email=email,
         rate_limit_per_minute=rate_limit_per_minute
     )
     db.add(db_key)

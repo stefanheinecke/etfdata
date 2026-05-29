@@ -48,6 +48,8 @@
         <input class="input" v-model="newKeyName" placeholder="e.g. my-app" style="margin-bottom:.75rem" />
         <label class="label">Rate Limit (req/min)</label>
         <input class="input" type="number" v-model.number="newKeyRateLimit" style="margin-bottom:.75rem" />
+        <label class="label">User Email <span style="font-weight:400;color:var(--text-muted)">(optional)</span></label>
+        <input class="input" type="email" v-model="newKeyEmail" placeholder="user@example.com" style="margin-bottom:.75rem" />
         <button class="btn btn-primary" @click="createKey" :disabled="!adminVerified || !newKeyName || createLoading">
           {{ createLoading ? 'Creating...' : 'Create API Key' }}
         </button>
@@ -213,6 +215,7 @@ const verifyError = ref('')
 
 const newKeyName = ref('my-key')
 const newKeyRateLimit = ref(60)
+const newKeyEmail = ref('')
 const createLoading = ref(false)
 const createError = ref('')
 const createdKey = ref('')
@@ -264,7 +267,7 @@ async function verifySecret() {
 async function createKey() {
   createLoading.value = true; createError.value = ''; createdKey.value = ''
   try {
-    const r = await adminService.createApiKey(adminSecret.value, newKeyName.value, newKeyRateLimit.value)
+    const r = await adminService.createApiKey(adminSecret.value, newKeyName.value, newKeyRateLimit.value, newKeyEmail.value || null)
     createdKey.value = r.data.api_key
   } catch(e) { createError.value = e.response?.data?.detail || e.message }
   finally { createLoading.value = false }

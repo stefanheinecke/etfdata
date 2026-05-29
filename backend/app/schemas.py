@@ -92,6 +92,7 @@ class APIKey(Base):
     id = Column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
     key = Column(String(64), unique=True, nullable=False, index=True)
     name = Column(String(100), nullable=False)
+    email = Column(String(255), nullable=True)
     rate_limit_per_minute = Column(Integer, default=60)
     is_active = Column(Boolean, default=True, index=True)
     created_at = Column(DateTime, default=datetime.utcnow)

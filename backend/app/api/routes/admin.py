@@ -62,14 +62,16 @@ def init_db_endpoint(_: None = Depends(verify_admin_secret)):
 @router.post("/api-keys")
 def create_key(
     name: str,
+    email: Optional[str] = None,
     rate_limit_per_minute: int = 60,
     db: Session = Depends(get_db),
     _: None = Depends(verify_admin_secret),
 ):
-    raw_key, db_key = create_api_key(db, name=name, rate_limit_per_minute=rate_limit_per_minute)
+    raw_key, db_key = create_api_key(db, name=name, rate_limit_per_minute=rate_limit_per_minute, email=email)
     return {
         "api_key": raw_key,
         "name": db_key.name,
+        "email": db_key.email,
         "id": str(db_key.id),
         "rate_limit_per_minute": db_key.rate_limit_per_minute,
     }

@@ -23,4 +23,9 @@ def get_db():
 
 def init_db():
     from app.schemas import Base
+    from sqlalchemy import text
     Base.metadata.create_all(bind=engine)
+    # Additive column migrations (idempotent via IF NOT EXISTS)
+    with engine.connect() as conn:
+        conn.execute(text("ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS email VARCHAR(255)"))
+        conn.commit()
