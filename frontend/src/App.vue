@@ -33,7 +33,8 @@
       <ETFList v-else-if="currentPage === 'etfs'" />
       <Analytics v-else-if="currentPage === 'analytics'" />
       <ApiDocs v-else-if="currentPage === 'docs'" />
-      <Admin v-else-if="currentPage === 'admin'" />
+      <Admin v-else-if="currentPage === 'admin' && adminActive" />
+      <Home v-else-if="currentPage === 'admin' && !adminActive" @navigate="currentPage = $event" />
     </main>
 
     <!-- Disclaimer -->
@@ -55,19 +56,45 @@
           <button @click="currentPage = 'analytics'">Analytics</button>
           <button @click="currentPage = 'docs'">API Docs</button>
           <button v-if="adminActive" @click="currentPage = 'admin'">Admin</button>
-          <button v-else @click="currentPage = 'admin'" style="opacity:.4;font-size:.8rem">Admin</button>
+          <button v-else @click="showAdminLogin = true" class="admin-lock-btn" title="Admin login">🔒</button>
         </div>
         <p class="footer-copy">© {{ new Date().getFullYear() }} ETF Data. Not investment advice.</p>
       </div>
     </footer>
     <!-- Get API Key Modal -->
     <GetApiKeyModal :show="showApiKeyModal" @close="showApiKeyModal = false" />
+
+    <!-- Admin Login Modal -->
+    <Teleport to="body">
+      <div v-if="showAdminLogin" class="modal-backdrop" @click.self="showAdminLogin = false">
+        <div class="admin-login-modal">
+          <h3 class="admin-login-title">🔐 Admin Login</h3>
+          <p class="admin-login-sub">Enter your <code>ADMIN_SECRET</code> to continue.</p>
+          <input
+            :type="adminLoginShow ? 'text' : 'password'"
+            v-model="adminLoginSecret"
+            class="admin-login-input"
+            placeholder="Admin secret…"
+            @keydown.enter="doAdminLogin"
+            autofocus
+          />
+          <div v-if="adminLoginError" class="admin-login-error">{{ adminLoginError }}</div>
+          <div class="admin-login-actions">
+            <button class="admin-login-toggle" @click="adminLoginShow = !adminLoginShow">{{ adminLoginShow ? 'Hide' : 'Show' }}</button>
+            <button class="admin-login-cancel" @click="showAdminLogin = false">Cancel</button>
+            <button class="admin-login-submit" @click="doAdminLogin" :disabled="!adminLoginSecret || adminLoginLoading">
+              {{ adminLoginLoading ? 'Verifying…' : 'Log In' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted, provide } from 'vue'
-import { healthService } from './services/api.js'
+import { healthService, adminService } from './services/api.js'
 
 const adminActive = ref(!!sessionStorage.getItem('admin_secret'))
 function setAdminActive(val) {
@@ -75,6 +102,30 @@ function setAdminActive(val) {
   if (!val) sessionStorage.removeItem('admin_secret')
 }
 provide('setAdminActive', setAdminActive)
+
+// Admin login modal state (in App.vue so non-admins never see the Admin page)
+const showAdminLogin = ref(false)
+const adminLoginSecret = ref('')
+const adminLoginShow = ref(false)
+const adminLoginLoading = ref(false)
+const adminLoginError = ref('')
+
+async function doAdminLogin() {
+  if (!adminLoginSecret.value || adminLoginLoading.value) return
+  adminLoginLoading.value = true; adminLoginError.value = ''
+  try {
+    await adminService.verify(adminLoginSecret.value)
+    sessionStorage.setItem('admin_secret', adminLoginSecret.value)
+    setAdminActive(true)
+    showAdminLogin.value = false
+    adminLoginSecret.value = ''
+    currentPage.value = 'admin'
+  } catch (e) {
+    adminLoginError.value = e.response?.status === 403 ? 'Invalid admin secret.' : (e.response?.data?.detail || e.message)
+  } finally {
+    adminLoginLoading.value = false
+  }
+}
 import Home from './pages/Home.vue'
 import ETFList from './pages/ETFList.vue'
 import Analytics from './pages/Analytics.vue'
@@ -215,6 +266,41 @@ onMounted(async () => {
 }
 .footer-links button:hover { color: var(--green-600); }
 .footer-copy { font-size: .8rem; color: var(--text-muted); }
+/* Admin lock icon button in footer */
+.admin-lock-btn {
+  background: none; border: none; cursor: pointer;
+  font-size: .85rem; opacity: .25; padding: 0 .25rem;
+  transition: opacity .2s;
+}
+.admin-lock-btn:hover { opacity: .6; }
+/* Admin login modal */
+.modal-backdrop {
+  position: fixed; inset: 0; z-index: 1000;
+  background: rgba(0,0,0,.5); backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center;
+}
+.admin-login-modal {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 14px; padding: 2rem; width: 100%; max-width: 380px;
+  box-shadow: 0 20px 60px rgba(0,0,0,.3);
+}
+.admin-login-title { font-size: 1.1rem; font-weight: 700; margin-bottom: .35rem; }
+.admin-login-sub { font-size: .85rem; color: var(--text-muted); margin-bottom: 1rem; }
+.admin-login-input {
+  width: 100%; box-sizing: border-box;
+  padding: .6rem .85rem; border: 1px solid var(--border);
+  border-radius: 8px; font-size: .9rem; background: var(--bg-2);
+  color: var(--text); font-family: inherit; margin-bottom: .5rem;
+}
+.admin-login-input:focus { outline: 2px solid var(--green-400); border-color: transparent; }
+.admin-login-error { color: #dc2626; font-size: .82rem; margin-bottom: .5rem; }
+.admin-login-actions { display: flex; gap: .5rem; justify-content: flex-end; margin-top: .75rem; }
+.admin-login-toggle { background: none; border: 1px solid var(--border); border-radius: 7px; padding: .45rem .8rem; cursor: pointer; font-size: .82rem; color: var(--text-muted); font-family: inherit; }
+.admin-login-cancel { background: none; border: 1px solid var(--border); border-radius: 7px; padding: .45rem .8rem; cursor: pointer; font-size: .85rem; color: var(--text-muted); font-family: inherit; }
+.admin-login-cancel:hover { background: var(--bg-3); }
+.admin-login-submit { background: linear-gradient(135deg,#667eea,#764ba2); color: #fff; border: none; border-radius: 7px; padding: .45rem 1.1rem; font-weight: 700; font-size: .875rem; cursor: pointer; font-family: inherit; }
+.admin-login-submit:disabled { opacity: .5; cursor: not-allowed; }
+.admin-login-submit:not(:disabled):hover { opacity: .9; }
 
 /* Shared page styles */
 .page { max-width: 1280px; margin: 0 auto; padding: 2rem 1.5rem; }
