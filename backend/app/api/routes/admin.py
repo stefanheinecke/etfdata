@@ -77,6 +77,50 @@ def create_key(
     }
 
 
+@router.get("/request-logs")
+def get_request_logs(
+    limit: int = 100,
+    offset: int = 0,
+    api_key_name: Optional[str] = None,
+    email: Optional[str] = None,
+    path: Optional[str] = None,
+    db: Session = Depends(get_db),
+    _: None = Depends(verify_admin_secret),
+):
+    """Return paginated request logs, newest first. Filter by api_key_name, email, or path prefix."""
+    from app.schemas import RequestLog
+    q = db.query(RequestLog)
+    if api_key_name:
+        q = q.filter(RequestLog.api_key_name.ilike(f"%{api_key_name}%"))
+    if email:
+        q = q.filter(RequestLog.email.ilike(f"%{email}%"))
+    if path:
+        q = q.filter(RequestLog.path.ilike(f"{path}%"))
+    total = q.count()
+    rows = q.order_by(RequestLog.created_at.desc()).offset(offset).limit(limit).all()
+    return {
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+        "logs": [
+            {
+                "id": r.id,
+                "api_key_name": r.api_key_name,
+                "email": r.email,
+                "method": r.method,
+                "path": r.path,
+                "query_string": r.query_string,
+                "request_body": r.request_body,
+                "status_code": r.status_code,
+                "response_time_ms": r.response_time_ms,
+                "client_ip": r.client_ip,
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+            }
+            for r in rows
+        ],
+    }
+
+
 @router.post("/reset")
 def reset(
     db: Session = Depends(get_db),

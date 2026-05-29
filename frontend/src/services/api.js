@@ -109,6 +109,13 @@ export const adminService = {
       data: etfIds,
       headers: { 'x-admin-secret': adminSecret }
     })
-  }
+  },
+  requestLogs(adminSecret, { limit = 100, offset = 0, api_key_name = '', email = '', path = '' } = {}) {
+    const params = { limit, offset }
+    if (api_key_name) params.api_key_name = api_key_name
+    if (email) params.email = email
+    if (path) params.path = path
+    return api.get('/admin/request-logs', { params, headers: { 'x-admin-secret': adminSecret } })
+  },
 }
 

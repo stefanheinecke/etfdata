@@ -99,6 +99,27 @@ class APIKey(Base):
     last_used_at = Column(DateTime)
     expires_at = Column(DateTime)
 
+class RequestLog(Base):
+    __tablename__ = "request_logs"
+
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    api_key_id = Column(PGUUID(as_uuid=True), ForeignKey("api_keys.id", ondelete="SET NULL"), nullable=True, index=True)
+    api_key_name = Column(String(100))
+    email = Column(String(255))
+    method = Column(String(10), nullable=False)
+    path = Column(String(500), nullable=False)
+    query_string = Column(Text)
+    request_body = Column(Text)
+    status_code = Column(Integer)
+    response_time_ms = Column(Integer)
+    client_ip = Column(String(50))
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+    __table_args__ = (
+        Index("idx_request_logs_created_at", "created_at"),
+        Index("idx_request_logs_api_key_id", "api_key_id"),
+    )
+
 class ETLJob(Base):
     __tablename__ = "etl_jobs"
 

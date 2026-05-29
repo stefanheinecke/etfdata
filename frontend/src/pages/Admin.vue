@@ -188,6 +188,61 @@
       </div>
     </div>
 
+    <!-- Request Logs -->
+    <div v-if="adminVerified" class="card" style="margin-top:1.5rem">
+      <h2 class="section-title">📡 Request Logs</h2>
+      <div class="log-filters">
+        <input v-model="logFilterName" class="input" placeholder="Filter by key name…" style="flex:1" />
+        <input v-model="logFilterEmail" class="input" placeholder="Filter by email…" style="flex:1" />
+        <input v-model="logFilterPath" class="input" placeholder="Filter by path prefix…" style="flex:1" />
+        <button class="btn" @click="loadLogs(0)" :disabled="logsLoading">{{ logsLoading ? 'Loading…' : 'Search' }}</button>
+      </div>
+      <div v-if="logsError" class="error-msg" style="margin-top:.5rem">{{ logsError }}</div>
+      <div v-if="logsData" style="margin-top:.75rem">
+        <div class="log-meta">{{ logsData.total }} total &nbsp;|&nbsp; showing {{ logsData.offset + 1 }}–{{ Math.min(logsData.offset + logsData.limit, logsData.total) }}</div>
+        <div class="log-table-wrap">
+          <table class="log-table">
+            <thead>
+              <tr>
+                <th>Time (UTC)</th>
+                <th>Method</th>
+                <th>Path</th>
+                <th>Status</th>
+                <th>ms</th>
+                <th>Key / Email</th>
+                <th>IP</th>
+                <th>Query / Body</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="row in logsData.logs" :key="row.id" :class="row.status_code >= 400 ? 'row-error' : ''">
+                <td class="td-time">{{ row.created_at ? row.created_at.replace('T',' ').slice(0,19) : '—' }}</td>
+                <td><span :class="'method-' + row.method">{{ row.method }}</span></td>
+                <td class="td-path">{{ row.path }}</td>
+                <td :class="row.status_code >= 400 ? 'cell-red' : 'cell-green'">{{ row.status_code }}</td>
+                <td>{{ row.response_time_ms }}</td>
+                <td class="td-key">
+                  <span v-if="row.api_key_name">{{ row.api_key_name }}</span>
+                  <span v-if="row.email" style="color:var(--text-muted);font-size:.8rem"><br>{{ row.email }}</span>
+                  <span v-if="!row.api_key_name" style="color:var(--text-muted)">—</span>
+                </td>
+                <td>{{ row.client_ip || '—' }}</td>
+                <td class="td-detail">
+                  <span v-if="row.query_string" class="detail-chip">?{{ row.query_string }}</span>
+                  <span v-if="row.request_body" class="detail-chip body-chip" :title="row.request_body">body</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="log-pagination">
+          <button class="btn" :disabled="logsData.offset === 0" @click="loadLogs(logsData.offset - logsData.limit)">← Prev</button>
+          <span>Page {{ Math.floor(logsData.offset / logsData.limit) + 1 }}</span>
+          <button class="btn" :disabled="logsData.offset + logsData.limit >= logsData.total" @click="loadLogs(logsData.offset + logsData.limit)">Next →</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Disclaimer -->
     <div class="disclaimer-card" style="margin-top:1.5rem">
       <h3>📋 Admin Disclaimer</h3>
@@ -257,6 +312,7 @@ async function verifySecret() {
   try {
     await adminService.verify(adminSecret.value)
     adminVerified.value = true
+    loadLogs(0)
   } catch(e) {
     adminVerified.value = false
     verifyError.value = e.response?.status === 403 ? 'Invalid admin secret.' : (e.response?.data?.detail || e.message)
@@ -367,6 +423,32 @@ async function deleteSelectedEtfs() {
     deleteEtfLoading.value = false
   }
 }
+
+// ─── Request Logs ─────────────────────────────────────────────
+const logFilterName = ref('')
+const logFilterEmail = ref('')
+const logFilterPath = ref('')
+const logsLoading = ref(false)
+const logsError = ref('')
+const logsData = ref(null)
+
+async function loadLogs(offset = 0) {
+  logsLoading.value = true; logsError.value = ''
+  try {
+    const r = await adminService.requestLogs(adminSecret.value, {
+      limit: 50,
+      offset,
+      api_key_name: logFilterName.value,
+      email: logFilterEmail.value,
+      path: logFilterPath.value,
+    })
+    logsData.value = r.data
+  } catch(e) {
+    logsError.value = e.response?.data?.detail || e.message
+  } finally {
+    logsLoading.value = false
+  }
+}
 </script>
 
 <style scoped>
@@ -388,4 +470,27 @@ async function deleteSelectedEtfs() {
 .etf-ticker { font-family: monospace; font-weight: 600; width: 70px; flex-shrink: 0; }
 .etf-name { flex: 1; font-size: .875rem; }
 .etf-provider { font-size: .8rem; color: var(--text-muted); width: 80px; text-align: right; flex-shrink: 0; }
+.log-filters { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; }
+.log-table-wrap { overflow-x: auto; margin-top: .5rem; border: 1px solid var(--border); border-radius: var(--radius); }
+.log-table { width: 100%; border-collapse: collapse; font-size: .78rem; }
+.log-table th { background: var(--bg-3); padding: .45rem .75rem; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; font-weight: 600; color: var(--text-muted); }
+.log-table td { padding: .4rem .75rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+.log-table tbody tr:hover { background: var(--bg-2); }
+.log-table tbody tr:last-child td { border-bottom: none; }
+.row-error td { background: #fef2f2; }
+[data-theme="dark"] .row-error td { background: #2d0707; }
+.td-time { white-space: nowrap; font-size: .74rem; color: var(--text-muted); }
+.td-path { font-family: monospace; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.td-key { max-width: 140px; }
+.td-detail { max-width: 160px; }
+.method-GET { color: #2563eb; font-weight: 700; font-family: monospace; }
+.method-POST { color: #16a34a; font-weight: 700; font-family: monospace; }
+.method-DELETE { color: #dc2626; font-weight: 700; font-family: monospace; }
+.method-PUT,.method-PATCH { color: #d97706; font-weight: 700; font-family: monospace; }
+.cell-green { color: #16a34a; font-weight: 600; }
+.cell-red { color: #dc2626; font-weight: 600; }
+.log-meta { font-size: .8rem; color: var(--text-muted); }
+.log-pagination { display: flex; align-items: center; gap: 1rem; margin-top: .75rem; font-size: .875rem; }
+.detail-chip { display: inline-block; font-family: monospace; font-size: .72rem; background: var(--bg-3); border: 1px solid var(--border); border-radius: 4px; padding: 0 .4rem; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle; margin-right: .2rem; }
+.body-chip { color: #7c3aed; cursor: help; }
 </style>
