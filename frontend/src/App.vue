@@ -21,6 +21,7 @@
           <button class="theme-toggle" @click="toggleTheme" :title="theme === 'dark' ? 'Light mode' : 'Dark mode'">
             {{ theme === 'dark' ? '☀️' : '🌙' }}
           </button>
+          <button v-if="!hasApiKey" class="btn-get-key" @click="showApiKeyModal = true">Get API Key</button>
           <button class="nav-btn admin-btn" @click="currentPage = 'admin'">⚙ Admin</button>
         </div>
       </div>
@@ -58,22 +59,34 @@
         <p class="footer-copy">© {{ new Date().getFullYear() }} ETF Data. Not investment advice.</p>
       </div>
     </footer>
+    <!-- Get API Key Modal -->
+    <GetApiKeyModal :show="showApiKeyModal" @close="showApiKeyModal = false" />
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, provide } from 'vue'
 import { healthService } from './services/api.js'
 import Home from './pages/Home.vue'
 import ETFList from './pages/ETFList.vue'
 import Analytics from './pages/Analytics.vue'
 import ApiDocs from './pages/ApiDocs.vue'
 import Admin from './pages/Admin.vue'
+import GetApiKeyModal from './components/GetApiKeyModal.vue'
 
 const currentPage = ref('home')
 const theme = ref(localStorage.getItem('theme') || 'light')
 const apiStatus = ref('checking')
 const apiStatusText = ref('Checking...')
+const showApiKeyModal = ref(false)
+const hasApiKey = ref(!!localStorage.getItem('api_key'))
+
+provide('showApiKeyModal', showApiKeyModal)
+
+// Reflect key changes from the modal's "Use this key" button
+window.addEventListener('storage', (e) => {
+  if (e.key === 'api_key') hasApiKey.value = !!e.newValue
+})
 
 const navItems = [
   { id: 'home', label: 'Home' },
@@ -128,6 +141,15 @@ onMounted(async () => {
   margin: 0 auto;
 }
 .nav-actions { display: flex; align-items: center; gap: .75rem; flex-shrink: 0; }
+.btn-get-key {
+  padding: .4rem 1rem; border-radius: 8px; font-size: .875rem; font-weight: 700;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: #fff; border: none; cursor: pointer;
+  box-shadow: 0 2px 8px rgba(102,126,234,.4);
+  transition: opacity .15s, transform .1s;
+  white-space: nowrap;
+}
+.btn-get-key:hover { opacity: .9; transform: translateY(-1px); }
 .nav-btn {
   background: none; border: none; cursor: pointer;
   padding: .4rem .85rem; border-radius: 8px;

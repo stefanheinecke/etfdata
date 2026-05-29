@@ -62,7 +62,7 @@ def init_db_endpoint(_: None = Depends(verify_admin_secret)):
 @router.post("/api-keys")
 def create_key(
     name: str,
-    email: Optional[str] = None,
+    email: str,
     rate_limit_per_minute: int = 60,
     db: Session = Depends(get_db),
     _: None = Depends(verify_admin_secret),

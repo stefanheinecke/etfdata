@@ -4,6 +4,13 @@
       <h1 class="page-title">Analytics</h1>
       <p class="page-subtitle">Portfolio overlap analysis, exposure breakdown and ETF similarity search.</p>
     </div>
+    <div v-if="!hasApiKey" class="cta-banner">
+      <div class="cta-text">
+        <strong>An API key is required to run analytics.</strong>
+        <span>Get yours for free in 10 seconds.</span>
+      </div>
+      <button class="cta-btn" @click="showApiKeyModal = true">Get Free API Key</button>
+    </div>
     <div class="ana-tabs">
       <button v-for="t in tabs" :key="t.id" :class="['ana-tab',{active:activeTab===t.id}]" @click="activeTab=t.id">
         <span>{{ t.icon }}</span> {{ t.label }}
@@ -193,8 +200,12 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, inject } from 'vue'
 import { etfService, analyticsService } from '../services/api.js'
+
+const showApiKeyModal = inject('showApiKeyModal')
+const hasApiKey = ref(!!localStorage.getItem('api_key'))
+window.addEventListener('storage', (e) => { if (e.key === 'api_key') hasApiKey.value = !!e.newValue })
 
 const activeTab = ref('risk')
 const tabs = [
@@ -319,6 +330,12 @@ onMounted(() => { loadETFs(); loadRisk() })
 </script>
 
 <style scoped>
+.cta-banner{display:flex;align-items:center;justify-content:space-between;gap:1rem;background:linear-gradient(135deg,#667eea15,#764ba215);border:1.5px solid #667eea55;border-radius:12px;padding:1rem 1.25rem;margin-bottom:1.5rem;flex-wrap:wrap}
+.cta-text{display:flex;flex-direction:column;gap:.2rem;font-size:.9rem}
+.cta-text strong{color:var(--text)}
+.cta-text span{color:var(--text-muted)}
+.cta-btn{padding:.55rem 1.2rem;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;border:none;border-radius:8px;font-weight:700;font-size:.875rem;cursor:pointer;white-space:nowrap;flex-shrink:0}
+.cta-btn:hover{opacity:.9}
 .risk-table{width:100%;border-collapse:collapse;font-size:.875rem}
 .risk-table thead tr{background:var(--bg-3)}
 .risk-table th,.risk-table td{padding:.6rem 1rem;text-align:left;border-bottom:1px solid var(--border)}

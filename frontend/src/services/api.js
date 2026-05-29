@@ -66,6 +66,12 @@ export const healthService = {
   }
 }
 
+export const authService = {
+  requestKey(name, email) {
+    return api.post('/auth/request-key', null, { params: { name, email } })
+  }
+}
+
 export const adminService = {
   verify(adminSecret) {
     return api.get('/admin/verify', { headers: { 'x-admin-secret': adminSecret } })

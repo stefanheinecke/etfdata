@@ -4,8 +4,12 @@
       <h1 class="page-title">ETF Explorer</h1>
       <p class="page-subtitle">Browse all tracked ETFs, inspect holdings, allocations and performance data.</p>
     </div>
-    <div v-if="!apiKey" class="error-box" style="margin-bottom:1.5rem">
-      No API key set — go to <strong>Admin</strong> and enter your API key first.
+    <div v-if="!apiKey" class="cta-banner">
+      <div class="cta-text">
+        <strong>You need an API key to load ETF data.</strong>
+        <span>It's free and takes 10 seconds.</span>
+      </div>
+      <button class="cta-btn" @click="showApiKeyModal = true">Get Free API Key</button>
     </div>
     <div class="card" style="margin-bottom:1.5rem">
       <div class="filters">
@@ -187,7 +191,9 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, nextTick } from 'vue'
+import { ref, computed, onMounted, nextTick, inject } from 'vue'
+
+const showApiKeyModal = inject('showApiKeyModal')
 import { Chart } from 'chart.js/auto'
 import { etfService } from '../services/api.js'
 
@@ -195,6 +201,10 @@ const allETFs = ref([])
 const loading = ref(false)
 const error = ref('')
 const apiKey = ref(localStorage.getItem('api_key') || '')
+// Refresh apiKey when the Get API Key modal saves a new one
+window.addEventListener('storage', (e) => { if (e.key === 'api_key') { apiKey.value = e.newValue || ''; if (e.newValue) loadETFs() } })
+// Refresh apiKey when modal saves a new one
+window.addEventListener('storage', (e) => { if (e.key === 'api_key') apiKey.value = e.newValue || '' })
 
 // Filters
 const search = ref('')
@@ -446,4 +456,10 @@ onMounted(loadETFs)
 .show-more-btn:hover{text-decoration:underline}
 .perf-kpi{display:flex;gap:.75rem;flex-wrap:wrap}
 .perf-stat{flex:1;min-width:110px;background:var(--bg-2);border:1px solid var(--border);border-radius:var(--radius);padding:.65rem 1rem}
+.cta-banner{display:flex;align-items:center;justify-content:space-between;gap:1rem;background:linear-gradient(135deg,#667eea15,#764ba215);border:1.5px solid #667eea55;border-radius:12px;padding:1rem 1.25rem;margin-bottom:1.5rem;flex-wrap:wrap}
+.cta-text{display:flex;flex-direction:column;gap:.2rem;font-size:.9rem}
+.cta-text strong{color:var(--text)}
+.cta-text span{color:var(--text-muted)}
+.cta-btn{padding:.55rem 1.2rem;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;border:none;border-radius:8px;font-weight:700;font-size:.875rem;cursor:pointer;white-space:nowrap;flex-shrink:0}
+.cta-btn:hover{opacity:.9}
 </style>
