@@ -24,8 +24,8 @@
     <div class="card" style="margin-bottom:1.5rem">
       <h2 class="card-title">Admin Credentials</h2>
       <p style="font-size:.875rem;color:var(--text-muted);margin-bottom:1rem">
-        Enter your <code>ADMIN_SECRET</code> from Railway to use admin operations below.
-        This is never stored — only used for the current session.
+        Enter your <code>ADMIN_SECRET</code> from Railway to unlock admin operations.
+        Stored in <strong>sessionStorage</strong> — cleared automatically when you close the browser tab.
       </p>
       <label class="label">Admin Secret</label>
       <div class="key-row">
@@ -36,7 +36,10 @@
         </button>
       </div>
       <div v-if="verifyError" class="error-box" style="margin-top:.5rem">{{ verifyError }}</div>
-      <div v-if="adminVerified" class="success-msg" style="margin-top:.5rem">✓ Admin secret verified — operations unlocked.</div>
+      <div v-if="adminVerified" class="success-msg" style="margin-top:.5rem;display:flex;align-items:center;justify-content:space-between;gap:1rem">
+        <span>✓ Admin secret verified — operations unlocked.</span>
+        <button class="btn btn-outline" style="font-size:.8rem;padding:.35rem .75rem" @click="logout">Log out</button>
+      </div>
     </div>
 
     <!-- Admin operations -->
@@ -256,8 +259,10 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, inject } from 'vue'
 import { healthService, adminService, etfService } from '../services/api.js'
+
+const setAdminActive = inject('setAdminActive')
 
 const apiKey = ref(localStorage.getItem('api_key') || '')
 const showKey = ref(false)
@@ -267,6 +272,14 @@ const showAdmin = ref(false)
 const adminVerified = ref(false)
 const verifyLoading = ref(false)
 const verifyError = ref('')
+
+onMounted(() => {
+  const saved = sessionStorage.getItem('admin_secret')
+  if (saved) {
+    adminSecret.value = saved
+    verifySecret()
+  }
+})
 
 const newKeyName = ref('my-key')
 const newKeyRateLimit = ref(60)
@@ -311,6 +324,8 @@ async function verifySecret() {
   verifyLoading.value = true; verifyError.value = ''
   try {
     await adminService.verify(adminSecret.value)
+    sessionStorage.setItem('admin_secret', adminSecret.value)
+    setAdminActive(true)
     adminVerified.value = true
     loadLogs(0)
   } catch(e) {
@@ -318,6 +333,14 @@ async function verifySecret() {
     verifyError.value = e.response?.status === 403 ? 'Invalid admin secret.' : (e.response?.data?.detail || e.message)
   }
   finally { verifyLoading.value = false }
+}
+
+function logout() {
+  sessionStorage.removeItem('admin_secret')
+  setAdminActive(false)
+  adminVerified.value = false
+  adminSecret.value = ''
+  logsData.value = null
 }
 
 async function createKey() {

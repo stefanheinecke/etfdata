@@ -22,7 +22,7 @@
             {{ theme === 'dark' ? '☀️' : '🌙' }}
           </button>
           <button v-if="!hasApiKey" class="btn-get-key" @click="showApiKeyModal = true">Get API Key</button>
-          <button class="nav-btn admin-btn" @click="currentPage = 'admin'">⚙ Admin</button>
+          <button v-if="adminActive" class="nav-btn admin-btn" @click="currentPage = 'admin'">⚙ Admin</button>
         </div>
       </div>
     </nav>
@@ -54,7 +54,8 @@
           <button @click="currentPage = 'etfs'">ETFs</button>
           <button @click="currentPage = 'analytics'">Analytics</button>
           <button @click="currentPage = 'docs'">API Docs</button>
-          <button @click="currentPage = 'admin'">Admin</button>
+          <button v-if="adminActive" @click="currentPage = 'admin'">Admin</button>
+          <button v-else @click="currentPage = 'admin'" style="opacity:.4;font-size:.8rem">Admin</button>
         </div>
         <p class="footer-copy">© {{ new Date().getFullYear() }} ETF Data. Not investment advice.</p>
       </div>
@@ -67,6 +68,13 @@
 <script setup>
 import { ref, onMounted, provide } from 'vue'
 import { healthService } from './services/api.js'
+
+const adminActive = ref(!!sessionStorage.getItem('admin_secret'))
+function setAdminActive(val) {
+  adminActive.value = val
+  if (!val) sessionStorage.removeItem('admin_secret')
+}
+provide('setAdminActive', setAdminActive)
 import Home from './pages/Home.vue'
 import ETFList from './pages/ETFList.vue'
 import Analytics from './pages/Analytics.vue'
