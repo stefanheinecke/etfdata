@@ -92,8 +92,12 @@ app.add_middleware(RequestLogMiddleware)
 
 @app.on_event("startup")
 async def startup():
-    init_db()
-    print("✓ Database initialized")
+    try:
+        init_db()
+        print("✓ Database initialized")
+    except Exception as e:
+        print(f"✗ Database init failed: {e}")
+        raise
 
 @app.get("/health", response_model=HealthResponse)
 async def health_check(db: Session = Depends(get_db)):

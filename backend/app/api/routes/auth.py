@@ -71,42 +71,49 @@ def request_key(email: str, db: Session = Depends(get_db)):
     Validate the email, store a one-time confirmation token, and send a
     confirmation email. Returns immediately without creating an API key.
     """
-    if not email or "@" not in email:
-        raise HTTPException(status_code=422, detail="A valid email address is required.")
-
-    email = email.strip().lower()[:255]
-
-    # Check whether a key already exists for this email
-    is_replacement = db.query(APIKey).filter(APIKey.email == email).first() is not None
-
-    # Remove any previous pending request for this email (re-request scenario)
-    db.query(PendingKeyRequest).filter(PendingKeyRequest.email == email).delete()
-
-    # Store a fresh token valid for 30 minutes
-    token   = secrets.token_urlsafe(32)
-    expires = datetime.utcnow() + timedelta(minutes=30)
-    db.add(PendingKeyRequest(token=token, email=email,
-                             is_replacement=is_replacement, expires_at=expires))
-    db.commit()
-
-    # Build the confirmation URL (backend endpoint — returns an HTML page)
-    base_url    = os.getenv("API_BASE_URL", "https://etfdata-production.up.railway.app")
-    confirm_url = f"{base_url}/auth/confirm-key?token={token}"
-
     try:
-        send_confirmation_email(to_email=email, confirm_url=confirm_url,
-                                is_replacement=is_replacement)
-    except (RuntimeError, _requests.HTTPError) as exc:
-        db.query(PendingKeyRequest).filter(PendingKeyRequest.token == token).delete()
-        db.commit()
-        detail = str(exc) if isinstance(exc, RuntimeError) else \
-                 f"Email delivery failed: {exc.response.text if exc.response else exc}"
-        raise HTTPException(status_code=503, detail=detail)
+        if not email or "@" not in email:
+            raise HTTPException(status_code=422, detail="A valid email address is required.")
 
-    return {
-        "message": "Confirmation email sent. Click the link in the email to receive your API key.",
-        "email": email,
-    }
+        email = email.strip().lower()[:255]
+
+        # Check whether a key already exists for this email
+        is_replacement = db.query(APIKey).filter(APIKey.email == email).first() is not None
+
+        # Remove any previous pending request for this email (re-request scenario)
+        db.query(PendingKeyRequest).filter(PendingKeyRequest.email == email).delete()
+
+        # Store a fresh token valid for 30 minutes
+        token   = secrets.token_urlsafe(32)
+        expires = datetime.utcnow() + timedelta(minutes=30)
+        db.add(PendingKeyRequest(token=token, email=email,
+                                 is_replacement=is_replacement, expires_at=expires))
+        db.commit()
+
+        # Build the confirmation URL (backend endpoint — returns an HTML page)
+        base_url    = os.getenv("API_BASE_URL", "https://etfdata-production.up.railway.app")
+        confirm_url = f"{base_url}/auth/confirm-key?token={token}"
+
+        try:
+            send_confirmation_email(to_email=email, confirm_url=confirm_url,
+                                    is_replacement=is_replacement)
+        except (RuntimeError, _requests.HTTPError) as exc:
+            db.query(PendingKeyRequest).filter(PendingKeyRequest.token == token).delete()
+            db.commit()
+            detail = str(exc) if isinstance(exc, RuntimeError) else \
+                     f"Email delivery failed: {exc.response.text if exc.response else exc}"
+            raise HTTPException(status_code=503, detail=detail)
+
+        return {
+            "message": "Confirmation email sent. Click the link in the email to receive your API key.",
+            "email": email,
+        }
+    except HTTPException:
+        raise
+    except Exception as exc:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Internal error: {exc}")
 
 
 # ── Step 2: confirm ───────────────────────────────────────────────────────────
