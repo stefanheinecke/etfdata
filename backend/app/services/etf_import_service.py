@@ -62,9 +62,16 @@ def _fetch_stooq_history(stooq_sym: str, logs: list):
         if resp.status_code != 200 or b"No data" in resp.content[:200]:
             logs.append(f"  Stooq returned no data for '{stooq_sym}'.")
             return None
-        df = pd.read_csv(io.BytesIO(resp.content), parse_dates=["Date"])
-        if df.empty or "Close" not in df.columns:
-            logs.append(f"  Stooq CSV has unexpected format for '{stooq_sym}'.")
+        df = pd.read_csv(io.BytesIO(resp.content))
+        # Normalise column names to title-case regardless of what Stooq returns
+        df.columns = [c.strip().title() for c in df.columns]
+        if "Date" not in df.columns or "Close" not in df.columns:
+            logs.append(f"  Stooq CSV has unexpected columns {list(df.columns)} for '{stooq_sym}'.")
+            return None
+        df["Date"] = pd.to_datetime(df["Date"])
+        df = df.dropna(subset=["Close"])
+        if df.empty:
+            logs.append(f"  Stooq returned empty data for '{stooq_sym}'.")
             return None
         logs.append(f"  Stooq fallback succeeded: {len(df)} rows for '{stooq_sym}'.")
         return df
@@ -320,7 +327,7 @@ def import_etf(
     known_bench  = (known or {}).get("benchmark")
     known_url    = (known or {}).get("holdings_url")
 
-    logs.append(f"Using yfinance symbol: {yf_symbol}")
+    logs.append(f"Using yfinance symbol for metadata: {yf_symbol}")
 
     # ---- Holdings (only when a CSV was uploaded) ----
     logs.append(f"Fetching metadata from yfinance ({yf_symbol})...")
