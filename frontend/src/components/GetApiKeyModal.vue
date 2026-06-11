@@ -15,8 +15,12 @@
         <!-- Success state -->
         <template v-if="sent">
           <div class="sent-icon">✉️</div>
-          <p class="modal-sub success-sub">Your API key has been sent to <strong>{{ email }}</strong>. Check your inbox.</p>
-          <p class="modal-note" style="margin-top:.75rem">Didn't receive it? Check your spam folder or request a new key.</p>
+          <p class="modal-sub success-sub">Check your inbox at <strong>{{ email }}</strong>.</p>
+          <p style="font-size:.875rem;color:var(--text-muted);line-height:1.6">
+            We sent a confirmation email. Click the button in the email to receive your API key.
+            The link expires in <strong>30 minutes</strong>.
+          </p>
+          <p class="modal-note" style="margin-top:.75rem">Didn't receive it? Check your spam folder or try again.</p>
           <button class="btn btn-primary" style="width:100%;margin-top:1rem" @click="close">
             Close
           </button>

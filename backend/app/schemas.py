@@ -120,8 +120,17 @@ class RequestLog(Base):
         Index("idx_request_logs_api_key_id", "api_key_id"),
     )
 
-class ETLJob(Base):
-    __tablename__ = "etl_jobs"
+class PendingKeyRequest(Base):
+    __tablename__ = "pending_key_requests"
+
+    id = Column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    token = Column(String(64), unique=True, nullable=False, index=True)
+    email = Column(String(255), nullable=False, index=True)
+    is_replacement = Column(Boolean, nullable=False, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    expires_at = Column(DateTime, nullable=False)
+
+
 
     id = Column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
     job_name = Column(String(100), nullable=False)
