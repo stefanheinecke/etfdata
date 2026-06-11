@@ -1,8 +1,21 @@
 <template>
   <div class="page">
     <div class="page-header">
-      <h1 class="page-title">API Reference</h1>
-      <p class="page-subtitle">Complete documentation for all ETF Data API endpoints.</p>
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;flex-wrap:wrap">
+        <div>
+          <h1 class="page-title">API Reference</h1>
+          <p class="page-subtitle">Complete documentation for all ETF Data API endpoints.</p>
+        </div>
+        <button class="btn btn-primary" style="flex-shrink:0;margin-top:.25rem" @click="showApiKeyModal = true">
+          Get API Key
+        </button>
+      </div>
+    </div>
+
+    <!-- No-key banner -->
+    <div v-if="!hasApiKey" class="key-banner">
+      <span>🔑 You don't have an API key yet — all endpoints require one.</span>
+      <button class="btn btn-primary btn-sm" @click="showApiKeyModal = true">Get a free key</button>
     </div>
 
     <div class="docs-layout">
@@ -97,8 +110,12 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, inject } from 'vue'
 const BASE = 'https://etfdata-production.up.railway.app'
+
+const showApiKeyModal = inject('showApiKeyModal')
+const hasApiKey = ref(!!localStorage.getItem('api_key'))
+window.addEventListener('storage', e => { if (e.key === 'api_key') hasApiKey.value = !!e.newValue })
 const langs = ['cURL', 'Python', 'JavaScript']
 const activeLang = ref('cURL')
 const activeId = ref('list-etfs')
@@ -215,6 +232,13 @@ const active = computed(() => allEndpoints.value.find(e => e.id === activeId.val
 </script>
 
 <style scoped>
+.key-banner {
+  display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;
+  background: var(--green-50); border: 1px solid var(--green-200); border-radius: var(--radius);
+  padding: .75rem 1.25rem; margin-bottom: 1.5rem; font-size: .875rem; color: var(--green-700);
+}
+[data-theme="dark"] .key-banner { background: #052e16; border-color: #14532d; color: #86efac; }
+.btn-sm { padding: .35rem .85rem; font-size: .8rem; }
 .docs-layout { display: grid; grid-template-columns: 240px 1fr; gap: 2rem; align-items: start; }
 @media(max-width:700px) { .docs-layout { grid-template-columns: 1fr; } }
 .docs-nav { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem; position: sticky; top: 80px; }

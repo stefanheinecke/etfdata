@@ -21,7 +21,7 @@
           <button class="theme-toggle" @click="toggleTheme" :title="theme === 'dark' ? 'Light mode' : 'Dark mode'">
             {{ theme === 'dark' ? '☀️' : '🌙' }}
           </button>
-          <button v-if="!hasApiKey" class="btn-get-key" @click="showApiKeyModal = true">Get API Key</button>
+          <button class="btn-get-key" @click="showApiKeyModal = true">Get API Key</button>
           <button v-if="adminActive" class="nav-btn admin-btn" @click="currentPage = 'admin'">⚙ Admin</button>
         </div>
       </div>
