@@ -39,9 +39,46 @@ def _fetch_yf_meta(yf_symbol: str, logs: list) -> dict:
     return result
 
 
+def _stooq_symbol(yf_sym: str) -> str:
+    """Convert a yfinance symbol to Stooq format (lowercase; US tickers get .us suffix)."""
+    sym = yf_sym.lower()
+    if "." not in sym:
+        sym = sym + ".us"
+    return sym
+
+
+def _fetch_stooq_history(stooq_sym: str, logs: list):
+    """Fetch 1-year daily price history from Stooq. Returns a DataFrame or None."""
+    import requests, io, pandas as pd
+    from datetime import date, timedelta
+    end = date.today()
+    start = end - timedelta(days=366)
+    url = "https://stooq.com/q/d/l/"
+    params = {"s": stooq_sym, "d1": start.strftime("%Y%m%d"),
+              "d2": end.strftime("%Y%m%d"), "i": "d"}
+    try:
+        resp = requests.get(url, params=params, timeout=15,
+                            headers={"User-Agent": "Mozilla/5.0"})
+        if resp.status_code != 200 or b"No data" in resp.content[:200]:
+            logs.append(f"  Stooq returned no data for '{stooq_sym}'.")
+            return None
+        df = pd.read_csv(io.BytesIO(resp.content), parse_dates=["Date"])
+        if df.empty or "Close" not in df.columns:
+            logs.append(f"  Stooq CSV has unexpected format for '{stooq_sym}'.")
+            return None
+        logs.append(f"  Stooq fallback succeeded: {len(df)} rows for '{stooq_sym}'.")
+        return df
+    except Exception as exc:
+        logs.append(f"  Stooq fetch failed ({exc}).")
+        return None
+
+
 def _upload_performance(etf: ETF, ticker_obj, currency: str, db, logs: list,
                         perf_yf_symbol: str | None = None) -> int:
     import yfinance as yf
+
+    # Determine the effective symbol used for price data
+    effective_symbol = perf_yf_symbol or None
 
     # Use a dedicated USD-listed ticker for price history if specified
     if perf_yf_symbol:
@@ -50,24 +87,30 @@ def _upload_performance(etf: ETF, ticker_obj, currency: str, db, logs: list,
     else:
         price_ticker = ticker_obj
 
+    # --- Try yfinance first ---
     hist = None
-    try:
-        hist = price_ticker.history(period="1y")
-    except Exception as exc:
-        logs.append(f"  Price history fetch failed ({exc}). Skipping performance data.")
-        return 0
-    if hist is None or hist.empty:
-        logs.append("  No historical price data available from yfinance.")
-        return 0
-
-    # Detect actual price currency (overrides ETF's stated currency)
     actual_currency = currency
     try:
-        reported = price_ticker.fast_info.currency or ""
-        if reported:
-            actual_currency = reported
-    except Exception:
-        pass
+        hist = price_ticker.history(period="1y")
+        if hist is not None and not hist.empty:
+            try:
+                reported = price_ticker.fast_info.currency or ""
+                if reported:
+                    actual_currency = reported
+            except Exception:
+                pass
+    except Exception as exc:
+        logs.append(f"  yfinance rate-limited ({exc}). Trying Stooq fallback...")
+        hist = None
+
+    # --- Stooq fallback ---
+    stooq_df = None
+    if hist is None or hist.empty:
+        stooq_sym = _stooq_symbol(perf_yf_symbol or etf.ticker)
+        stooq_df = _fetch_stooq_history(stooq_sym, logs)
+        if stooq_df is None:
+            logs.append("  No price data available from yfinance or Stooq.")
+            return 0
 
     # GBp = pence (GBX) — divide by 100 to convert to GBP
     gbx_factor = 1.0
@@ -78,19 +121,36 @@ def _upload_performance(etf: ETF, ticker_obj, currency: str, db, logs: list,
 
     db.query(Performance).filter_by(etf_id=etf.id).delete()
     count = 0
-    for idx, row in hist.iterrows():
-        close = float(row["Close"]) * gbx_factor
-        if close <= 0:
-            continue
-        div = float(row.get("Dividends", 0) or 0) * gbx_factor
-        db.add(Performance(
-            etf_id=etf.id,
-            date=idx.date(),
-            close_price=round(close, 4),
-            dividend=round(div, 6) if div else None,
-            currency=actual_currency[:3].upper(),
-        ))
-        count += 1
+
+    if stooq_df is not None:
+        # Stooq path — no dividend column, currency stays as-is
+        for _, row in stooq_df.iterrows():
+            close = float(row["Close"]) * gbx_factor
+            if close <= 0:
+                continue
+            db.add(Performance(
+                etf_id=etf.id,
+                date=row["Date"].date(),
+                close_price=round(close, 4),
+                currency=actual_currency[:3].upper(),
+            ))
+            count += 1
+    else:
+        # yfinance path
+        for idx, row in hist.iterrows():
+            close = float(row["Close"]) * gbx_factor
+            if close <= 0:
+                continue
+            div = float(row.get("Dividends", 0) or 0) * gbx_factor
+            db.add(Performance(
+                etf_id=etf.id,
+                date=idx.date(),
+                close_price=round(close, 4),
+                dividend=round(div, 6) if div else None,
+                currency=actual_currency[:3].upper(),
+            ))
+            count += 1
+
     return count
 
 
