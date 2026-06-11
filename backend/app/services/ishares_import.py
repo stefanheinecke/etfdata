@@ -101,15 +101,18 @@ ISHARES_ETFS: list[dict] = [
      "holdings_url": "https://www.ishares.com/us/products/239566/ISHARES_IBOXX_INVESTMENT_GRADE_CORPORATE_BOND_ETF/1467271812596.ajax?tab=all&fileType=csv"},
     # European UCITS ETFs
     # Download URL pattern: https://www.ishares.com/uk/individual/en/products/{id}/{SLUG}/1467271812596.ajax?tab=all&fileType=csv
-    {"yf_symbol": "SWDA.L", "ticker": "SWDA", "name": "iShares Core MSCI World UCITS ETF USD (Acc)", "isin": "IE00B4L5Y983", "currency": "USD", "domicile": "IE", "ter": 0.20, "replication_method": "Physical", "benchmark": "MSCI World Index",
+    # perf_yf_symbol: alternate ticker for price history when the primary listing is in GBX.
+    #   SWDA.L / CSNKY.L / IEDY.L trade in GBX on LSE; we use the USD-denominated
+    #   Euronext Amsterdam listings so performance data is stored in USD.
+    {"yf_symbol": "SWDA.L",  "perf_yf_symbol": "SWDA.SW",  "ticker": "SWDA",  "name": "iShares Core MSCI World UCITS ETF USD (Acc)",       "isin": "IE00B4L5Y983", "currency": "USD", "domicile": "IE", "ter": 0.20, "replication_method": "Physical", "benchmark": "MSCI World Index",
      "holdings_url": "https://www.ishares.com/uk/individual/en/products/251882/ISHARES_CORE_MSCI_WORLD_UCITS_ETF_USD_ACC/1467271812596.ajax?tab=all&fileType=csv"},
-    {"yf_symbol": "CSSPX.SW", "ticker": "CSSPX", "name": "iShares Core S&P 500 UCITS ETF USD (Acc)", "isin": "IE00B5BMR087", "currency": "USD", "domicile": "IE", "ter": 0.07, "replication_method": "Physical", "benchmark": "S&P 500 Index",
+    {"yf_symbol": "CSSPX.SW", "ticker": "CSSPX", "name": "iShares Core S&P 500 UCITS ETF USD (Acc)",             "isin": "IE00B5BMR087", "currency": "USD", "domicile": "IE", "ter": 0.07, "replication_method": "Physical", "benchmark": "S&P 500 Index",
      "holdings_url": "https://www.ishares.com/uk/individual/en/products/253743/ISHARES_CORE_SP_500_UCITS_ETF_USD_ACC/1467271812596.ajax?tab=all&fileType=csv"},
-    {"yf_symbol": "CSNDX.SW", "ticker": "CSNDX", "name": "iShares Core NASDAQ 100 UCITS ETF USD (Acc)", "isin": "IE00B53SZB19", "currency": "USD", "domicile": "IE", "ter": 0.33, "replication_method": "Physical", "benchmark": "NASDAQ-100 Index",
+    {"yf_symbol": "CSNDX.SW", "ticker": "CSNDX", "name": "iShares Core NASDAQ 100 UCITS ETF USD (Acc)",          "isin": "IE00B53SZB19", "currency": "USD", "domicile": "IE", "ter": 0.33, "replication_method": "Physical", "benchmark": "NASDAQ-100 Index",
      "holdings_url": "https://www.ishares.com/uk/individual/en/products/253741/ISHARES_NASDAQ_100_UCITS_ETF/1467271812596.ajax?tab=all&fileType=csv"},
-    {"yf_symbol": "CSNKY.L", "ticker": "CSNKY", "name": "iShares Core MSCI Japan IMI UCITS ETF USD (Acc)", "isin": "IE00B52MJD48", "currency": "USD", "domicile": "IE", "ter": 0.15, "replication_method": "Physical", "benchmark": "MSCI Japan IMI Index",
+    {"yf_symbol": "CSNKY.L",  "perf_yf_symbol": "CSJP.AS",   "ticker": "CSNKY", "name": "iShares Core MSCI Japan IMI UCITS ETF USD (Acc)",   "isin": "IE00B52MJD48", "currency": "USD", "domicile": "IE", "ter": 0.15, "replication_method": "Physical", "benchmark": "MSCI Japan IMI Index",
      "holdings_url": "https://www.ishares.com/uk/individual/en/products/264659/ISHARES_CORE_MSCI_JAPAN_IMI_UCITS_ETF/1467271812596.ajax?tab=all&fileType=csv"},
-    {"yf_symbol": "IEDY.L", "ticker": "IEDY", "name": "iShares Emerging Markets Dividend UCITS ETF", "isin": "IE00B652H904", "currency": "USD", "domicile": "IE", "ter": 0.65, "replication_method": "Physical", "benchmark": "Dow Jones Emerging Markets Select Dividend Index",
+    {"yf_symbol": "IEDY.L",   "perf_yf_symbol": "SEDY.AS",   "ticker": "IEDY",  "name": "iShares Emerging Markets Dividend UCITS ETF",        "isin": "IE00B652H904", "currency": "USD", "domicile": "IE", "ter": 0.65, "replication_method": "Physical", "benchmark": "Dow Jones Emerging Markets Select Dividend Index",
      "holdings_url": "https://www.ishares.com/uk/individual/en/products/264139/ISHARES_EM_DIVIDEND_UCITS_ETF/1467271812596.ajax?tab=all&fileType=csv"},
 ]
 
@@ -186,21 +189,46 @@ def _upsert_allocations(
     return count
 
 
-def _upsert_performance(etf: ETF, ticker_obj: "yf.Ticker", db: Session) -> int:
-    hist = ticker_obj.history(period="1y")
+def _upsert_performance(etf: ETF, ticker_obj: "yf.Ticker", db: Session,
+                        perf_yf_symbol: str | None = None) -> int:
+    # Use a dedicated USD-listed ticker for price history if specified
+    if perf_yf_symbol:
+        price_ticker = yf.Ticker(perf_yf_symbol)
+        logger.info("%s: fetching price history from %s", etf.ticker, perf_yf_symbol)
+    else:
+        price_ticker = ticker_obj
+
+    hist = price_ticker.history(period="1y")
     if hist is None or hist.empty:
         return 0
+
+    # Detect the actual price currency reported by yfinance
+    actual_currency = etf.currency
+    try:
+        reported = price_ticker.fast_info.currency or ""
+        if reported:
+            actual_currency = reported
+    except Exception:
+        pass
+
+    # GBp = pence (GBX) — divide by 100 to get GBP
+    gbx_factor = 1.0
+    if actual_currency in ("GBp", "GBX", "GBx"):
+        gbx_factor = 0.01
+        actual_currency = "GBP"
+        logger.info("%s: prices are in pence (GBX), converting to GBP", etf.ticker)
+
     db.query(Performance).filter_by(etf_id=etf.id).delete()
     count = 0
     for idx, row in hist.iterrows():
-        close = float(row["Close"])
+        close = float(row["Close"]) * gbx_factor
         if close <= 0:
             continue
         db.add(Performance(
             etf_id=etf.id,
             date=idx.date(),
             close_price=round(close, 4),
-            currency=etf.currency,
+            currency=actual_currency,
         ))
         count += 1
     return count
@@ -287,7 +315,8 @@ def import_ishares(db: Session, tickers: Optional[list[str]] = None) -> dict:
                 result["error"] = "No holdings returned by yfinance"
 
             result["allocations"] = _upsert_allocations(etf, sector_w, holdings, as_of, db)
-            result["performance"] = _upsert_performance(etf, ticker_obj, db)
+            result["performance"] = _upsert_performance(etf, ticker_obj, db,
+                                                          perf_yf_symbol=meta.get("perf_yf_symbol"))
 
             db.commit()
             logger.info("%s: %d holdings, %d allocations, %d perf rows",
