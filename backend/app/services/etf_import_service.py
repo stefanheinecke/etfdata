@@ -20,23 +20,23 @@ from app.services.ishares_import import ISHARES_ETFS, _COUNTRY_ISO, _lookup_coun
 # ---------------------------------------------------------------------------
 
 def _fetch_yf_meta(yf_symbol: str, logs: list) -> dict:
+    import yfinance as yf
+    t = yf.Ticker(yf_symbol)
+    result: dict = {"ticker_obj": t}  # always present — history() may still work even when info is rate-limited
     try:
-        import yfinance as yf
-        t = yf.Ticker(yf_symbol)
         info = t.info or {}
         ter_raw = info.get("totalExpenseRatio")
         ter_pct = round(float(ter_raw) * 100, 4) if ter_raw else None
         fund_size = info.get("totalAssets")
-        return {
-            "name":       info.get("longName") or info.get("shortName") or "",
-            "currency":   info.get("currency") or "",
-            "ter":        ter_pct,
-            "fund_size":  int(fund_size) if fund_size else None,
-            "ticker_obj": t,
-        }
+        result.update({
+            "name":      info.get("longName") or info.get("shortName") or "",
+            "currency":  info.get("currency") or "",
+            "ter":       ter_pct,
+            "fund_size": int(fund_size) if fund_size else None,
+        })
     except Exception as exc:
-        logs.append(f"  yfinance lookup failed for '{yf_symbol}' ({exc})")
-        return {}
+        logs.append(f"  yfinance metadata lookup failed for '{yf_symbol}' ({exc})")
+    return result
 
 
 def _upload_performance(etf: ETF, ticker_obj, currency: str, db, logs: list,
