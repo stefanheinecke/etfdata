@@ -131,6 +131,8 @@ class PendingKeyRequest(Base):
     expires_at = Column(DateTime, nullable=False)
 
 
+class ETLJob(Base):
+    __tablename__ = "etl_jobs"
 
     id = Column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
     job_name = Column(String(100), nullable=False)
