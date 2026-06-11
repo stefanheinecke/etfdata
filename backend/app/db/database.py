@@ -24,6 +24,20 @@ def get_db():
 def init_db():
     from app.schemas import Base
     from sqlalchemy import text
+    with engine.connect() as conn:
+        # Drop pending_key_requests if it was created with the wrong schema
+        # (a deployment bug merged ETLJob columns into it — safe to drop, it's ephemeral data)
+        conn.execute(text("""
+            DO $$ BEGIN
+                IF EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_name = 'pending_key_requests' AND column_name = 'job_name'
+                ) THEN
+                    DROP TABLE pending_key_requests;
+                END IF;
+            END $$;
+        """))
+        conn.commit()
     Base.metadata.create_all(bind=engine)
     # Additive column migrations (idempotent via IF NOT EXISTS)
     with engine.connect() as conn:
