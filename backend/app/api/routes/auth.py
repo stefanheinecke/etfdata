@@ -2,6 +2,7 @@
 Public auth routes — no admin secret required.
 """
 import smtplib
+import socket
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -43,6 +44,10 @@ def request_key(
         db.delete(db_key)
         db.commit()
         raise HTTPException(status_code=503, detail=f"Failed to send email: {exc}")
+    except (socket.timeout, TimeoutError, OSError) as exc:
+        db.delete(db_key)
+        db.commit()
+        raise HTTPException(status_code=503, detail=f"Could not reach SMTP server — check SMTP_HOST and SMTP_PORT. Detail: {exc}")
 
     return {
         "message": f"Your API key has been sent to {email}. Check your inbox.",

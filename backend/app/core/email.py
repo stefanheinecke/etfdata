@@ -73,7 +73,7 @@ def send_api_key_email(to_email: str, api_key: str, app_name: str = "ETF Data AP
     msg.attach(MIMEText(body_text, "plain"))
     msg.attach(MIMEText(body_html, "html"))
 
-    with smtplib.SMTP(host, port) as server:
+    with smtplib.SMTP(host, port, timeout=10) as server:
         server.ehlo()
         server.starttls()
         server.login(user, password)
