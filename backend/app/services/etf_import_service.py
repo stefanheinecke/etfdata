@@ -50,7 +50,12 @@ def _upload_performance(etf: ETF, ticker_obj, currency: str, db, logs: list,
     else:
         price_ticker = ticker_obj
 
-    hist = price_ticker.history(period="1y")
+    hist = None
+    try:
+        hist = price_ticker.history(period="1y")
+    except Exception as exc:
+        logs.append(f"  Price history fetch failed ({exc}). Skipping performance data.")
+        return 0
     if hist is None or hist.empty:
         logs.append("  No historical price data available from yfinance.")
         return 0
