@@ -1,8 +1,7 @@
 """
 Public auth routes — no admin secret required.
 """
-import smtplib
-import socket
+import requests as _requests
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -28,7 +27,6 @@ def request_key(
         raise HTTPException(status_code=422, detail="A valid email address is required.")
 
     email = email.strip().lower()[:255]
-    # Derive a key name from the local part of the email address
     name = email.split("@")[0][:100]
 
     raw_key, db_key = create_api_key(db, name=name, email=email)
@@ -36,18 +34,13 @@ def request_key(
     try:
         send_api_key_email(to_email=email, api_key=raw_key)
     except RuntimeError as exc:
-        # SMTP not configured — roll back so the key is not orphaned
         db.delete(db_key)
         db.commit()
         raise HTTPException(status_code=503, detail=str(exc))
-    except smtplib.SMTPException as exc:
+    except _requests.HTTPError as exc:
         db.delete(db_key)
         db.commit()
-        raise HTTPException(status_code=503, detail=f"Failed to send email: {exc}")
-    except (socket.timeout, TimeoutError, OSError) as exc:
-        db.delete(db_key)
-        db.commit()
-        raise HTTPException(status_code=503, detail=f"Could not reach SMTP server — check SMTP_HOST and SMTP_PORT. Detail: {exc}")
+        raise HTTPException(status_code=503, detail=f"Email delivery failed: {exc.response.text if exc.response else exc}")
 
     return {
         "message": f"Your API key has been sent to {email}. Check your inbox.",
