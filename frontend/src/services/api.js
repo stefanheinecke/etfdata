@@ -77,15 +77,16 @@ export const adminService = {
     return api.get('/admin/verify', { headers: { 'x-admin-secret': adminSecret } })
   },
   importETF(adminSecret, ticker, isin, csvFile = null, name = null, ter = null) {
-    const form = new FormData()
-    if (csvFile) form.append('csv_file', csvFile)
     const params = { ticker, isin }
     if (name) params.name = name
     if (ter != null) params.ter = ter
-    return api.post('/admin/import-etf', form, {
-      params,
-      headers: { 'x-admin-secret': adminSecret },
-    })
+    const config = { params, headers: { 'x-admin-secret': adminSecret } }
+    if (csvFile) {
+      const form = new FormData()
+      form.append('csv_file', csvFile)
+      return api.post('/admin/import-etf', form, config)
+    }
+    return api.post('/admin/import-etf', null, config)
   },
   createApiKey(adminSecret, name, rateLimit = 60, email = null) {
     const params = { name, rate_limit_per_minute: rateLimit }
