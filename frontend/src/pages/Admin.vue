@@ -5,6 +5,14 @@
       <p class="page-subtitle">Manage API keys, seed data and configure your connection settings.</p>
     </div>
 
+    <!-- Tab Navigation -->
+    <div class="tab-bar">
+      <button :class="['tab-btn', { active: activeTab === 'management' }]" @click="activeTab = 'management'">Management</button>
+      <button :class="['tab-btn', { active: activeTab === 'etfvalues' }]" @click="switchToValues">ETF Values</button>
+    </div>
+
+    <template v-if="activeTab === 'management'">
+
     <!-- API Key Config -->
     <div class="card" style="margin-bottom:1.5rem">
       <h2 class="card-title">API Key</h2>
@@ -255,6 +263,82 @@
         Do not use real financial data without appropriate licensing and compliance review.
       </p>
     </div>
+
+    </template><!-- /management tab -->
+
+    <!-- ETF Values Tab -->
+    <template v-if="activeTab === 'etfvalues'">
+      <div class="card" style="margin-bottom:1.5rem">
+        <h2 class="card-title">ETF Values (Performance Data)</h2>
+        <p style="font-size:.875rem;color:var(--text-muted);margin-bottom:1rem">
+          Select an ETF and an optional date range to view daily close price and NAV data. Use this to test performance and risk calculations.
+        </p>
+
+        <div class="grid-2" style="margin-bottom:.75rem">
+          <div>
+            <label class="label">ETF</label>
+            <div style="display:flex;gap:.5rem">
+              <select class="input" v-model="valuesEtfId" style="flex:1">
+                <option value="">— select ETF —</option>
+                <option v-for="e in valuesEtfList" :key="e.id" :value="e.id">{{ e.ticker }} — {{ e.name }}</option>
+              </select>
+              <button class="btn btn-outline" @click="loadValuesEtfList" :disabled="valuesEtfListLoading" title="Refresh ETF list">
+                {{ valuesEtfListLoading ? '…' : '↻' }}
+              </button>
+            </div>
+          </div>
+          <div style="display:flex;gap:.5rem;align-items:flex-end">
+            <div style="flex:1">
+              <label class="label">From</label>
+              <input class="input" type="date" v-model="valuesFromDate" />
+            </div>
+            <div style="flex:1">
+              <label class="label">To</label>
+              <input class="input" type="date" v-model="valuesToDate" />
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:.75rem;align-items:center;margin-bottom:1rem;flex-wrap:wrap">
+          <button class="btn btn-primary" @click="loadEtfValues" :disabled="!valuesEtfId || valuesLoading">
+            {{ valuesLoading ? 'Loading…' : 'Load Data' }}
+          </button>
+          <button class="btn btn-outline" @click="downloadValuesCsv" :disabled="!valuesData || valuesData.length === 0">
+            ⬇ Download CSV
+          </button>
+          <span v-if="valuesData" style="font-size:.85rem;color:var(--text-muted)">{{ valuesData.length }} row(s)</span>
+        </div>
+
+        <div v-if="valuesError" class="error-box" style="margin-bottom:.75rem">{{ valuesError }}</div>
+
+        <div v-if="valuesData && valuesData.length > 0" class="log-table-wrap">
+          <table class="log-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th style="text-align:right">Close Price</th>
+                <th style="text-align:right">NAV</th>
+                <th>Currency</th>
+                <th style="text-align:right">Dividend</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="row in valuesData" :key="row.date">
+                <td>{{ row.date }}</td>
+                <td style="text-align:right;font-variant-numeric:tabular-nums">{{ row.close_price != null ? Number(row.close_price).toFixed(4) : '—' }}</td>
+                <td style="text-align:right;font-variant-numeric:tabular-nums">{{ row.nav != null ? Number(row.nav).toFixed(4) : '—' }}</td>
+                <td>{{ row.currency }}</td>
+                <td style="text-align:right;font-variant-numeric:tabular-nums">{{ row.dividend != null ? Number(row.dividend).toFixed(4) : '—' }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div v-else-if="valuesData && valuesData.length === 0" style="padding:1.5rem;text-align:center;color:var(--text-muted);font-size:.875rem">
+          No performance data found for this ETF and date range.
+        </div>
+      </div>
+    </template><!-- /etfvalues tab -->
+
   </div>
 </template>
 
@@ -263,6 +347,14 @@ import { ref, computed, onMounted, inject } from 'vue'
 import { healthService, adminService, etfService } from '../services/api.js'
 
 const setAdminActive = inject('setAdminActive')
+
+// ─── Tab state ────────────────────────────────────────────────
+const activeTab = ref('management')
+
+function switchToValues() {
+  activeTab.value = 'etfvalues'
+  if (valuesEtfList.value.length === 0) loadValuesEtfList()
+}
 
 const apiKey = ref(localStorage.getItem('api_key') || '')
 const showKey = ref(false)
@@ -447,6 +539,68 @@ async function deleteSelectedEtfs() {
   }
 }
 
+// ─── ETF Values ───────────────────────────────────────────────
+const valuesEtfList = ref([])
+const valuesEtfListLoading = ref(false)
+const valuesEtfId = ref('')
+const valuesFromDate = ref('')
+const valuesToDate = ref('')
+const valuesLoading = ref(false)
+const valuesError = ref('')
+const valuesData = ref(null)
+
+async function loadValuesEtfList() {
+  valuesEtfListLoading.value = true
+  try {
+    const r = await etfService.getETFs(0, 200)
+    valuesEtfList.value = r.data
+  } catch (e) {
+    console.error('Failed to load ETF list for values tab', e)
+  } finally {
+    valuesEtfListLoading.value = false
+  }
+}
+
+async function loadEtfValues() {
+  valuesLoading.value = true
+  valuesError.value = ''
+  valuesData.value = null
+  try {
+    const r = await etfService.getPerformance(
+      valuesEtfId.value,
+      valuesFromDate.value || null,
+      valuesToDate.value || null
+    )
+    valuesData.value = r.data
+  } catch (e) {
+    valuesError.value = e.response?.data?.detail || e.message
+  } finally {
+    valuesLoading.value = false
+  }
+}
+
+function downloadValuesCsv() {
+  if (!valuesData.value || valuesData.value.length === 0) return
+  const etf = valuesEtfList.value.find(e => e.id === valuesEtfId.value)
+  const ticker = etf ? etf.ticker : 'etf'
+  const header = ['date', 'close_price', 'nav', 'currency', 'dividend']
+  const rows = valuesData.value.map(r => [
+    r.date,
+    r.close_price ?? '',
+    r.nav ?? '',
+    r.currency,
+    r.dividend ?? ''
+  ])
+  const csv = [header, ...rows].map(row => row.join(',')).join('\n')
+  const blob = new Blob([csv], { type: 'text/csv' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `${ticker}_performance.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 // ─── Request Logs ─────────────────────────────────────────────
 const logFilterName = ref('')
 const logFilterEmail = ref('')
@@ -475,6 +629,11 @@ async function loadLogs(offset = 0) {
 </script>
 
 <style scoped>
+.tab-bar { display: flex; gap: 0; margin-bottom: 1.5rem; border-bottom: 2px solid var(--border); }
+.tab-btn { background: none; border: none; border-bottom: 2px solid transparent; margin-bottom: -2px; padding: .6rem 1.25rem; font-size: .9rem; font-weight: 500; color: var(--text-muted); cursor: pointer; transition: color .15s, border-color .15s; border-radius: var(--radius-sm) var(--radius-sm) 0 0; }
+.tab-btn:hover { color: var(--text); background: var(--bg-2); }
+.tab-btn.active { color: var(--green-600); border-bottom-color: var(--green-600); }
+[data-theme="dark"] .tab-btn.active { color: #4ade80; border-bottom-color: #4ade80; }
 .key-row { display: flex; gap: .5rem; align-items: center; }
 .key-row .input { flex: 1; }
 .success-msg { background: var(--green-50); border: 1px solid var(--green-200); border-radius: var(--radius-sm); padding: .75rem 1rem; color: var(--green-700); font-size: .875rem; margin-top: .75rem; }
