@@ -67,8 +67,8 @@ export const healthService = {
 }
 
 export const authService = {
-  requestKey(name, email) {
-    return api.post('/auth/request-key', null, { params: { name, email } })
+  requestKey(email) {
+    return api.post('/auth/request-key', null, { params: { email } })
   }
 }
 

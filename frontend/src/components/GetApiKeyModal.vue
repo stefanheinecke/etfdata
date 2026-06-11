@@ -13,34 +13,23 @@
         </div>
 
         <!-- Success state -->
-        <template v-if="apiKey">
-          <p class="modal-sub success-sub">✓ Your key has been created. Copy it now — it won't be shown again.</p>
-          <div class="key-display">
-            <code class="key-code">{{ apiKey }}</code>
-            <button class="btn btn-outline btn-sm" @click="copyKey">{{ copied ? '✓ Copied' : 'Copy' }}</button>
-          </div>
-          <button class="btn btn-primary" style="width:100%;margin-top:1rem" @click="useKey">
-            Use this key &amp; close
+        <template v-if="sent">
+          <div class="sent-icon">✉️</div>
+          <p class="modal-sub success-sub">Your API key has been sent to <strong>{{ email }}</strong>. Check your inbox.</p>
+          <p class="modal-note" style="margin-top:.75rem">Didn't receive it? Check your spam folder or request a new key.</p>
+          <button class="btn btn-primary" style="width:100%;margin-top:1rem" @click="close">
+            Close
           </button>
         </template>
 
         <!-- Form state -->
         <template v-else>
-          <p class="modal-sub">Enter your name and email to get a free API key with 60 req/min.</p>
+          <p class="modal-sub">Enter your email address to receive a free API key (60 req/min).</p>
 
-          <div class="form-field">
-            <label class="label">Your Name</label>
-            <input
-              ref="nameInput"
-              class="input"
-              v-model="name"
-              placeholder="e.g. Jane Smith"
-              @keyup.enter="submit"
-            />
-          </div>
           <div class="form-field">
             <label class="label">Email Address</label>
             <input
+              ref="emailInput"
               class="input"
               type="email"
               v-model="email"
@@ -54,14 +43,14 @@
           <button
             class="btn btn-primary"
             style="width:100%"
-            :disabled="!name || !email || loading"
+            :disabled="!email || loading"
             @click="submit"
           >
-            {{ loading ? 'Creating…' : 'Create API Key' }}
+            {{ loading ? 'Sending…' : 'Get API Key' }}
           </button>
 
           <p class="modal-note">
-            Your email is only used to identify your key. We don't send marketing emails.
+            Your key will be emailed to you. We don't send marketing emails.
           </p>
         </template>
       </div>
@@ -76,47 +65,31 @@ import { authService } from '../services/api.js'
 const props = defineProps({ show: Boolean })
 const emit  = defineEmits(['close'])
 
-const name     = ref('')
-const email    = ref('')
-const loading  = ref(false)
-const errorMsg = ref('')
-const apiKey   = ref('')
-const copied   = ref(false)
-const nameInput = ref(null)
+const email      = ref('')
+const loading    = ref(false)
+const errorMsg   = ref('')
+const sent       = ref(false)
+const emailInput = ref(null)
 
 watch(() => props.show, async (val) => {
   if (val) {
-    name.value = ''; email.value = ''; errorMsg.value = ''; apiKey.value = ''; copied.value = false
+    email.value = ''; errorMsg.value = ''; sent.value = false
     await nextTick()
-    nameInput.value?.focus()
+    emailInput.value?.focus()
   }
 })
 
 async function submit() {
-  if (!name.value || !email.value) return
+  if (!email.value) return
   loading.value = true; errorMsg.value = ''
   try {
-    const r = await authService.requestKey(name.value.trim(), email.value.trim())
-    apiKey.value = r.data.api_key
+    await authService.requestKey(email.value.trim())
+    sent.value = true
   } catch(e) {
     errorMsg.value = e.response?.data?.detail || e.message
   } finally {
     loading.value = false
   }
-}
-
-function copyKey() {
-  navigator.clipboard.writeText(apiKey.value).then(() => {
-    copied.value = true
-    setTimeout(() => copied.value = false, 2000)
-  })
-}
-
-function useKey() {
-  localStorage.setItem('api_key', apiKey.value)
-  // Trigger storage event for other components listening
-  window.dispatchEvent(new StorageEvent('storage', { key: 'api_key', newValue: apiKey.value }))
-  close()
 }
 
 function close() {
@@ -146,6 +119,7 @@ function close() {
   box-shadow: 0 20px 60px rgba(0,0,0,0.25);
   animation: modal-in 0.18s ease;
 }
+.sent-icon { font-size: 2.5rem; text-align: center; margin-bottom: .5rem; }
 
 @keyframes modal-in {
   from { opacity: 0; transform: translateY(-16px) scale(0.97); }
