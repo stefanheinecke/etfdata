@@ -39,25 +39,51 @@ def _fetch_yf_meta(yf_symbol: str, logs: list) -> dict:
         return {}
 
 
-def _upload_performance(etf: ETF, ticker_obj, currency: str, db, logs: list) -> int:
-    hist = ticker_obj.history(period="1y")
+def _upload_performance(etf: ETF, ticker_obj, currency: str, db, logs: list,
+                        perf_yf_symbol: str | None = None) -> int:
+    import yfinance as yf
+
+    # Use a dedicated USD-listed ticker for price history if specified
+    if perf_yf_symbol:
+        price_ticker = yf.Ticker(perf_yf_symbol)
+        logs.append(f"  Using alternate performance ticker: {perf_yf_symbol}")
+    else:
+        price_ticker = ticker_obj
+
+    hist = price_ticker.history(period="1y")
     if hist is None or hist.empty:
         logs.append("  No historical price data available from yfinance.")
         return 0
 
+    # Detect actual price currency (overrides ETF's stated currency)
+    actual_currency = currency
+    try:
+        reported = price_ticker.fast_info.currency or ""
+        if reported:
+            actual_currency = reported
+    except Exception:
+        pass
+
+    # GBp = pence (GBX) — divide by 100 to convert to GBP
+    gbx_factor = 1.0
+    if actual_currency in ("GBp", "GBX", "GBx"):
+        gbx_factor = 0.01
+        actual_currency = "GBP"
+        logs.append("  Prices are in pence (GBX), converting to GBP.")
+
     db.query(Performance).filter_by(etf_id=etf.id).delete()
     count = 0
     for idx, row in hist.iterrows():
-        close = float(row["Close"])
+        close = float(row["Close"]) * gbx_factor
         if close <= 0:
             continue
-        div = float(row.get("Dividends", 0) or 0)
+        div = float(row.get("Dividends", 0) or 0) * gbx_factor
         db.add(Performance(
             etf_id=etf.id,
             date=idx.date(),
             close_price=round(close, 4),
             dividend=round(div, 6) if div else None,
-            currency=currency[:3].upper(),
+            currency=actual_currency[:3].upper(),
         ))
         count += 1
     return count
@@ -205,22 +231,20 @@ def import_etf(
     name_override: str | None = None,
     ter_override: float | None = None,
 ) -> dict:
-    """
-    Full ETF import pipeline (metadata + performance + holdings) in-process.
+    """Full ETF import pipeline (metadata + performance + optional holdings) in-process.
 
     Args:
         ticker:    ETF ticker (e.g. "SWDA").
         isin:      ETF ISIN (e.g. "IE00B4L5Y983").
-        csv_bytes: Raw CSV content bytes, or None to auto-download.
+        csv_bytes: Raw CSV content bytes, or None to skip holdings import.
         db:        SQLAlchemy session (from get_db()).
         logs:      List to append human-readable log lines to.
 
     Returns:
-        Summary dict with etf_id, ticker, name, holdings, allocations, skipped.
+        Summary dict with etf_id, ticker, name, and optionally holdings/allocations/skipped.
 
     Raises:
-        ValueError:   Invalid input (bad CSV, ticker not in built-in list with no CSV).
-        RuntimeError: Network / download failure.
+        ValueError:   Invalid input (bad CSV format).
     """
     ticker = ticker.strip().upper()
     isin   = isin.strip().upper()
@@ -233,41 +257,7 @@ def import_etf(
 
     logs.append(f"Using yfinance symbol: {yf_symbol}")
 
-    # ---- Auto-download CSV if not uploaded ----
-    if csv_bytes is None:
-        if not known_url:
-            raise ValueError(
-                f"No CSV uploaded and no built-in holdings URL for '{ticker}'. "
-                "Upload a CSV file or add the ticker to the ISHARES_ETFS built-in list."
-            )
-        import requests
-        headers = {
-            "User-Agent": (
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/124.0.0.0 Safari/537.36"
-            ),
-            "Accept": "text/csv,application/csv,text/plain,*/*",
-            "Accept-Language": "en-US,en;q=0.9",
-            "Referer": "https://www.ishares.com/",
-        }
-        logs.append("Downloading holdings CSV from iShares...")
-        try:
-            resp = requests.get(known_url, headers=headers, timeout=30)
-        except requests.RequestException as exc:
-            raise RuntimeError(f"Network error downloading CSV: {exc}")
-        if resp.status_code != 200:
-            raise RuntimeError(f"HTTP {resp.status_code} downloading holdings CSV.")
-        preview = resp.content[:200].decode("utf-8", errors="ignore").lstrip()
-        if "html" in resp.headers.get("Content-Type", "").lower() or preview.lower().startswith("<!doctype"):
-            raise RuntimeError(
-                "iShares returned an HTML page instead of CSV (cookie/bot wall). "
-                "Download the file manually and upload it here."
-            )
-        csv_bytes = resp.content
-        logs.append(f"Downloaded {len(csv_bytes):,} bytes.")
-
-    # ---- yfinance metadata ----
+    # ---- Holdings (only when a CSV was uploaded) ----
     logs.append(f"Fetching metadata from yfinance ({yf_symbol})...")
     yf_meta   = _fetch_yf_meta(yf_symbol, logs)
     name      = name_override or yf_meta.get("name") or ticker
@@ -308,18 +298,24 @@ def import_etf(
 
     # ---- Performance ----
     ticker_obj = yf_meta.get("ticker_obj")
+    perf_yf_symbol = (known or {}).get("perf_yf_symbol")
     if ticker_obj is not None:
         logs.append("Uploading 1-year performance data...")
-        perf_count = _upload_performance(etf, ticker_obj, currency, db, logs)
+        perf_count = _upload_performance(etf, ticker_obj, currency, db, logs,
+                                         perf_yf_symbol=perf_yf_symbol)
         db.commit()
         logs.append(f"  {perf_count} daily price records inserted.")
     else:
-        logs.append("Skipping performance data (yfinance unavailable).")
+        logs.append("Skipping performance data (yfinance unavailable.)")
 
-    # ---- Holdings ----
-    logs.append("Processing holdings CSV...")
-    summary = _process_csv(csv_bytes, etf, db, logs)
-    db.commit()
+    # ---- Holdings (only when a CSV was uploaded) ----
+    if csv_bytes is not None:
+        logs.append("Processing holdings CSV...")
+        summary = _process_csv(csv_bytes, etf, db, logs)
+        db.commit()
+    else:
+        logs.append("No CSV uploaded — holdings import skipped.")
+        summary = {}
 
     return {
         "etf_id": str(etf.id),
