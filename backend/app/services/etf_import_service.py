@@ -201,14 +201,16 @@ def _fetch_yf_meta(yf_symbol: str, logs: list) -> dict:
     result: dict = {"ticker_obj": t}  # always present — history() may still work even when info is rate-limited
     try:
         info = t.info or {}
-        ter_raw = info.get("totalExpenseRatio")
+        ter_raw = (info.get("totalExpenseRatio") or info.get("annualReportExpenseRatio"))
         ter_pct = round(float(ter_raw) * 100, 4) if ter_raw else None
-        fund_size = info.get("totalAssets")
+        # totalNetAssets is the correct field for ETFs on yfinance; totalAssets is the fallback
+        fund_size = info.get("totalNetAssets") or info.get("totalAssets")
         result.update({
             "name":      info.get("longName") or info.get("shortName") or "",
             "currency":  info.get("currency") or "",
             "ter":       ter_pct,
             "fund_size": int(fund_size) if fund_size else None,
+            "isin":      (info.get("isin") or "").strip(),
         })
     except Exception as exc:
         logs.append(f"  yfinance metadata lookup failed for '{yf_symbol}' ({exc})")
@@ -605,6 +607,28 @@ def import_etf(
             logs.append(f"  yfinance fallback: name='{yf_meta['name']}', currency={yf_meta.get('currency')}")
         else:
             logs.append(f"  yfinance ({yf_sym}) also returned no data. ETF created with minimal metadata.")
+
+    # If EODHD gave us a name but is missing ISIN / TER / fund_size (common for European ETFs
+    # where EODHD's ETF_Data section is sparse), supplement those fields from yfinance.
+    if eodhd_meta.get("name") and (
+        not eodhd_meta.get("isin")
+        or eodhd_meta.get("ter") is None
+        or not eodhd_meta.get("fund_size")
+    ):
+        yf_supp_sym = ticker + ".L"
+        logs.append(f"  EODHD metadata incomplete — supplementing from yfinance ({yf_supp_sym})...")
+        yf_supp = _fetch_yf_meta(yf_supp_sym, logs)
+        for field in ["isin", "ter", "fund_size"]:
+            if not eodhd_meta.get(field) and yf_supp.get(field):
+                eodhd_meta[field] = yf_supp[field]
+                logs.append(f"    Supplemented {field}={yf_supp[field]} from yfinance.")
+        # Also infer dividend_policy from the yfinance longName if EODHD couldn't
+        if not eodhd_meta.get("dividend_policy") and yf_supp.get("name"):
+            n = yf_supp["name"].lower()
+            if "(acc)" in n or "accumul" in n:
+                eodhd_meta["dividend_policy"] = "Accumulating"
+            elif "(dist)" in n or "distribut" in n:
+                eodhd_meta["dividend_policy"] = "Distributing"
 
     isin = (isin_override or eodhd_meta.get("isin") or "").strip().upper() or None
     if not isin:
