@@ -512,6 +512,22 @@ def import_etf(
             if lse_sym != eodhd_symbol:
                 logs.append(f"  No fundamentals for {eodhd_symbol}, retrying with {lse_sym}...")
                 eodhd_meta = _fetch_eodhd_meta(lse_sym, token, logs)
+        elif not eodhd_meta.get("isin"):
+            # Got partial data but no ISIN — supplement missing fields from the LSE listing.
+            # Currency is intentionally kept from the original symbol (e.g. USD for .SW).
+            lse_sym = f"{ticker}.LSE"
+            if lse_sym != eodhd_symbol:
+                logs.append(f"  ISIN missing from {eodhd_symbol}, supplementing from {lse_sym}...")
+                lse_meta = _fetch_eodhd_meta(lse_sym, token, logs)
+                if lse_meta:
+                    orig_currency = eodhd_meta.get("currency")
+                    for field in ["isin", "benchmark", "ter", "domicile", "provider",
+                                  "dividend_policy", "holdings"]:
+                        if not eodhd_meta.get(field) and lse_meta.get(field):
+                            eodhd_meta[field] = lse_meta[field]
+                    # Restore original currency — LSE returns GBP but e.g. .SW trades in USD
+                    if orig_currency:
+                        eodhd_meta["currency"] = orig_currency
     else:
         logs.append("  Warning: EODHD_TOKEN not configured — cannot fetch metadata or prices.")
 
