@@ -429,12 +429,20 @@ def import_etf(
     logs.append(f"Using yfinance symbol for metadata: {yf_symbol}")
 
     # ---- Metadata: EODHD first, yfinance fallback ----
+    # For fundamentals use the primary yf_symbol converted to EODHD format
+    # (e.g. SWDA.L → SWDA.LSE) — EODHD has fundamentals for LSE/US listings
+    # but not always for Swiss (.SW) listings.
     token = _eodhd_token()
     eodhd_meta = {}
     if token:
-        eodhd_sym = _to_eodhd_symbol(perf_sym or yf_symbol)
-        logs.append(f"Fetching metadata from EODHD ({eodhd_sym})...")
-        eodhd_meta = _fetch_eodhd_meta(eodhd_sym, token, logs)
+        eodhd_fund_sym = _to_eodhd_symbol(yf_symbol)   # SWDA.L → SWDA.LSE
+        logs.append(f"Fetching metadata from EODHD ({eodhd_fund_sym})...")
+        eodhd_meta = _fetch_eodhd_meta(eodhd_fund_sym, token, logs)
+        # If LSE listing also 403'd, try the price ticker as last resort
+        if not eodhd_meta and perf_sym:
+            eodhd_perf_sym = _to_eodhd_symbol(perf_sym)
+            logs.append(f"  Retrying fundamentals with {eodhd_perf_sym}...")
+            eodhd_meta = _fetch_eodhd_meta(eodhd_perf_sym, token, logs)
 
     logs.append(f"Fetching metadata from yfinance ({yf_symbol})...")
     yf_meta   = _fetch_yf_meta(yf_symbol, logs)
