@@ -49,8 +49,8 @@ def _fetch_eodhd_meta(eodhd_sym: str, token: str, logs: list) -> dict:
             logs.append(f"  EODHD meta HTTP {resp.status_code} for '{eodhd_sym}'.")
             return {}
         data = resp.json()
-        general  = data.get("General", {})
-        etf_data = data.get("ETF_Data", {})
+        general  = data.get("General") or {}
+        etf_data = data.get("ETF_Data") or {}  # EODHD sends null for European ETFs — treat as {}
 
         name      = general.get("Name") or general.get("LongName") or ""
         if not name:
@@ -65,8 +65,10 @@ def _fetch_eodhd_meta(eodhd_sym: str, token: str, logs: list) -> dict:
         isin      = (general.get("ISIN") or general.get("Isin") or
                      general.get("isin") or "").strip()
 
-        # Log which ETF_Data keys actually have values (aids debugging field-name mismatches)
-        non_empty_keys = [k for k, v in etf_data.items() if v not in (None, "", {}, [])]
+        # Log which keys actually have values — helps diagnose field-name mismatches
+        non_empty_general = [k for k, v in general.items() if v not in (None, "", {}, [])]
+        non_empty_keys    = [k for k, v in etf_data.items() if v not in (None, "", {}, [])]
+        logs.append(f"  EODHD General non-empty keys: {non_empty_general[:30]}")
         logs.append(f"  EODHD ETF_Data non-empty keys: {non_empty_keys[:25]}")
 
         # Provider / fund family
@@ -139,6 +141,30 @@ def _fetch_eodhd_meta(eodhd_sym: str, token: str, logs: list) -> dict:
     except Exception as exc:
         logs.append(f"  EODHD meta fetch failed ({exc}).")
         return {}
+
+
+def _fetch_eodhd_isin(eodhd_sym: str, token: str, logs: list) -> str:
+    """Look up ISIN for an ETF via EODHD search API (always returns ISIN in results)."""
+    import requests
+    try:
+        resp = requests.get(f"{_EODHD_BASE}/search/{eodhd_sym}",
+                            params={"api_token": token, "limit": 5}, timeout=10)
+        if resp.status_code != 200:
+            return ""
+        results = resp.json()
+        code = eodhd_sym.split(".")[0].upper()
+        for r in results:
+            if r.get("Code", "").upper() == code and r.get("ISIN"):
+                logs.append(f"  EODHD search: found ISIN={r['ISIN']} for {eodhd_sym}")
+                return r["ISIN"]
+        # Try any result with an ISIN
+        for r in results:
+            if r.get("ISIN"):
+                logs.append(f"  EODHD search fallback: ISIN={r['ISIN']} from first match")
+                return r["ISIN"]
+    except Exception as exc:
+        logs.append(f"  EODHD ISIN search failed ({exc}).")
+    return ""
 
 
 def _fetch_eodhd_currency(eodhd_sym: str, token: str, logs: list) -> str | None:
@@ -615,6 +641,15 @@ def import_etf(
         or eodhd_meta.get("ter") is None
         or not eodhd_meta.get("fund_size")
     ):
+        # ISIN: EODHD search API is the most reliable source
+        if not eodhd_meta.get("isin") and token:
+            found_isin = _fetch_eodhd_isin(eodhd_symbol, token, logs)
+            if not found_isin:
+                # Also try the LSE listing symbol
+                found_isin = _fetch_eodhd_isin(f"{ticker}.LSE", token, logs)
+            if found_isin:
+                eodhd_meta["isin"] = found_isin
+
         yf_supp_sym = ticker + ".L"
         logs.append(f"  EODHD metadata incomplete — supplementing from yfinance ({yf_supp_sym})...")
         yf_supp = _fetch_yf_meta(yf_supp_sym, logs)
