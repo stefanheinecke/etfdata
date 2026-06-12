@@ -6,7 +6,8 @@ a database URL from the caller (uses the app's existing SQLAlchemy session).
 """
 
 import io
-from datetime import date
+import os
+from datetime import date, timedelta
 from decimal import Decimal
 
 import pandas as pd
@@ -14,9 +15,80 @@ import pandas as pd
 from app.schemas import ETF, Performance, Holding, Allocation
 from app.services.ishares_import import ISHARES_ETFS, _COUNTRY_ISO, _lookup_country
 
+_EODHD_BASE = "https://eodhd.com/api"
+
+
+def _eodhd_token() -> str | None:
+    return os.getenv("EODHD_TOKEN") or None
+
+
+def _to_eodhd_symbol(yf_sym: str) -> str:
+    """Convert a yfinance-style ticker to EODHD format.
+    SWDA.SW  -> SWDA.SW   (SIX, unchanged)
+    IVV      -> IVV.US    (US, no suffix)
+    SWDA.L   -> SWDA.LSE  (London)
+    """
+    if "." not in yf_sym:
+        return yf_sym + ".US"
+    if yf_sym.endswith(".L"):
+        return yf_sym[:-2] + ".LSE"
+    return yf_sym  # .SW, .AS, etc. unchanged
+
 
 # ---------------------------------------------------------------------------
-# yfinance helpers
+# EODHD helpers
+# ---------------------------------------------------------------------------
+
+def _fetch_eodhd_meta(eodhd_sym: str, token: str, logs: list) -> dict:
+    """Fetch ETF metadata from EODHD fundamentals endpoint."""
+    import requests
+    url = f"{_EODHD_BASE}/fundamentals/{eodhd_sym}"
+    try:
+        resp = requests.get(url, params={"api_token": token, "filter": "General"}, timeout=15)
+        if resp.status_code != 200:
+            logs.append(f"  EODHD meta HTTP {resp.status_code} for '{eodhd_sym}'.")
+            return {}
+        data = resp.json()
+        general = data.get("General", data)
+        name = general.get("Name") or general.get("LongName") or ""
+        currency = general.get("CurrencyCode") or general.get("Currency") or ""
+        return {"name": name, "currency": currency}
+    except Exception as exc:
+        logs.append(f"  EODHD meta fetch failed ({exc}).")
+        return {}
+
+
+def _fetch_eodhd_history(eodhd_sym: str, token: str, logs: list):
+    """Fetch 1-year daily price history from EODHD. Returns a DataFrame or None."""
+    import requests
+    end = date.today()
+    start = end - timedelta(days=366)
+    url = f"{_EODHD_BASE}/eod/{eodhd_sym}"
+    try:
+        resp = requests.get(url, params={
+            "api_token": token, "fmt": "json",
+            "from": start.isoformat(), "to": end.isoformat(), "period": "d"
+        }, timeout=20)
+        if resp.status_code != 200:
+            logs.append(f"  EODHD history HTTP {resp.status_code} for '{eodhd_sym}'.")
+            return None
+        rows = resp.json()
+        if not rows:
+            logs.append(f"  EODHD returned empty history for '{eodhd_sym}'.")
+            return None
+        df = pd.DataFrame(rows)
+        df["date"] = pd.to_datetime(df["date"])
+        df = df.rename(columns={"adjusted_close": "Close", "date": "Date"})
+        df = df[["Date", "Close"]].dropna()
+        logs.append(f"  EODHD history: {len(df)} rows for '{eodhd_sym}'.")
+        return df
+    except Exception as exc:
+        logs.append(f"  EODHD history fetch failed ({exc}).")
+        return None
+
+
+# ---------------------------------------------------------------------------
+# yfinance helpers (fallback when EODHD_TOKEN not set or EODHD fails)
 # ---------------------------------------------------------------------------
 
 def _fetch_yf_meta(yf_symbol: str, logs: list) -> dict:
@@ -84,42 +156,42 @@ def _upload_performance(etf: ETF, ticker_obj, currency: str, db, logs: list,
                         perf_yf_symbol: str | None = None) -> int:
     import yfinance as yf
 
-    # Determine the effective symbol used for price data
-    effective_symbol = perf_yf_symbol or None
-
-    # Use a dedicated USD-listed ticker for price history if specified
+    effective_sym = perf_yf_symbol or etf.ticker
     if perf_yf_symbol:
-        price_ticker = yf.Ticker(perf_yf_symbol)
         logs.append(f"  Using alternate performance ticker: {perf_yf_symbol}")
-    else:
-        price_ticker = ticker_obj
 
-    # --- Try yfinance first ---
-    hist = None
+    ext_df = None       # DataFrame from EODHD
+    hist   = None       # yfinance DataFrame
     actual_currency = currency
-    try:
-        hist = price_ticker.history(period="1y")
-        if hist is not None and not hist.empty:
-            try:
-                reported = price_ticker.fast_info.currency or ""
-                if reported:
-                    actual_currency = reported
-            except Exception:
-                pass
-    except Exception as exc:
-        logs.append(f"  yfinance rate-limited ({exc}). Trying Stooq fallback...")
-        hist = None
 
-    # --- Stooq fallback ---
-    stooq_df = None
-    if hist is None or hist.empty:
-        stooq_sym = _stooq_symbol(perf_yf_symbol or etf.ticker)
-        stooq_df = _fetch_stooq_history(stooq_sym, logs)
-        if stooq_df is None:
-            logs.append("  No price data available from yfinance or Stooq.")
-            return 0
+    token = _eodhd_token()
+    if token:
+        # --- EODHD (primary when token is configured) ---
+        eodhd_sym = _to_eodhd_symbol(effective_sym)
+        logs.append(f"  Fetching prices from EODHD ({eodhd_sym})...")
+        ext_df = _fetch_eodhd_history(eodhd_sym, token, logs)
 
-    # GBp = pence (GBX) — divide by 100 to convert to GBP
+    if ext_df is None:
+        # --- yfinance fallback ---
+        price_ticker = yf.Ticker(perf_yf_symbol) if perf_yf_symbol else ticker_obj
+        try:
+            hist = price_ticker.history(period="1y")
+            if hist is not None and not hist.empty:
+                try:
+                    reported = price_ticker.fast_info.currency or ""
+                    if reported:
+                        actual_currency = reported
+                except Exception:
+                    pass
+            else:
+                hist = None
+        except Exception as exc:
+            logs.append(f"  yfinance rate-limited ({exc}). No further fallback available.")
+            hist = None
+
+    if ext_df is None and (hist is None or hist.empty):
+        logs.append("  No price data available.")
+        return 0
     gbx_factor = 1.0
     if actual_currency in ("GBp", "GBX", "GBx"):
         gbx_factor = 0.01
@@ -129,9 +201,9 @@ def _upload_performance(etf: ETF, ticker_obj, currency: str, db, logs: list,
     db.query(Performance).filter_by(etf_id=etf.id).delete()
     count = 0
 
-    if stooq_df is not None:
-        # Stooq path — no dividend column, currency stays as-is
-        for _, row in stooq_df.iterrows():
+    if ext_df is not None:
+        # EODHD path
+        for _, row in ext_df.iterrows():
             close = float(row["Close"]) * gbx_factor
             if close <= 0:
                 continue
@@ -323,17 +395,25 @@ def import_etf(
 
     known        = next((e for e in ISHARES_ETFS if e["ticker"] == ticker), None)
     yf_symbol    = (known or {}).get("yf_symbol", ticker)
+    perf_sym     = (known or {}).get("perf_yf_symbol")
     known_ter    = (known or {}).get("ter")
     known_bench  = (known or {}).get("benchmark")
     known_url    = (known or {}).get("holdings_url")
 
     logs.append(f"Using yfinance symbol for metadata: {yf_symbol}")
 
-    # ---- Holdings (only when a CSV was uploaded) ----
+    # ---- Metadata: EODHD first, yfinance fallback ----
+    token = _eodhd_token()
+    eodhd_meta = {}
+    if token:
+        eodhd_sym = _to_eodhd_symbol(perf_sym or yf_symbol)
+        logs.append(f"Fetching metadata from EODHD ({eodhd_sym})...")
+        eodhd_meta = _fetch_eodhd_meta(eodhd_sym, token, logs)
+
     logs.append(f"Fetching metadata from yfinance ({yf_symbol})...")
     yf_meta   = _fetch_yf_meta(yf_symbol, logs)
-    name      = name_override or yf_meta.get("name") or ticker
-    currency  = yf_meta.get("currency") or "USD"
+    name      = name_override or eodhd_meta.get("name") or yf_meta.get("name") or ticker
+    currency  = eodhd_meta.get("currency") or yf_meta.get("currency") or "USD"
     ter       = ter_override if ter_override is not None else (yf_meta.get("ter") if yf_meta.get("ter") is not None else known_ter)
     fund_size = yf_meta.get("fund_size")
     benchmark = known_bench
@@ -370,11 +450,10 @@ def import_etf(
 
     # ---- Performance ----
     ticker_obj = yf_meta.get("ticker_obj")
-    perf_yf_symbol = (known or {}).get("perf_yf_symbol")
-    if ticker_obj is not None:
+    if ticker_obj is not None or token:
         logs.append("Uploading 1-year performance data...")
         perf_count = _upload_performance(etf, ticker_obj, currency, db, logs,
-                                         perf_yf_symbol=perf_yf_symbol)
+                                         perf_yf_symbol=perf_sym)
         db.commit()
         logs.append(f"  {perf_count} daily price records inserted.")
     else:
