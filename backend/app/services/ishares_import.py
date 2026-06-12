@@ -198,7 +198,7 @@ def _upsert_performance(etf: ETF, ticker_obj: "yf.Ticker", db: Session,
     else:
         price_ticker = ticker_obj
 
-    hist = price_ticker.history(period="1y")
+    hist = price_ticker.history(period="max")
     if hist is None or hist.empty:
         return 0
 

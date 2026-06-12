@@ -85,16 +85,14 @@ def _fetch_eodhd_meta(eodhd_sym: str, token: str, logs: list) -> dict:
 
 
 def _fetch_eodhd_history(eodhd_sym: str, token: str, logs: list):
-    """Fetch 1-year daily price history from EODHD. Returns a DataFrame or None."""
+    """Fetch full price history from EODHD (from 2000-01-01). Returns a DataFrame or None."""
     import requests
-    end = date.today()
-    start = end - timedelta(days=366)
     url = f"{_EODHD_BASE}/eod/{eodhd_sym}"
     try:
         resp = requests.get(url, params={
             "api_token": token, "fmt": "json",
-            "from": start.isoformat(), "to": end.isoformat(), "period": "d"
-        }, timeout=20)
+            "from": "2000-01-01", "to": date.today().isoformat(), "period": "d"
+        }, timeout=60)
         if resp.status_code != 200:
             logs.append(f"  EODHD history HTTP {resp.status_code} for '{eodhd_sym}'.")
             return None
@@ -106,7 +104,8 @@ def _fetch_eodhd_history(eodhd_sym: str, token: str, logs: list):
         df["date"] = pd.to_datetime(df["date"])
         df = df.rename(columns={"adjusted_close": "Close", "date": "Date"})
         df = df[["Date", "Close"]].dropna()
-        logs.append(f"  EODHD history: {len(df)} rows for '{eodhd_sym}'.")
+        logs.append(f"  EODHD history: {len(df)} rows for '{eodhd_sym}' "
+                    f"({df['Date'].min().date()} – {df['Date'].max().date()}).")
         return df
     except Exception as exc:
         logs.append(f"  EODHD history fetch failed ({exc}).")
@@ -201,7 +200,7 @@ def _upload_performance(etf: ETF, ticker_obj, currency: str, db, logs: list,
         # --- yfinance fallback ---
         price_ticker = yf.Ticker(perf_yf_symbol) if perf_yf_symbol else ticker_obj
         try:
-            hist = price_ticker.history(period="1y")
+            hist = price_ticker.history(period="max")
             if hist is not None and not hist.empty:
                 try:
                     reported = price_ticker.fast_info.currency or ""
