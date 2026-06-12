@@ -84,6 +84,28 @@ def _fetch_eodhd_meta(eodhd_sym: str, token: str, logs: list) -> dict:
         return {}
 
 
+def _fetch_eodhd_currency(eodhd_sym: str, token: str, logs: list) -> str | None:
+    """Detect the trading currency of an EODHD listing via the search API."""
+    import requests
+    try:
+        resp = requests.get(f"{_EODHD_BASE}/search/{eodhd_sym}",
+                            params={"api_token": token, "limit": 5}, timeout=10)
+        if resp.status_code != 200:
+            return None
+        results = resp.json()
+        # Match the exact code
+        code = eodhd_sym.split(".")[0].upper()
+        for r in results:
+            if r.get("Code", "").upper() == code:
+                return r.get("Currency") or r.get("currency")
+        # Fall back to first result's currency
+        if results:
+            return results[0].get("Currency") or results[0].get("currency")
+    except Exception as exc:
+        logs.append(f"  EODHD currency lookup failed ({exc}).")
+    return None
+
+
 def _fetch_eodhd_history(eodhd_sym: str, token: str, logs: list):
     """Fetch full price history from EODHD (from 2000-01-01). Returns a DataFrame or None."""
     import requests
@@ -195,6 +217,12 @@ def _upload_performance(etf: ETF, ticker_obj, currency: str, db, logs: list,
         eodhd_sym = _to_eodhd_symbol(effective_sym)
         logs.append(f"  Fetching prices from EODHD ({eodhd_sym})...")
         ext_df = _fetch_eodhd_history(eodhd_sym, token, logs)
+        if ext_df is not None:
+            # Detect actual trading currency for this specific listing
+            detected = _fetch_eodhd_currency(eodhd_sym, token, logs)
+            if detected:
+                actual_currency = detected
+                logs.append(f"  Price currency for {eodhd_sym}: {actual_currency}")
 
     if ext_df is None:
         # --- yfinance fallback ---
