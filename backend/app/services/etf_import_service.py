@@ -57,7 +57,7 @@ def _fetch_eodhd_meta(eodhd_sym: str, token: str, logs: list) -> dict:
             # EODHD returned a response but with no ETF data — symbol not in their database
             # or the exchange code is wrong. Returning {} lets the caller try a fallback.
             logs.append(f"  EODHD: empty fundamentals for '{eodhd_sym}' "
-                        f"(top-level keys: {list(data.keys())}).")
+                        f"(keys: {list(data.keys())}, body: {resp.text[:300]!r}).")
             return {}
         currency  = general.get("CurrencyCode") or general.get("Currency") or ""
         fund_size = etf_data.get("Net_Assets") or etf_data.get("TotalAssets")
@@ -204,6 +204,42 @@ def _fetch_yf_meta(yf_symbol: str, logs: list) -> dict:
     except Exception as exc:
         logs.append(f"  yfinance metadata lookup failed for '{yf_symbol}' ({exc})")
     return result
+
+
+def _fetch_yf_holdings(ticker_obj, logs: list) -> list:
+    """Fetch ETF top holdings from yfinance funds_data (best-effort, typically top-10).
+    Returns a list of holding dicts compatible with the EODHD holdings format.
+    Note: ISINs are not available via this path; a sanitised name is used as identifier.
+    """
+    try:
+        fd = ticker_obj.funds_data
+        top = getattr(fd, "top_holdings", None)
+        if top is None or (hasattr(top, "empty") and top.empty):
+            logs.append("  yfinance: no top_holdings data available.")
+            return []
+        holdings = []
+        for i, (_, row) in enumerate(top.iterrows()):
+            name = str(row.get("holdingName") or "").strip()
+            pct  = row.get("holdingPercent")
+            if not name or pct is None:
+                continue
+            weight = float(pct)
+            if weight < 1.0:   # fraction (0.05) → percentage (5.0)
+                weight *= 100
+            # No ISIN available — use sanitised name as 12-char identifier
+            ident = name.replace(" ", "").upper()[:12] or f"HOLD{i:04d}"
+            holdings.append({
+                "isin":    ident,
+                "name":    name[:255],
+                "weight":  round(weight, 4),
+                "sector":  "Equity",
+                "country": "",
+            })
+        logs.append(f"  yfinance top holdings: {len(holdings)} positions.")
+        return holdings
+    except Exception as exc:
+        logs.append(f"  yfinance holdings unavailable ({exc}).")
+        return []
 
 
 def _stooq_symbol(yf_sym: str) -> str:
@@ -537,6 +573,29 @@ def import_etf(
                         eodhd_meta["currency"] = orig_currency
     else:
         logs.append("  Warning: EODHD_TOKEN not configured — cannot fetch metadata or prices.")
+
+    # If EODHD returned no usable metadata, fall back to yfinance for basic info.
+    # Construct the London yfinance symbol (ticker + ".L") which covers most UCITS ETFs.
+    if not eodhd_meta or not eodhd_meta.get("name"):
+        yf_sym = ticker + ".L"
+        logs.append(f"  All EODHD sources returned no data — falling back to yfinance ({yf_sym})...")
+        yf_meta = _fetch_yf_meta(yf_sym, logs)
+        if yf_meta.get("name"):
+            eodhd_meta = {
+                "name":            yf_meta["name"],
+                "currency":        yf_meta.get("currency") or "USD",
+                "ter":             yf_meta.get("ter"),
+                "fund_size":       yf_meta.get("fund_size"),
+                "isin":            (eodhd_meta or {}).get("isin", ""),
+                "benchmark":       None,
+                "domicile":        "IE",
+                "provider":        "iShares",
+                "dividend_policy": None,
+                "holdings":        _fetch_yf_holdings(yf_meta["ticker_obj"], logs),
+            }
+            logs.append(f"  yfinance fallback: name='{yf_meta['name']}', currency={yf_meta.get('currency')}")
+        else:
+            logs.append(f"  yfinance ({yf_sym}) also returned no data. ETF created with minimal metadata.")
 
     isin = (isin_override or eodhd_meta.get("isin") or "").strip().upper() or None
     if not isin:
