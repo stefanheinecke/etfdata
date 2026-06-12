@@ -53,6 +53,12 @@ def _fetch_eodhd_meta(eodhd_sym: str, token: str, logs: list) -> dict:
         etf_data = data.get("ETF_Data", {})
 
         name      = general.get("Name") or general.get("LongName") or ""
+        if not name:
+            # EODHD returned a response but with no ETF data — symbol not in their database
+            # or the exchange code is wrong. Returning {} lets the caller try a fallback.
+            logs.append(f"  EODHD: empty fundamentals for '{eodhd_sym}' "
+                        f"(top-level keys: {list(data.keys())}).")
+            return {}
         currency  = general.get("CurrencyCode") or general.get("Currency") or ""
         fund_size = etf_data.get("Net_Assets") or etf_data.get("TotalAssets")
         isin      = (general.get("ISIN") or "").strip()
@@ -507,7 +513,8 @@ def import_etf(
         eodhd_meta = _fetch_eodhd_meta(eodhd_symbol, token, logs)
         # EODHD fundamentals are often absent for Swiss/Xetra listings.
         # Fall back to the LSE equivalent which carries richer data.
-        if not eodhd_meta:
+        # Also falls back when the response was HTTP 200 but contained no ETF data (name empty).
+        if not eodhd_meta or not eodhd_meta.get("name"):
             lse_sym = f"{ticker}.LSE"
             if lse_sym != eodhd_symbol:
                 logs.append(f"  No fundamentals for {eodhd_symbol}, retrying with {lse_sym}...")
