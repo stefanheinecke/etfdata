@@ -446,7 +446,9 @@ def import_etf(
     logs.append(f"Fetching metadata from yfinance ({yf_symbol})...")
     yf_meta   = _fetch_yf_meta(yf_symbol, logs)
     name      = name_override or eodhd_meta.get("name") or yf_meta.get("name") or ticker
-    currency  = eodhd_meta.get("currency") or yf_meta.get("currency") or "USD"
+    # Catalogue currency takes precedence — fundamentals may reflect a different listing's currency
+    # (e.g. SWDA.LSE returns GBP but SWDA is USD-denominated and prices come from SWDA.SW)
+    currency  = known.get("currency") or eodhd_meta.get("currency") or yf_meta.get("currency") or "USD"
     ter       = ter_override if ter_override is not None else (yf_meta.get("ter") if yf_meta.get("ter") is not None else known_ter)
     fund_size = eodhd_meta.get("fund_size") or yf_meta.get("fund_size")
     benchmark = known_bench
