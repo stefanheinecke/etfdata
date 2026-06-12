@@ -21,6 +21,7 @@ class ETF(Base):
     fund_size = Column(BigInteger)
     benchmark = Column(String(255))
     currency = Column(String(3), nullable=False)
+    dividend_policy = Column(String(20))  # "Accumulating" | "Distributing"
     listings = Column(JSON)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

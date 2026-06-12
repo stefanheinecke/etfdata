@@ -56,6 +56,14 @@ def _fetch_eodhd_meta(eodhd_sym: str, token: str, logs: list) -> dict:
         currency  = general.get("CurrencyCode") or general.get("Currency") or ""
         fund_size = etf_data.get("Net_Assets") or etf_data.get("TotalAssets")
 
+        # Dividend policy from EODHD or inferred from fund name
+        div_policy = None
+        etf_type = (etf_data.get("Type") or etf_data.get("InvestmentType") or "").lower()
+        if "accum" in etf_type or "(acc)" in name.lower():
+            div_policy = "Accumulating"
+        elif "distrib" in etf_type or "(dist)" in name.lower():
+            div_policy = "Distributing"
+
         # Holdings: dict keyed by ticker symbol
         raw_holdings = etf_data.get("Holdings") or {}
         holdings = []
@@ -72,12 +80,13 @@ def _fetch_eodhd_meta(eodhd_sym: str, token: str, logs: list) -> dict:
             })
 
         logs.append(f"  EODHD meta: name='{name}', currency={currency}, "
-                    f"fund_size={fund_size}, {len(holdings)} holdings.")
+                    f"fund_size={fund_size}, div_policy={div_policy}, {len(holdings)} holdings.")
         return {
-            "name":      name,
-            "currency":  currency,
-            "fund_size": int(fund_size) if fund_size else None,
-            "holdings":  holdings,
+            "name":            name,
+            "currency":        currency,
+            "fund_size":       int(fund_size) if fund_size else None,
+            "holdings":        holdings,
+            "dividend_policy": div_policy,
         }
     except Exception as exc:
         logs.append(f"  EODHD meta fetch failed ({exc}).")
@@ -473,14 +482,24 @@ def import_etf(
 
     logs.append(f"Fetching metadata from yfinance ({yf_symbol})...")
     yf_meta   = _fetch_yf_meta(yf_symbol, logs)
-    name      = name_override or eodhd_meta.get("name") or yf_meta.get("name") or ticker
+    # Catalogue name is the most reliable fallback when both sources fail
+    known_name = (known or {}).get("name")
+    name      = name_override or eodhd_meta.get("name") or yf_meta.get("name") or known_name or ticker
     # Catalogue currency takes precedence — fundamentals may reflect a different listing's currency
     # (e.g. SWDA.LSE returns GBP but SWDA is USD-denominated and prices come from SWDA.SW)
-    currency  = known.get("currency") or eodhd_meta.get("currency") or yf_meta.get("currency") or "USD"
+    currency  = (known or {}).get("currency") or eodhd_meta.get("currency") or yf_meta.get("currency") or "USD"
     ter       = ter_override if ter_override is not None else (yf_meta.get("ter") if yf_meta.get("ter") is not None else known_ter)
     fund_size = eodhd_meta.get("fund_size") or yf_meta.get("fund_size")
     benchmark = known_bench
-    logs.append(f"  name={name}, currency={currency}, ter={ter}%, benchmark={benchmark}")
+    # Dividend policy: from EODHD, or parse from name as fallback
+    div_policy = eodhd_meta.get("dividend_policy")
+    if not div_policy:
+        n = name.lower()
+        if "(acc)" in n or "accumul" in n:
+            div_policy = "Accumulating"
+        elif "(dist)" in n or "distribut" in n:
+            div_policy = "Distributing"
+    logs.append(f"  name={name}, currency={currency}, ter={ter}%, dividend_policy={div_policy}")
 
     # ---- Upsert ETF row ----
     etf = db.query(ETF).filter(ETF.ticker == ticker).first()
@@ -494,6 +513,8 @@ def import_etf(
             etf.benchmark = benchmark
         if currency:
             etf.currency = currency[:3].upper()
+        if div_policy:
+            etf.dividend_policy = div_policy
         db.commit()
         db.refresh(etf)
         logs.append(f"Updated existing ETF: {etf.name} ({etf.ticker}), id={etf.id}")
@@ -505,6 +526,7 @@ def import_etf(
             ter=Decimal(str(ter)) if ter is not None else None,
             fund_size=fund_size, benchmark=benchmark,
             currency=currency[:3].upper(),
+            dividend_policy=div_policy,
         )
         db.add(etf)
         db.commit()

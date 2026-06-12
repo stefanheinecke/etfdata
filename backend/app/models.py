@@ -15,6 +15,7 @@ class ETFBase(BaseModel):
     fund_size: Optional[int] = None
     benchmark: Optional[str] = None
     currency: str
+    dividend_policy: Optional[str] = None
     listings: Optional[dict] = None
 
 class ETFCreate(ETFBase):

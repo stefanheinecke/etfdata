@@ -42,4 +42,5 @@ def init_db():
     # Additive column migrations (idempotent via IF NOT EXISTS)
     with engine.connect() as conn:
         conn.execute(text("ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS email VARCHAR(255)"))
+        conn.execute(text("ALTER TABLE etfs ADD COLUMN IF NOT EXISTS dividend_policy VARCHAR(20)"))
         conn.commit()

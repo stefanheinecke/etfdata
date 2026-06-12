@@ -88,6 +88,7 @@
         <div class="etf-meta">
           <span>{{ etf.domicile }}</span><span>{{ etf.currency }}</span>
           <span v-if="etf.fund_size">{{ formatSize(etf.fund_size) }}</span>
+          <span v-if="etf.dividend_policy" :class="etf.dividend_policy === 'Accumulating' ? 'badge-acc' : 'badge-dist'">{{ etf.dividend_policy === 'Accumulating' ? 'Acc' : 'Dist' }}</span>
         </div>
         <div class="etf-replication">{{ etf.replication_method }}</div>
       </div>
@@ -315,6 +316,7 @@ const etfStats = computed(() => {
     {label:'Currency',value:e.currency},{label:'TER',value:e.ter?e.ter+'%':'—'},
     {label:'Fund Size',value:e.fund_size?formatSize(e.fund_size):'—'},
     {label:'Replication',value:e.replication_method||'—'},
+    {label:'Dividend Policy',value:e.dividend_policy||'—'},
     {label:'Benchmark',value:e.benchmark||'—'},{label:'ISIN',value:e.isin},
   ]
 })
@@ -436,6 +438,8 @@ onMounted(loadETFs)
 .etf-isin{font-size:.75rem;color:var(--text-muted);font-family:monospace;margin-bottom:.75rem}
 .etf-meta{display:flex;gap:.75rem;font-size:.8rem;color:var(--text-muted);flex-wrap:wrap}
 .etf-replication{margin-top:.5rem;font-size:.75rem;color:var(--text-muted)}
+.badge-acc{background:#d1fae5;color:#065f46;border-radius:4px;padding:1px 6px;font-size:.7rem;font-weight:600}
+.badge-dist{background:#dbeafe;color:#1e40af;border-radius:4px;padding:1px 6px;font-size:.7rem;font-weight:600}
 .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:200;padding:1rem}
 .modal{background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow-lg);width:100%;max-width:800px;max-height:90vh;overflow-y:auto;padding:1.5rem}
 .modal-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1.25rem}
