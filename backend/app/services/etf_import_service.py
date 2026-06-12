@@ -60,8 +60,14 @@ def _fetch_eodhd_meta(eodhd_sym: str, token: str, logs: list) -> dict:
                         f"(keys: {list(data.keys())}, body: {resp.text[:300]!r}).")
             return {}
         currency  = general.get("CurrencyCode") or general.get("Currency") or ""
-        fund_size = etf_data.get("Net_Assets") or etf_data.get("TotalAssets")
-        isin      = (general.get("ISIN") or "").strip()
+        fund_size = (etf_data.get("Net_Assets") or etf_data.get("NetAssets") or
+                     etf_data.get("TotalNetAssets") or etf_data.get("TotalAssets"))
+        isin      = (general.get("ISIN") or general.get("Isin") or
+                     general.get("isin") or "").strip()
+
+        # Log which ETF_Data keys actually have values (aids debugging field-name mismatches)
+        non_empty_keys = [k for k, v in etf_data.items() if v not in (None, "", {}, [])]
+        logs.append(f"  EODHD ETF_Data non-empty keys: {non_empty_keys[:25]}")
 
         # Provider / fund family
         provider = (general.get("Fund_Family") or general.get("FundFamily") or "iShares").strip() or "iShares"
@@ -72,7 +78,9 @@ def _fetch_eodhd_meta(eodhd_sym: str, token: str, logs: list) -> dict:
 
         # TER: EODHD returns as decimal fraction (e.g. 0.0018 = 0.18%)
         ter_pct = None
-        ter_raw = etf_data.get("TotalExpenseRatio") or general.get("TotalExpenseRatio")
+        ter_raw = (etf_data.get("TotalExpenseRatio") or etf_data.get("Expense_Ratio") or
+                   etf_data.get("OngoingCharge") or etf_data.get("ManagementFee") or
+                   general.get("TotalExpenseRatio"))
         if ter_raw is not None:
             try:
                 f = float(ter_raw)
@@ -673,6 +681,9 @@ def import_etf(
         logs.append(f"Importing {len(eodhd_holdings)} holdings from EODHD...")
         as_of = date.today()
         db.query(Holding).filter_by(etf_id=etf.id).delete()
+        db.query(Allocation).filter_by(etf_id=etf.id).delete()
+        country_totals: dict[str, float] = {}
+        sector_totals:  dict[str, float] = {}
         for h in eodhd_holdings:
             db.add(Holding(
                 etf_id=etf.id, date=as_of,
@@ -682,9 +693,31 @@ def import_etf(
                 sector=h["sector"],
                 country=h["country"],
             ))
+            if h["country"]:
+                country_totals[h["country"]] = country_totals.get(h["country"], 0.0) + h["weight"]
+            if h["sector"]:
+                sector_totals[h["sector"]] = sector_totals.get(h["sector"], 0.0) + h["weight"]
+
+        # Normalise to 100% and insert allocations
+        ct = sum(country_totals.values())
+        st = sum(sector_totals.values())
+        if ct > 0:
+            country_totals = {k: v / ct * 100 for k, v in country_totals.items()}
+        if st > 0:
+            sector_totals  = {k: v / st * 100 for k, v in sector_totals.items()}
+        alloc_count = 0
+        for bucket, w in country_totals.items():
+            db.add(Allocation(etf_id=etf.id, date=as_of, type="country",
+                              bucket=bucket, weight=round(w, 4)))
+            alloc_count += 1
+        for bucket, w in sector_totals.items():
+            db.add(Allocation(etf_id=etf.id, date=as_of, type="sector",
+                              bucket=bucket, weight=round(w, 4)))
+            alloc_count += 1
+
         db.commit()
-        logs.append(f"  {len(eodhd_holdings)} holdings inserted.")
-        summary = {"holdings": len(eodhd_holdings), "skipped": 0}
+        logs.append(f"  {len(eodhd_holdings)} holdings and {alloc_count} allocations inserted.")
+        summary = {"holdings": len(eodhd_holdings), "allocations": alloc_count, "skipped": 0}
     else:
         logs.append("No CSV uploaded and no EODHD holdings — holdings import skipped.")
         summary = {}
