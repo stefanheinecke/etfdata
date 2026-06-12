@@ -40,19 +40,45 @@ def _to_eodhd_symbol(yf_sym: str) -> str:
 # ---------------------------------------------------------------------------
 
 def _fetch_eodhd_meta(eodhd_sym: str, token: str, logs: list) -> dict:
-    """Fetch ETF metadata from EODHD fundamentals endpoint."""
+    """Fetch ETF metadata + holdings from EODHD fundamentals endpoint."""
     import requests
     url = f"{_EODHD_BASE}/fundamentals/{eodhd_sym}"
     try:
-        resp = requests.get(url, params={"api_token": token, "filter": "General"}, timeout=15)
+        resp = requests.get(url, params={"api_token": token}, timeout=20)
         if resp.status_code != 200:
             logs.append(f"  EODHD meta HTTP {resp.status_code} for '{eodhd_sym}'.")
             return {}
         data = resp.json()
-        general = data.get("General", data)
-        name = general.get("Name") or general.get("LongName") or ""
-        currency = general.get("CurrencyCode") or general.get("Currency") or ""
-        return {"name": name, "currency": currency}
+        general  = data.get("General", {})
+        etf_data = data.get("ETF_Data", {})
+
+        name      = general.get("Name") or general.get("LongName") or ""
+        currency  = general.get("CurrencyCode") or general.get("Currency") or ""
+        fund_size = etf_data.get("Net_Assets") or etf_data.get("TotalAssets")
+
+        # Holdings: dict keyed by ticker symbol
+        raw_holdings = etf_data.get("Holdings") or {}
+        holdings = []
+        for sym, h in raw_holdings.items():
+            weight = h.get("Assets_%")
+            if weight is None or float(weight) <= 0:
+                continue
+            holdings.append({
+                "isin":    h.get("Isin") or sym,
+                "name":    h.get("Name") or sym,
+                "weight":  round(float(weight), 4),
+                "sector":  h.get("Sector") or "Equity",
+                "country": h.get("Country") or "",
+            })
+
+        logs.append(f"  EODHD meta: name='{name}', currency={currency}, "
+                    f"fund_size={fund_size}, {len(holdings)} holdings.")
+        return {
+            "name":      name,
+            "currency":  currency,
+            "fund_size": int(fund_size) if fund_size else None,
+            "holdings":  holdings,
+        }
     except Exception as exc:
         logs.append(f"  EODHD meta fetch failed ({exc}).")
         return {}
@@ -415,7 +441,7 @@ def import_etf(
     name      = name_override or eodhd_meta.get("name") or yf_meta.get("name") or ticker
     currency  = eodhd_meta.get("currency") or yf_meta.get("currency") or "USD"
     ter       = ter_override if ter_override is not None else (yf_meta.get("ter") if yf_meta.get("ter") is not None else known_ter)
-    fund_size = yf_meta.get("fund_size")
+    fund_size = eodhd_meta.get("fund_size") or yf_meta.get("fund_size")
     benchmark = known_bench
     logs.append(f"  name={name}, currency={currency}, ter={ter}%, benchmark={benchmark}")
 
@@ -459,13 +485,30 @@ def import_etf(
     else:
         logs.append("Skipping performance data (yfinance unavailable.)")
 
-    # ---- Holdings (only when a CSV was uploaded) ----
+    # ---- Holdings: CSV > EODHD > skip ----
+    eodhd_holdings = eodhd_meta.get("holdings", [])
     if csv_bytes is not None:
         logs.append("Processing holdings CSV...")
         summary = _process_csv(csv_bytes, etf, db, logs)
         db.commit()
+    elif eodhd_holdings:
+        logs.append(f"Importing {len(eodhd_holdings)} holdings from EODHD...")
+        as_of = date.today()
+        db.query(Holding).filter_by(etf_id=etf.id).delete()
+        for h in eodhd_holdings:
+            db.add(Holding(
+                etf_id=etf.id, date=as_of,
+                instrument_isin=h["isin"][:12],
+                instrument_name=h["name"][:255],
+                weight=h["weight"],
+                sector=h["sector"],
+                country=h["country"],
+            ))
+        db.commit()
+        logs.append(f"  {len(eodhd_holdings)} holdings inserted.")
+        summary = {"holdings": len(eodhd_holdings), "skipped": 0}
     else:
-        logs.append("No CSV uploaded — holdings import skipped.")
+        logs.append("No CSV uploaded and no EODHD holdings — holdings import skipped.")
         summary = {}
 
     return {
