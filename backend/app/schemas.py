@@ -11,7 +11,7 @@ class ETF(Base):
     __tablename__ = "etfs"
 
     id = Column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
-    isin = Column(String(12), unique=True, nullable=False, index=True)
+    isin = Column(String(12), unique=True, nullable=True, index=True)
     ticker = Column(String(10), nullable=False, index=True)
     name = Column(String(255), nullable=False)
     provider = Column(String(50), nullable=False, index=True)

@@ -5,7 +5,7 @@ from uuid import UUID
 from pydantic import BaseModel
 
 class ETFBase(BaseModel):
-    isin: str
+    isin: Optional[str] = None
     ticker: str
     name: str
     provider: str

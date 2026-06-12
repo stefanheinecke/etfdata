@@ -112,6 +112,10 @@
         <label class="label">EODHD Symbol</label>
         <input class="input" v-model="importSymbol" placeholder="e.g. EIMI.SW or SWDA.LSE" style="text-transform:uppercase" />
       </div>
+      <div style="margin-bottom:.75rem">
+        <label class="label">ISIN <span style="font-weight:400;color:var(--text-muted)">(optional — fetched from EODHD automatically; enter manually if EODHD doesn't return it)</span></label>
+        <input class="input" v-model="importIsin" placeholder="e.g. IE00BKM4GZ66" style="text-transform:uppercase" />
+      </div>
       <div class="grid-2" style="margin-bottom:.75rem">
         <div>
           <label class="label">Name <span style="font-weight:400;color:var(--text-muted)">(optional override)</span></label>
@@ -384,6 +388,7 @@ const dbError = ref('')
 const importSymbol = ref('')
 const importName = ref('')
 const importTer = ref(null)
+const importIsin = ref('')
 const importCsvFile = ref(null)
 const importLoading = ref(false)
 const importError = ref('')
@@ -447,6 +452,7 @@ async function importETF() {
       importCsvFile.value || null,
       importName.value.trim() || null,
       importTer.value != null && importTer.value !== '' ? importTer.value : null,
+      importIsin.value.trim().toUpperCase() || null,
     )
     importResult.value = r.data
     importLogs.value = r.data.logs || []

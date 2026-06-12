@@ -531,12 +531,9 @@ def import_etf(
     else:
         logs.append("  Warning: EODHD_TOKEN not configured — cannot fetch metadata or prices.")
 
-    isin = (isin_override or eodhd_meta.get("isin") or "").strip().upper()
+    isin = (isin_override or eodhd_meta.get("isin") or "").strip().upper() or None
     if not isin:
-        raise ValueError(
-            f"ISIN not found in EODHD data for '{eodhd_symbol}'. "
-            "Please provide it via the isin parameter."
-        )
+        logs.append(f"  Warning: ISIN not found for '{eodhd_symbol}' — proceeding without it.")
 
     name      = name_override or eodhd_meta.get("name") or ticker
     currency  = eodhd_meta.get("currency") or "USD"
