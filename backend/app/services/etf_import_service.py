@@ -13,7 +13,7 @@ from decimal import Decimal
 import pandas as pd
 
 from app.schemas import ETF, Performance, Holding, Allocation
-from app.services.ishares_import import ISHARES_ETFS, _COUNTRY_ISO, _lookup_country
+from app.services.ishares_import import _COUNTRY_ISO, _lookup_country
 
 _EODHD_BASE = "https://eodhd.com/api"
 
@@ -55,6 +55,32 @@ def _fetch_eodhd_meta(eodhd_sym: str, token: str, logs: list) -> dict:
         name      = general.get("Name") or general.get("LongName") or ""
         currency  = general.get("CurrencyCode") or general.get("Currency") or ""
         fund_size = etf_data.get("Net_Assets") or etf_data.get("TotalAssets")
+        isin      = (general.get("ISIN") or "").strip()
+
+        # Provider / fund family
+        provider = (general.get("Fund_Family") or general.get("FundFamily") or "iShares").strip() or "iShares"
+
+        # Domicile: EODHD returns ISO alpha-2 in CountryISO
+        domicile_raw = (general.get("CountryISO") or general.get("CountryCode") or "IE").strip()
+        domicile = domicile_raw[:2].upper() if domicile_raw else "IE"
+
+        # TER: EODHD returns as decimal fraction (e.g. 0.0018 = 0.18%)
+        ter_pct = None
+        ter_raw = etf_data.get("TotalExpenseRatio") or general.get("TotalExpenseRatio")
+        if ter_raw is not None:
+            try:
+                f = float(ter_raw)
+                ter_pct = round(f * 100, 4) if f < 1 else round(f, 4)
+            except (ValueError, TypeError):
+                pass
+
+        # Benchmark index
+        benchmark = (
+            etf_data.get("BenchmarkName") or
+            etf_data.get("Index_Name") or
+            etf_data.get("IndexName") or
+            None
+        )
 
         # Dividend policy from EODHD or inferred from fund name
         div_policy = None
@@ -79,12 +105,19 @@ def _fetch_eodhd_meta(eodhd_sym: str, token: str, logs: list) -> dict:
                 "country": h.get("Country") or "",
             })
 
-        logs.append(f"  EODHD meta: name='{name}', currency={currency}, "
-                    f"fund_size={fund_size}, div_policy={div_policy}, {len(holdings)} holdings.")
+        logs.append(f"  EODHD meta: name='{name}', isin={isin}, currency={currency}, "
+                    f"ter={ter_pct}%, benchmark='{benchmark}', domicile={domicile}, "
+                    f"provider={provider}, fund_size={fund_size}, div_policy={div_policy}, "
+                    f"{len(holdings)} holdings.")
         return {
             "name":            name,
             "currency":        currency,
             "fund_size":       int(fund_size) if fund_size else None,
+            "isin":            isin,
+            "ter":             ter_pct,
+            "benchmark":       benchmark,
+            "domicile":        domicile,
+            "provider":        provider,
             "holdings":        holdings,
             "dividend_policy": div_policy,
         }
@@ -429,69 +462,73 @@ def _process_csv(csv_bytes: bytes, etf: ETF, db, logs: list) -> dict:
 # ---------------------------------------------------------------------------
 
 def import_etf(
-    ticker: str,
-    isin: str,
+    eodhd_symbol: str,
     csv_bytes: bytes | None,
     db,
     logs: list,
+    isin_override: str | None = None,
     name_override: str | None = None,
     ter_override: float | None = None,
 ) -> dict:
-    """Full ETF import pipeline (metadata + performance + optional holdings) in-process.
+    """Full ETF import pipeline driven by an EODHD symbol (e.g. 'EIMI.SW', 'SWDA.LSE').
+
+    All metadata (name, ISIN, TER, benchmark, domicile, provider, holdings) is fetched
+    from EODHD.  Price history uses the same symbol so the currency reflects the chosen
+    listing (e.g. USD for .SW listings, GBP for .LSE listings).
+
+    If EODHD fundamentals are unavailable for the given exchange (common for .SW listings),
+    the LSE equivalent is tried automatically as a fallback.
 
     Args:
-        ticker:    ETF ticker (e.g. "SWDA").
-        isin:      ETF ISIN (e.g. "IE00B4L5Y983").
-        csv_bytes: Raw CSV content bytes, or None to skip holdings import.
-        db:        SQLAlchemy session (from get_db()).
-        logs:      List to append human-readable log lines to.
+        eodhd_symbol: EODHD-format symbol, e.g. 'EIMI.SW' or 'SWDA.LSE'.
+        csv_bytes:    Optional holdings CSV bytes; takes precedence over EODHD holdings.
+        db:           SQLAlchemy session.
+        logs:         List to append human-readable log lines to.
+        isin_override: Override ISIN if EODHD does not return one.
+        name_override: Override the ETF name.
+        ter_override:  Override the TER (%).
 
     Returns:
-        Summary dict with etf_id, ticker, name, and optionally holdings/allocations/skipped.
+        Summary dict with etf_id, ticker, name, and optionally holdings/skipped counts.
 
     Raises:
-        ValueError:   Invalid input (bad CSV format).
+        ValueError: ISIN could not be resolved.
     """
-    ticker = ticker.strip().upper()
-    isin   = isin.strip().upper()
+    eodhd_symbol = eodhd_symbol.strip().upper()
+    ticker = eodhd_symbol.split(".")[0]
 
-    known        = next((e for e in ISHARES_ETFS if e["ticker"] == ticker), None)
-    yf_symbol    = (known or {}).get("yf_symbol", ticker)
-    perf_sym     = (known or {}).get("perf_yf_symbol")
-    known_ter    = (known or {}).get("ter")
-    known_bench  = (known or {}).get("benchmark")
-    known_url    = (known or {}).get("holdings_url")
+    logs.append(f"Importing ETF from EODHD symbol: {eodhd_symbol}")
 
-    logs.append(f"Using yfinance symbol for metadata: {yf_symbol}")
-
-    # ---- Metadata: EODHD first, yfinance fallback ----
-    # For fundamentals use the primary yf_symbol converted to EODHD format
-    # (e.g. SWDA.L → SWDA.LSE) — EODHD has fundamentals for LSE/US listings
-    # but not always for Swiss (.SW) listings.
+    # ---- Metadata: EODHD ----
     token = _eodhd_token()
-    eodhd_meta = {}
+    eodhd_meta: dict = {}
     if token:
-        eodhd_fund_sym = _to_eodhd_symbol(yf_symbol)   # SWDA.L → SWDA.LSE
-        logs.append(f"Fetching metadata from EODHD ({eodhd_fund_sym})...")
-        eodhd_meta = _fetch_eodhd_meta(eodhd_fund_sym, token, logs)
-        # If LSE listing also 403'd, try the price ticker as last resort
-        if not eodhd_meta and perf_sym:
-            eodhd_perf_sym = _to_eodhd_symbol(perf_sym)
-            logs.append(f"  Retrying fundamentals with {eodhd_perf_sym}...")
-            eodhd_meta = _fetch_eodhd_meta(eodhd_perf_sym, token, logs)
+        logs.append(f"Fetching metadata from EODHD ({eodhd_symbol})...")
+        eodhd_meta = _fetch_eodhd_meta(eodhd_symbol, token, logs)
+        # EODHD fundamentals are often absent for Swiss/Xetra listings.
+        # Fall back to the LSE equivalent which carries richer data.
+        if not eodhd_meta:
+            lse_sym = f"{ticker}.LSE"
+            if lse_sym != eodhd_symbol:
+                logs.append(f"  No fundamentals for {eodhd_symbol}, retrying with {lse_sym}...")
+                eodhd_meta = _fetch_eodhd_meta(lse_sym, token, logs)
+    else:
+        logs.append("  Warning: EODHD_TOKEN not configured — cannot fetch metadata or prices.")
 
-    logs.append(f"Fetching metadata from yfinance ({yf_symbol})...")
-    yf_meta   = _fetch_yf_meta(yf_symbol, logs)
-    # Catalogue name is the most reliable fallback when both sources fail
-    known_name = (known or {}).get("name")
-    name      = name_override or eodhd_meta.get("name") or yf_meta.get("name") or known_name or ticker
-    # Catalogue currency takes precedence — fundamentals may reflect a different listing's currency
-    # (e.g. SWDA.LSE returns GBP but SWDA is USD-denominated and prices come from SWDA.SW)
-    currency  = (known or {}).get("currency") or eodhd_meta.get("currency") or yf_meta.get("currency") or "USD"
-    ter       = ter_override if ter_override is not None else (yf_meta.get("ter") if yf_meta.get("ter") is not None else known_ter)
-    fund_size = eodhd_meta.get("fund_size") or yf_meta.get("fund_size")
-    benchmark = known_bench
-    # Dividend policy: from EODHD, or parse from name as fallback
+    isin = (isin_override or eodhd_meta.get("isin") or "").strip().upper()
+    if not isin:
+        raise ValueError(
+            f"ISIN not found in EODHD data for '{eodhd_symbol}'. "
+            "Please provide it via the isin parameter."
+        )
+
+    name      = name_override or eodhd_meta.get("name") or ticker
+    currency  = eodhd_meta.get("currency") or "USD"
+    ter       = ter_override if ter_override is not None else eodhd_meta.get("ter")
+    fund_size = eodhd_meta.get("fund_size")
+    benchmark = eodhd_meta.get("benchmark")
+    domicile  = eodhd_meta.get("domicile") or "IE"
+    provider  = eodhd_meta.get("provider") or "iShares"
     div_policy = eodhd_meta.get("dividend_policy")
     if not div_policy:
         n = name.lower()
@@ -499,7 +536,8 @@ def import_etf(
             div_policy = "Accumulating"
         elif "(dist)" in n or "distribut" in n:
             div_policy = "Distributing"
-    logs.append(f"  name={name}, currency={currency}, ter={ter}%, dividend_policy={div_policy}")
+    logs.append(f"  name={name}, currency={currency}, ter={ter}%, isin={isin}, "
+                f"domicile={domicile}, provider={provider}, dividend_policy={div_policy}")
 
     # ---- Upsert ETF row ----
     etf = db.query(ETF).filter(ETF.ticker == ticker).first()
@@ -515,14 +553,16 @@ def import_etf(
             etf.currency = currency[:3].upper()
         if div_policy:
             etf.dividend_policy = div_policy
+        etf.provider = provider
+        etf.domicile = domicile
         db.commit()
         db.refresh(etf)
         logs.append(f"Updated existing ETF: {etf.name} ({etf.ticker}), id={etf.id}")
     else:
         etf = ETF(
             isin=isin, ticker=ticker,
-            name=name[:255], provider="iShares",
-            domicile="IE", replication_method="Physical",
+            name=name[:255], provider=provider,
+            domicile=domicile, replication_method="Physical",
             ter=Decimal(str(ter)) if ter is not None else None,
             fund_size=fund_size, benchmark=benchmark,
             currency=currency[:3].upper(),
@@ -534,15 +574,14 @@ def import_etf(
         logs.append(f"Created new ETF: {etf.name} ({etf.ticker}), id={etf.id}")
 
     # ---- Performance ----
-    ticker_obj = yf_meta.get("ticker_obj")
-    if ticker_obj is not None or token:
-        logs.append("Uploading 1-year performance data...")
-        perf_count = _upload_performance(etf, ticker_obj, currency, db, logs,
-                                         perf_yf_symbol=perf_sym)
+    if token:
+        logs.append("Uploading performance data...")
+        perf_count = _upload_performance(etf, None, currency, db, logs,
+                                         perf_yf_symbol=eodhd_symbol)
         db.commit()
         logs.append(f"  {perf_count} daily price records inserted.")
     else:
-        logs.append("Skipping performance data (yfinance unavailable.)")
+        logs.append("Skipping performance (EODHD_TOKEN not set).")
 
     # ---- Holdings: CSV > EODHD > skip ----
     eodhd_holdings = eodhd_meta.get("holdings", [])

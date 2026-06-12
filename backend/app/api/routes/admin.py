@@ -31,20 +31,21 @@ def verify_endpoint(_: None = Depends(verify_admin_secret)):
 
 @router.post("/import-etf")
 def import_etf_endpoint(
-    ticker: str,
-    isin: str,
+    symbol: str,
+    isin: Optional[str] = None,
     name: Optional[str] = None,
     ter: Optional[float] = None,
     csv_file: Optional[UploadFile] = File(None),
     db: Session = Depends(get_db),
     _: None = Depends(verify_admin_secret),
 ):
-    """Register or update an iShares ETF and upload its holdings CSV."""
+    """Register or update an ETF by EODHD symbol (e.g. 'EIMI.SW', 'SWDA.LSE').
+    All metadata is fetched from EODHD. Provide isin only if EODHD does not return it."""
     from app.services.etf_import_service import import_etf
     csv_bytes = csv_file.file.read() if csv_file else None
     logs: list = []
     try:
-        result = import_etf(ticker, isin, csv_bytes, db, logs, name_override=name, ter_override=ter)
+        result = import_etf(symbol, csv_bytes, db, logs, isin_override=isin, name_override=name, ter_override=ter)
         return {"status": "ok", "logs": logs, **result}
     except (ValueError, RuntimeError) as exc:
         raise HTTPException(status_code=400, detail=str(exc))

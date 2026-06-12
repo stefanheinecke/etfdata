@@ -76,8 +76,9 @@ export const adminService = {
   verify(adminSecret) {
     return api.get('/admin/verify', { headers: { 'x-admin-secret': adminSecret } })
   },
-  importETF(adminSecret, ticker, isin, csvFile = null, name = null, ter = null) {
-    const params = { ticker, isin }
+  importETF(adminSecret, symbol, csvFile = null, name = null, ter = null, isin = null) {
+    const params = { symbol }
+    if (isin) params.isin = isin
     if (name) params.name = name
     if (ter != null) params.ter = ter
     const config = { params, headers: { 'x-admin-secret': adminSecret } }

@@ -114,6 +114,8 @@ ISHARES_ETFS: list[dict] = [
      "holdings_url": "https://www.ishares.com/uk/individual/en/products/264659/ISHARES_CORE_MSCI_JAPAN_IMI_UCITS_ETF/1467271812596.ajax?tab=all&fileType=csv"},
     {"yf_symbol": "IEDY.L",   "perf_yf_symbol": "SEDY.AS",   "ticker": "IEDY",  "name": "iShares Emerging Markets Dividend UCITS ETF",        "isin": "IE00B652H904", "currency": "USD", "domicile": "IE", "ter": 0.65, "replication_method": "Physical", "benchmark": "Dow Jones Emerging Markets Select Dividend Index",
      "holdings_url": "https://www.ishares.com/uk/individual/en/products/264139/ISHARES_EM_DIVIDEND_UCITS_ETF/1467271812596.ajax?tab=all&fileType=csv"},
+    {"yf_symbol": "EIMI.L",   "perf_yf_symbol": "EIMI.SW",   "ticker": "EIMI",  "name": "iShares Core MSCI Emerging Markets IMI UCITS ETF USD (Acc)", "isin": "IE00BKM4GZ66", "currency": "USD", "domicile": "IE", "ter": 0.18, "replication_method": "Physical", "benchmark": "MSCI Emerging Markets Investable Market Index",
+     "holdings_url": "https://www.ishares.com/uk/individual/en/products/264659/ISHARES_CORE_MSCI_EMERGING_MARKETS_IMI_UCITS_ETF/1467271812596.ajax?tab=all&fileType=csv"},
 ]
 
 
