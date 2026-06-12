@@ -103,12 +103,13 @@ def _fetch_eodhd_meta(eodhd_sym: str, token: str, logs: list) -> dict:
             weight = h.get("Assets_%")
             if weight is None or float(weight) <= 0:
                 continue
+            raw_country = (h.get("Country") or "").strip()
             holdings.append({
                 "isin":    h.get("Isin") or sym,
                 "name":    h.get("Name") or sym,
                 "weight":  round(float(weight), 4),
                 "sector":  h.get("Sector") or "Equity",
-                "country": h.get("Country") or "",
+                "country": _COUNTRY_ISO.get(raw_country, ""),
             })
 
         logs.append(f"  EODHD meta: name='{name}', isin={isin}, currency={currency}, "
