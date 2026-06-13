@@ -23,15 +23,20 @@ class RequestLogMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         start = time.monotonic()
 
-        # Buffer JSON bodies only; skip multipart/form-data to avoid stream corruption
+        # IMPORTANT: do NOT read request.body() before call_next.
+        # Doing so consumes the ASGI receive channel; downstream handlers then block
+        # indefinitely waiting for body bytes that have already been drained, causing
+        # a permanent hang on any endpoint that reads a JSON body (POST/PATCH/PUT).
+        # Instead we read the cached _body attribute AFTER call_next — FastAPI will
+        # have populated it while parsing endpoint parameters.
+        response = await call_next(request)
+
         body_str = None
         content_type = request.headers.get("content-type", "")
         if request.method in ("POST", "PUT", "PATCH") and "application/json" in content_type:
-            body_bytes = await request.body()
+            body_bytes = getattr(request, "_body", None)
             if body_bytes:
                 body_str = body_bytes[:4096].decode("utf-8", errors="replace")
-
-        response = await call_next(request)
         elapsed_ms = int((time.monotonic() - start) * 1000)
 
         if request.url.path not in _SKIP_LOG_PATHS:
