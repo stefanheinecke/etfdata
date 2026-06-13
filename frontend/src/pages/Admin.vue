@@ -9,6 +9,7 @@
     <div class="tab-bar">
       <button :class="['tab-btn', { active: activeTab === 'management' }]" @click="activeTab = 'management'">Management</button>
       <button :class="['tab-btn', { active: activeTab === 'etfvalues' }]" @click="switchToValues">ETF Values</button>
+      <button :class="['tab-btn', { active: activeTab === 'etfeditor' }]" @click="switchToEditor">ETF Editor</button>
     </div>
 
     <template v-if="activeTab === 'management'">
@@ -338,6 +339,171 @@
       </div>
     </template><!-- /etfvalues tab -->
 
+    <!-- ETF Editor Tab -->
+    <template v-if="activeTab === 'etfeditor'">
+
+      <!-- Selector -->
+      <div class="card" style="margin-bottom:1.5rem">
+        <h2 class="card-title">ETF Editor</h2>
+        <p style="font-size:.875rem;color:var(--text-muted);margin-bottom:1rem">Select an ETF to view and edit its metadata and holdings directly in the database.</p>
+        <div style="display:flex;gap:.5rem;align-items:center">
+          <select class="input" v-model="editorEtfId" style="flex:1">
+            <option value="">— select ETF —</option>
+            <option v-for="e in editorEtfList" :key="e.id" :value="e.id">{{ e.ticker }} — {{ e.name }}</option>
+          </select>
+          <button class="btn btn-outline" @click="loadEditorEtfList" title="Refresh list">↻</button>
+          <button class="btn btn-primary" @click="loadEditorData" :disabled="!editorEtfId || editorLoading">
+            {{ editorLoading ? 'Loading…' : 'Load' }}
+          </button>
+        </div>
+        <div v-if="editorError" class="error-box" style="margin-top:.75rem">{{ editorError }}</div>
+      </div>
+
+      <!-- Metadata editor -->
+      <div v-if="editorEtf" class="card" style="margin-bottom:1.5rem">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
+          <h2 class="card-title" style="margin:0">Metadata — {{ editorEtf.ticker }}</h2>
+          <button class="btn btn-primary" @click="saveMetadata" :disabled="metaSaving">
+            {{ metaSaving ? 'Saving…' : 'Save Metadata' }}
+          </button>
+        </div>
+        <div v-if="metaSaveError" class="error-box" style="margin-bottom:.75rem">{{ metaSaveError }}</div>
+        <div v-if="metaSaveOk" class="success-msg" style="margin-bottom:.75rem">✓ Metadata saved successfully.</div>
+
+        <div class="editor-grid">
+          <div>
+            <label class="label">Name</label>
+            <input class="input" v-model="editMeta.name" />
+          </div>
+          <div>
+            <label class="label">ISIN</label>
+            <input class="input" v-model="editMeta.isin" placeholder="e.g. IE00BKM4GZ66" style="text-transform:uppercase" />
+          </div>
+          <div>
+            <label class="label">TER %</label>
+            <input class="input" type="number" step="0.001" min="0" v-model.number="editMeta.ter" placeholder="e.g. 0.18" />
+          </div>
+          <div>
+            <label class="label">Currency</label>
+            <input class="input" v-model="editMeta.currency" placeholder="USD" style="text-transform:uppercase" maxlength="3" />
+          </div>
+          <div>
+            <label class="label">Provider</label>
+            <input class="input" v-model="editMeta.provider" placeholder="iShares" />
+          </div>
+          <div>
+            <label class="label">Domicile (ISO-2)</label>
+            <input class="input" v-model="editMeta.domicile" placeholder="IE" style="text-transform:uppercase" maxlength="2" />
+          </div>
+          <div>
+            <label class="label">Fund Size (USD)</label>
+            <input class="input" type="number" step="1000000" v-model.number="editMeta.fund_size" placeholder="e.g. 20000000000" />
+          </div>
+          <div>
+            <label class="label">Dividend Policy</label>
+            <select class="input" v-model="editMeta.dividend_policy">
+              <option value="">— unknown —</option>
+              <option value="Accumulating">Accumulating</option>
+              <option value="Distributing">Distributing</option>
+            </select>
+          </div>
+          <div style="grid-column:1/-1">
+            <label class="label">Benchmark Index</label>
+            <input class="input" v-model="editMeta.benchmark" placeholder="e.g. MSCI Emerging Markets IMI Index" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Holdings editor -->
+      <div v-if="editorEtf" class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
+          <h2 class="card-title" style="margin:0">Holdings ({{ editorHoldings.length }})</h2>
+          <button class="btn btn-outline" @click="showAddHolding = !showAddHolding; if(!showAddHolding) resetNewHolding()">
+            {{ showAddHolding ? 'Cancel' : '+ Add Holding' }}
+          </button>
+        </div>
+
+        <!-- Add holding form -->
+        <div v-if="showAddHolding" style="margin-bottom:1rem;padding:1rem;background:var(--bg-2);border-radius:var(--radius);border:1px solid var(--border)">
+          <div class="editor-grid" style="margin-bottom:.75rem">
+            <div>
+              <label class="label">ISIN / ID</label>
+              <input class="input" v-model="newHolding.instrument_isin" placeholder="IE00B4L5YC18" />
+            </div>
+            <div>
+              <label class="label">Name</label>
+              <input class="input" v-model="newHolding.instrument_name" placeholder="Apple Inc" />
+            </div>
+            <div>
+              <label class="label">Weight %</label>
+              <input class="input" type="number" step="0.0001" min="0" v-model.number="newHolding.weight" placeholder="2.5" />
+            </div>
+            <div>
+              <label class="label">Sector</label>
+              <input class="input" v-model="newHolding.sector" placeholder="Technology" />
+            </div>
+            <div>
+              <label class="label">Country (ISO-2)</label>
+              <input class="input" v-model="newHolding.country" placeholder="US" style="text-transform:uppercase" maxlength="2" />
+            </div>
+          </div>
+          <div style="display:flex;gap:.5rem;align-items:center">
+            <button class="btn btn-primary" @click="addHolding" :disabled="addHoldingLoading || !newHolding.instrument_isin || !newHolding.instrument_name || newHolding.weight == null">
+              {{ addHoldingLoading ? 'Adding…' : 'Add Holding' }}
+            </button>
+          </div>
+          <div v-if="addHoldingError" class="error-box" style="margin-top:.5rem">{{ addHoldingError }}</div>
+        </div>
+
+        <div v-if="holdingsError" class="error-box" style="margin-bottom:.75rem">{{ holdingsError }}</div>
+
+        <div class="log-table-wrap">
+          <table class="log-table">
+            <thead>
+              <tr>
+                <th>ISIN / ID</th>
+                <th>Name</th>
+                <th style="text-align:right">Weight %</th>
+                <th>Sector</th>
+                <th>Country</th>
+                <th style="text-align:center">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template v-for="h in editorHoldings" :key="h.id">
+                <tr v-if="editingHoldingId !== h.id">
+                  <td class="td-mono">{{ h.instrument_isin }}</td>
+                  <td>{{ h.instrument_name }}</td>
+                  <td style="text-align:right;font-variant-numeric:tabular-nums">{{ Number(h.weight).toFixed(4) }}</td>
+                  <td>{{ h.sector || '—' }}</td>
+                  <td>{{ h.country || '—' }}</td>
+                  <td style="text-align:center;white-space:nowrap">
+                    <button class="btn-icon" @click="startEditHolding(h)" title="Edit">✎</button>
+                    <button class="btn-icon btn-icon-danger" @click="deleteHolding(h.id)" title="Delete">✕</button>
+                  </td>
+                </tr>
+                <tr v-else style="background:var(--bg-2)">
+                  <td><input class="input input-sm" v-model="editHolding.instrument_isin" /></td>
+                  <td><input class="input input-sm" v-model="editHolding.instrument_name" /></td>
+                  <td><input class="input input-sm" type="number" step="0.0001" v-model.number="editHolding.weight" style="text-align:right" /></td>
+                  <td><input class="input input-sm" v-model="editHolding.sector" /></td>
+                  <td><input class="input input-sm" v-model="editHolding.country" style="text-transform:uppercase" maxlength="2" /></td>
+                  <td style="text-align:center;white-space:nowrap">
+                    <button class="btn-icon btn-icon-save" @click="saveHolding(h.id)" title="Save">✓</button>
+                    <button class="btn-icon" @click="editingHoldingId = null" title="Cancel">✕</button>
+                  </td>
+                </tr>
+              </template>
+              <tr v-if="editorHoldings.length === 0">
+                <td colspan="6" style="text-align:center;padding:2rem;color:var(--text-muted)">No holdings data found for this ETF.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </template><!-- /etfeditor tab -->
+
   </div>
 </template>
 
@@ -353,6 +519,11 @@ const activeTab = ref('management')
 function switchToValues() {
   activeTab.value = 'etfvalues'
   if (valuesEtfList.value.length === 0) loadValuesEtfList()
+}
+
+function switchToEditor() {
+  activeTab.value = 'etfeditor'
+  if (editorEtfList.value.length === 0) loadEditorEtfList()
 }
 
 const apiKey = ref(localStorage.getItem('api_key') || '')
@@ -600,6 +771,143 @@ function downloadValuesCsv() {
   URL.revokeObjectURL(url)
 }
 
+// ─── ETF Editor ───────────────────────────────────────────────
+const editorEtfList = ref([])
+const editorEtfId = ref('')
+const editorLoading = ref(false)
+const editorError = ref('')
+const editorEtf = ref(null)
+const editorHoldings = ref([])
+
+const editMeta = ref({})
+const metaSaving = ref(false)
+const metaSaveError = ref('')
+const metaSaveOk = ref(false)
+
+const editingHoldingId = ref(null)
+const editHolding = ref({})
+const holdingsError = ref('')
+
+const showAddHolding = ref(false)
+const newHolding = ref({ instrument_isin: '', instrument_name: '', weight: null, sector: '', country: '' })
+const addHoldingLoading = ref(false)
+const addHoldingError = ref('')
+
+async function loadEditorEtfList() {
+  try {
+    const r = await etfService.getETFs(0, 200)
+    editorEtfList.value = r.data
+  } catch (e) { console.error('Failed to load ETF list for editor', e) }
+}
+
+async function loadEditorData() {
+  editorLoading.value = true
+  editorError.value = ''
+  editorEtf.value = null
+  editorHoldings.value = []
+  editingHoldingId.value = null
+  showAddHolding.value = false
+  try {
+    const [etfR, holdingsR] = await Promise.all([
+      etfService.getETFById(editorEtfId.value),
+      etfService.getHoldings(editorEtfId.value),
+    ])
+    editorEtf.value = etfR.data
+    editorHoldings.value = holdingsR.data
+    editMeta.value = {
+      name:             editorEtf.value.name,
+      isin:             editorEtf.value.isin || '',
+      ter:              editorEtf.value.ter != null ? Number(editorEtf.value.ter) : null,
+      currency:         editorEtf.value.currency,
+      provider:         editorEtf.value.provider,
+      domicile:         editorEtf.value.domicile,
+      fund_size:        editorEtf.value.fund_size,
+      dividend_policy:  editorEtf.value.dividend_policy || '',
+      benchmark:        editorEtf.value.benchmark || '',
+    }
+  } catch (e) {
+    editorError.value = e.response?.data?.detail || e.message
+  } finally {
+    editorLoading.value = false
+  }
+}
+
+async function saveMetadata() {
+  metaSaving.value = true
+  metaSaveError.value = ''
+  metaSaveOk.value = false
+  try {
+    const payload = { ...editMeta.value }
+    if (!payload.isin) payload.isin = null
+    if (!payload.benchmark) payload.benchmark = null
+    if (!payload.dividend_policy) payload.dividend_policy = null
+    if (payload.ter === '') payload.ter = null
+    await adminService.updateETF(adminSecret.value, editorEtfId.value, payload)
+    metaSaveOk.value = true
+    // Refresh the ETF list so the name change shows in the selector
+    await loadEditorEtfList()
+    setTimeout(() => metaSaveOk.value = false, 3000)
+  } catch (e) {
+    metaSaveError.value = e.response?.data?.detail || e.message
+  } finally {
+    metaSaving.value = false
+  }
+}
+
+function startEditHolding(h) {
+  editingHoldingId.value = h.id
+  editHolding.value = {
+    instrument_isin:  h.instrument_isin,
+    instrument_name:  h.instrument_name,
+    weight:           Number(h.weight),
+    sector:           h.sector || '',
+    country:          h.country || '',
+  }
+}
+
+async function saveHolding(holdingId) {
+  holdingsError.value = ''
+  try {
+    const r = await adminService.updateHolding(adminSecret.value, editorEtfId.value, holdingId, editHolding.value)
+    const idx = editorHoldings.value.findIndex(h => h.id === holdingId)
+    if (idx !== -1) editorHoldings.value[idx] = r.data
+    editingHoldingId.value = null
+  } catch (e) {
+    holdingsError.value = e.response?.data?.detail || e.message
+  }
+}
+
+async function deleteHolding(holdingId) {
+  if (!confirm('Delete this holding? This cannot be undone.')) return
+  holdingsError.value = ''
+  try {
+    await adminService.deleteHolding(adminSecret.value, editorEtfId.value, holdingId)
+    editorHoldings.value = editorHoldings.value.filter(h => h.id !== holdingId)
+  } catch (e) {
+    holdingsError.value = e.response?.data?.detail || e.message
+  }
+}
+
+function resetNewHolding() {
+  newHolding.value = { instrument_isin: '', instrument_name: '', weight: null, sector: '', country: '' }
+  addHoldingError.value = ''
+}
+
+async function addHolding() {
+  addHoldingLoading.value = true
+  addHoldingError.value = ''
+  try {
+    const r = await adminService.addHolding(adminSecret.value, editorEtfId.value, newHolding.value)
+    editorHoldings.value.push(r.data)
+    showAddHolding.value = false
+    resetNewHolding()
+  } catch (e) {
+    addHoldingError.value = e.response?.data?.detail || e.message
+  } finally {
+    addHoldingLoading.value = false
+  }
+}
+
 // ─── Request Logs ─────────────────────────────────────────────
 const logFilterName = ref('')
 const logFilterEmail = ref('')
@@ -674,4 +982,13 @@ async function loadLogs(offset = 0) {
 .log-pagination { display: flex; align-items: center; gap: 1rem; margin-top: .75rem; font-size: .875rem; }
 .detail-chip { display: inline-block; font-family: monospace; font-size: .72rem; background: var(--bg-3); border: 1px solid var(--border); border-radius: 4px; padding: 0 .4rem; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle; margin-right: .2rem; }
 .body-chip { color: #7c3aed; cursor: help; }
+.editor-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: .75rem; }
+.td-mono { font-family: monospace; font-size: .82rem; }
+.btn-icon { background: none; border: 1px solid var(--border); border-radius: 4px; padding: .2rem .45rem; cursor: pointer; font-size: .85rem; color: var(--text-muted); transition: background .12s, color .12s; margin: 0 .1rem; }
+.btn-icon:hover { background: var(--bg-2); color: var(--text); }
+.btn-icon-danger:hover { background: #fef2f2; color: #dc2626; border-color: #fca5a5; }
+.btn-icon-save:hover { background: #f0fdf4; color: #16a34a; border-color: #86efac; }
+[data-theme="dark"] .btn-icon-danger:hover { background: #2d0707; color: #f87171; border-color: #7f1d1d; }
+[data-theme="dark"] .btn-icon-save:hover { background: #052e16; color: #4ade80; border-color: #14532d; }
+.input-sm { padding: .2rem .4rem; font-size: .82rem; height: auto; min-height: unset; }
 </style>

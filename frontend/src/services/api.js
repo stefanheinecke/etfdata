@@ -119,5 +119,17 @@ export const adminService = {
     if (path) params.path = path
     return api.get('/admin/request-logs', { params, headers: { 'x-admin-secret': adminSecret } })
   },
+  updateETF(adminSecret, etfId, data) {
+    return api.patch(`/admin/etfs/${etfId}`, data, { headers: { 'x-admin-secret': adminSecret } })
+  },
+  updateHolding(adminSecret, etfId, holdingId, data) {
+    return api.patch(`/admin/etfs/${etfId}/holdings/${holdingId}`, data, { headers: { 'x-admin-secret': adminSecret } })
+  },
+  deleteHolding(adminSecret, etfId, holdingId) {
+    return api.delete(`/admin/etfs/${etfId}/holdings/${holdingId}`, { headers: { 'x-admin-secret': adminSecret } })
+  },
+  addHolding(adminSecret, etfId, holdingData) {
+    return api.post(`/admin/etfs/${etfId}/holdings`, holdingData, { headers: { 'x-admin-secret': adminSecret } })
+  },
 }
 

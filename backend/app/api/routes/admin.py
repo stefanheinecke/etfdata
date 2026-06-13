@@ -1,4 +1,5 @@
 import os
+from datetime import date as date_type
 from fastapi import APIRouter, Depends, HTTPException, Header, UploadFile, File
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -14,6 +15,36 @@ router = APIRouter(prefix="/admin", tags=["admin"])
 
 class ImportRequest(BaseModel):
     tickers: Optional[List[str]] = None
+
+
+class ETFUpdateBody(BaseModel):
+    name: Optional[str] = None
+    isin: Optional[str] = None
+    ter: Optional[float] = None
+    currency: Optional[str] = None
+    benchmark: Optional[str] = None
+    provider: Optional[str] = None
+    domicile: Optional[str] = None
+    fund_size: Optional[int] = None
+    dividend_policy: Optional[str] = None
+    replication_method: Optional[str] = None
+
+
+class HoldingUpdateBody(BaseModel):
+    instrument_isin: Optional[str] = None
+    instrument_name: Optional[str] = None
+    weight: Optional[float] = None
+    sector: Optional[str] = None
+    country: Optional[str] = None
+
+
+class HoldingCreateBody(BaseModel):
+    instrument_isin: str
+    instrument_name: str
+    weight: float
+    sector: Optional[str] = None
+    country: Optional[str] = None
+    date: Optional[date_type] = None
 
 
 def verify_admin_secret(x_admin_secret: str = Header(None)):
@@ -192,3 +223,118 @@ def delete_etfs(
             deleted += 1
     db.commit()
     return {"deleted": deleted}
+
+
+@router.patch("/etfs/{etf_id}")
+def update_etf_metadata(
+    etf_id: UUID,
+    body: ETFUpdateBody,
+    db: Session = Depends(get_db),
+    _: None = Depends(verify_admin_secret),
+):
+    """Update ETF metadata fields. Only provided fields are changed."""
+    from decimal import Decimal
+    from app.schemas import ETF
+    etf = db.query(ETF).filter(ETF.id == etf_id).first()
+    if not etf:
+        raise HTTPException(status_code=404, detail="ETF not found")
+    for field, value in body.dict(exclude_none=True).items():
+        if field == "ter" and value is not None:
+            setattr(etf, field, Decimal(str(value)))
+        elif field == "isin":
+            setattr(etf, field, value.strip().upper() or None)
+        elif field == "domicile":
+            setattr(etf, field, value.strip().upper()[:2])
+        elif field == "currency":
+            setattr(etf, field, value.strip().upper()[:3])
+        else:
+            setattr(etf, field, value or None)
+    db.commit()
+    db.refresh(etf)
+    return {
+        "id": str(etf.id), "ticker": etf.ticker, "name": etf.name,
+        "isin": etf.isin, "ter": float(etf.ter) if etf.ter else None,
+        "currency": etf.currency, "provider": etf.provider,
+        "domicile": etf.domicile, "fund_size": etf.fund_size,
+        "benchmark": etf.benchmark, "dividend_policy": etf.dividend_policy,
+        "replication_method": etf.replication_method,
+    }
+
+
+def _holding_dict(h) -> dict:
+    return {
+        "id": str(h.id), "etf_id": str(h.etf_id), "date": h.date.isoformat(),
+        "instrument_isin": h.instrument_isin, "instrument_name": h.instrument_name,
+        "weight": float(h.weight), "sector": h.sector, "country": h.country,
+        "created_at": h.created_at.isoformat() if h.created_at else None,
+    }
+
+
+@router.patch("/etfs/{etf_id}/holdings/{holding_id}")
+def update_holding(
+    etf_id: UUID,
+    holding_id: UUID,
+    body: HoldingUpdateBody,
+    db: Session = Depends(get_db),
+    _: None = Depends(verify_admin_secret),
+):
+    """Update a single holding row."""
+    from decimal import Decimal
+    from app.schemas import Holding
+    h = db.query(Holding).filter(Holding.id == holding_id, Holding.etf_id == etf_id).first()
+    if not h:
+        raise HTTPException(status_code=404, detail="Holding not found")
+    for field, value in body.dict(exclude_none=True).items():
+        if field == "weight":
+            setattr(h, field, Decimal(str(value)))
+        elif field in ("country", "instrument_isin"):
+            setattr(h, field, (value or "").strip().upper())
+        else:
+            setattr(h, field, value)
+    db.commit()
+    db.refresh(h)
+    return _holding_dict(h)
+
+
+@router.delete("/etfs/{etf_id}/holdings/{holding_id}", status_code=204)
+def delete_holding(
+    etf_id: UUID,
+    holding_id: UUID,
+    db: Session = Depends(get_db),
+    _: None = Depends(verify_admin_secret),
+):
+    """Delete a single holding row."""
+    from app.schemas import Holding
+    h = db.query(Holding).filter(Holding.id == holding_id, Holding.etf_id == etf_id).first()
+    if not h:
+        raise HTTPException(status_code=404, detail="Holding not found")
+    db.delete(h)
+    db.commit()
+
+
+@router.post("/etfs/{etf_id}/holdings", status_code=201)
+def add_holding(
+    etf_id: UUID,
+    body: HoldingCreateBody,
+    db: Session = Depends(get_db),
+    _: None = Depends(verify_admin_secret),
+):
+    """Add a new holding row to an ETF."""
+    from decimal import Decimal
+    from app.schemas import ETF, Holding
+    etf = db.query(ETF).filter(ETF.id == etf_id).first()
+    if not etf:
+        raise HTTPException(status_code=404, detail="ETF not found")
+    h = Holding(
+        etf_id=etf_id,
+        date=body.date or date_type.today(),
+        instrument_isin=(body.instrument_isin or "").strip().upper()[:12],
+        instrument_name=(body.instrument_name or "")[:255],
+        weight=Decimal(str(body.weight)),
+        sector=body.sector or None,
+        country=(body.country or "").strip().upper()[:2] or None,
+    )
+    db.add(h)
+    db.commit()
+    db.refresh(h)
+    return _holding_dict(h)
