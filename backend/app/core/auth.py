@@ -1,10 +1,14 @@
 import hashlib
 import secrets
+from types import SimpleNamespace
 from datetime import datetime
 from fastapi import HTTPException, Header, Depends
 from sqlalchemy.orm import Session
 from app.db.database import get_db
 from app.schemas import APIKey
+
+# Public demo key — read-only, restricted to SWDA ETF only
+DEMO_API_KEY = "demo"
 
 def generate_api_key():
     return secrets.token_urlsafe(48)
@@ -18,6 +22,12 @@ async def verify_api_key(
 ) -> APIKey:
     if not x_api_key:
         raise HTTPException(status_code=401, detail="API Key required")
+
+    if x_api_key == DEMO_API_KEY:
+        return SimpleNamespace(
+            name="__demo__", id=None, is_active=True,
+            rate_limit_per_minute=10, email=None, key=None
+        )
 
     hashed_key = hash_api_key(x_api_key)
     api_key = db.query(APIKey).filter(

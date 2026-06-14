@@ -75,6 +75,44 @@
       </div>
     </section>
 
+    <!-- Try it out -->
+    <section class="page">
+      <div class="card tryout-card">
+        <div class="tryout-header">
+          <div>
+            <h2 class="card-title" style="font-size:1.2rem;margin:0">Try it out — no sign-up needed</h2>
+            <p style="font-size:.875rem;color:var(--text-muted);margin-top:.25rem">
+              Use the public demo key to fetch live SWDA ETF data right now
+            </p>
+          </div>
+          <span class="live-badge">LIVE</span>
+        </div>
+        <div class="tryout-meta">
+          <div class="tryout-row">
+            <span class="tryout-label">Demo API Key</span>
+            <code class="tryout-key">demo</code>
+          </div>
+          <div class="tryout-row">
+            <span class="tryout-label">Endpoint</span>
+            <code class="tryout-endpoint">GET /etfs</code>
+          </div>
+        </div>
+        <button class="btn btn-primary" :disabled="tryoutLoading" @click="runDemo" style="width:fit-content">
+          {{ tryoutLoading ? 'Loading…' : '▶  Execute' }}
+        </button>
+        <transition name="fade">
+          <div v-if="tryoutResult" class="tryout-result">
+            <div class="tryout-result-header">
+              <span class="tryout-status">200 OK</span>
+              <span style="font-size:.75rem;color:var(--text-muted)">SWDA — iShares MSCI World</span>
+            </div>
+            <pre class="tryout-pre">{{ tryoutResult }}</pre>
+          </div>
+        </transition>
+        <div v-if="tryoutError" class="tryout-error">{{ tryoutError }}</div>
+      </div>
+    </section>
+
     <!-- Disclaimer -->
     <section class="page">
       <div class="disclaimer-card">
@@ -93,8 +131,11 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
+import axios from 'axios'
 import { etfService } from '../services/api.js'
+
+const API_BASE = import.meta.env.VITE_API_URL || 'https://etfdata-production.up.railway.app'
 
 defineEmits(['navigate'])
 
@@ -183,10 +224,35 @@ function setTab(tab) {
 }
 
 // watch activeTab
-import { watch } from 'vue'
 watch(activeTab, val => {
   currentCode.value = codeTabs.find(t => t.label === val)?.code ?? ''
 })
+
+// Demo try-out
+const tryoutLoading = ref(false)
+const tryoutResult = ref('')
+const tryoutError = ref('')
+
+async function runDemo() {
+  tryoutLoading.value = true
+  tryoutResult.value = ''
+  tryoutError.value = ''
+  try {
+    const res = await axios.get(`${API_BASE}/etfs`, {
+      headers: { 'x-api-key': 'demo' }
+    })
+    const etf = res.data[0]
+    if (etf) {
+      tryoutResult.value = JSON.stringify(etf, null, 2)
+    } else {
+      tryoutError.value = 'No data returned — SWDA may not be imported yet.'
+    }
+  } catch (e) {
+    tryoutError.value = e?.response?.data?.detail || 'Request failed. Is the API reachable?'
+  } finally {
+    tryoutLoading.value = false
+  }
+}
 </script>
 
 <style scoped>
@@ -252,4 +318,52 @@ watch(activeTab, val => {
 .disclaimer-card h3 { font-size: 1rem; font-weight: 600; color: var(--text); margin-bottom: .75rem; }
 .disclaimer-card p { font-size: .875rem; color: var(--text-muted); line-height: 1.7; }
 .stat-loading { opacity: .35; }
+
+/* Try it out */
+.tryout-card { display: flex; flex-direction: column; gap: 1.25rem; }
+.tryout-header { display: flex; justify-content: space-between; align-items: flex-start; }
+.live-badge {
+  background: #22c55e; color: #fff; font-size: .7rem; font-weight: 700;
+  letter-spacing: .1em; padding: .2rem .55rem; border-radius: 20px;
+  animation: pulse-badge 2s ease-in-out infinite;
+}
+@keyframes pulse-badge {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .6; }
+}
+.tryout-meta { display: flex; flex-direction: column; gap: .6rem; }
+.tryout-row { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; }
+.tryout-label { font-size: .8rem; color: var(--text-muted); min-width: 90px; }
+.tryout-key {
+  background: var(--green-50); border: 1px solid var(--green-200);
+  color: var(--green-700); padding: .2rem .6rem; border-radius: 6px;
+  font-family: monospace; font-size: .9rem; font-weight: 600; letter-spacing: .05em;
+}
+[data-theme="dark"] .tryout-key { background: #0d2d0d; border-color: #1a4d1a; color: #4ade80; }
+.tryout-endpoint {
+  background: var(--bg-3); border: 1px solid var(--border);
+  color: var(--text-muted); padding: .2rem .6rem; border-radius: 6px;
+  font-family: monospace; font-size: .85rem;
+}
+.tryout-result { display: flex; flex-direction: column; gap: .5rem; }
+.tryout-result-header { display: flex; align-items: center; gap: 1rem; }
+.tryout-status {
+  background: var(--green-50); border: 1px solid var(--green-200);
+  color: var(--green-700); font-size: .75rem; font-weight: 700;
+  padding: .15rem .5rem; border-radius: 4px;
+}
+[data-theme="dark"] .tryout-status { background: #0d2d0d; border-color: #1a4d1a; color: #4ade80; }
+.tryout-pre {
+  background: var(--bg-3); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 1.25rem; overflow-x: auto;
+  font-size: .8rem; line-height: 1.6; max-height: 380px; overflow-y: auto;
+  white-space: pre; color: var(--text);
+}
+.tryout-error {
+  color: #dc2626; background: #fef2f2; border: 1px solid #fecaca;
+  border-radius: 8px; padding: .75rem 1rem; font-size: .875rem;
+}
+[data-theme="dark"] .tryout-error { background: #2d0a0a; border-color: #7f1d1d; color: #f87171; }
+.fade-enter-active { transition: opacity .35s, transform .35s; }
+.fade-enter-from { opacity: 0; transform: translateY(-6px); }
 </style>

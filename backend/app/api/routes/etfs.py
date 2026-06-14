@@ -12,6 +12,9 @@ from app.models import ETFCreate, ETFResponse
 
 router = APIRouter(prefix="/etfs", tags=["etfs"])
 
+def _is_demo(api_key) -> bool:
+    return getattr(api_key, 'name', '') == '__demo__'
+
 @router.get("", response_model=List[ETFResponse])
 async def list_etfs(
     skip: int = 0,
@@ -21,7 +24,9 @@ async def list_etfs(
     api_key: APIKey = Depends(verify_api_key)
 ):
     query = db.query(ETF)
-    if provider:
+    if _is_demo(api_key):
+        query = query.filter(ETF.ticker == "SWDA")
+    elif provider:
         query = query.filter(ETF.provider == provider)
     return query.offset(skip).limit(limit).all()
 
@@ -34,6 +39,8 @@ async def get_etf(
     etf = db.query(ETF).filter(ETF.id == etf_id).first()
     if not etf:
         raise HTTPException(status_code=404, detail="ETF not found")
+    if _is_demo(api_key) and etf.ticker != "SWDA":
+        raise HTTPException(status_code=403, detail="Demo key only allows access to SWDA ETF")
     return etf
 
 @router.get("/{etf_id}/holdings")
@@ -48,6 +55,8 @@ async def get_holdings(
     etf = db.query(ETF).filter(ETF.id == etf_id).first()
     if not etf:
         raise HTTPException(status_code=404, detail="ETF not found")
+    if _is_demo(api_key) and etf.ticker != "SWDA":
+        raise HTTPException(status_code=403, detail="Demo key only allows access to SWDA ETF")
 
     query = db.query(Holding).filter(Holding.etf_id == etf_id)
 
@@ -76,6 +85,8 @@ async def get_allocations(
     etf = db.query(ETF).filter(ETF.id == etf_id).first()
     if not etf:
         raise HTTPException(status_code=404, detail="ETF not found")
+    if _is_demo(api_key) and etf.ticker != "SWDA":
+        raise HTTPException(status_code=403, detail="Demo key only allows access to SWDA ETF")
 
     query = db.query(Allocation).filter(Allocation.etf_id == etf_id)
 
@@ -107,6 +118,8 @@ async def get_performance(
     etf = db.query(ETF).filter(ETF.id == etf_id).first()
     if not etf:
         raise HTTPException(status_code=404, detail="ETF not found")
+    if _is_demo(api_key) and etf.ticker != "SWDA":
+        raise HTTPException(status_code=403, detail="Demo key only allows access to SWDA ETF")
 
     query = db.query(Performance).filter(Performance.etf_id == etf_id)
 
@@ -125,6 +138,10 @@ async def get_etf_risk_metrics(
     db: Session = Depends(get_db),
     api_key: APIKey = Depends(verify_api_key)
 ):
+    if _is_demo(api_key):
+        etf = db.query(ETF).filter(ETF.id == etf_id).first()
+        if not etf or etf.ticker != "SWDA":
+            raise HTTPException(status_code=403, detail="Demo key only allows access to SWDA ETF")
     from app.services.analytics_service import AnalyticsService
     result = AnalyticsService.calculate_risk_metrics(db, rf_rate, etf_id)
     if not result:
