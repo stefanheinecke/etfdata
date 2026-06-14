@@ -148,7 +148,7 @@ def _fetch_eodhd_meta(eodhd_sym: str, token: str, logs: list) -> dict:
         return {
             "name":            name,
             "currency":        currency,
-            "fund_size":       int(fund_size) if fund_size else None,
+            "fund_size":       float(fund_size) if fund_size else None,
             "isin":            isin,
             "ter":             ter_pct,
             "benchmark":       benchmark,
