@@ -80,17 +80,17 @@
     <div v-else-if="filteredETFs.length" class="etf-grid">
       <div v-for="etf in filteredETFs" :key="etf.id" class="etf-card" @click="openETF(etf)">
         <div class="etf-card-top">
-          <div><span class="etf-ticker">{{ etf.ticker }}</span><span class="badge" style="margin-left:.5rem">{{ etf.provider }}</span></div>
-          <span class="etf-ter">TER {{ etf.ter }}%</span>
+          <div><span class="etf-ticker">{{ etf.ticker }}</span><span v-if="etf.provider" class="badge" style="margin-left:.5rem">{{ etf.provider }}</span></div>
+          <span class="etf-ter">TER {{ etf.ter != null ? etf.ter + '%' : '—' }}</span>
         </div>
         <h3 class="etf-name">{{ etf.name }}</h3>
-        <p class="etf-isin">{{ etf.isin }}</p>
+        <p class="etf-isin">{{ etf.isin || '' }}</p>
         <div class="etf-meta">
-          <span>{{ etf.domicile }}</span><span>{{ etf.currency }}</span>
+          <span v-if="etf.domicile">{{ etf.domicile }}</span><span v-if="etf.currency">{{ etf.currency }}</span>
           <span v-if="etf.fund_size">{{ formatSize(etf.fund_size) }}</span>
           <span v-if="etf.dividend_policy" :class="etf.dividend_policy === 'Accumulating' ? 'badge-acc' : 'badge-dist'">{{ etf.dividend_policy === 'Accumulating' ? 'Acc' : 'Dist' }}</span>
         </div>
-        <div class="etf-replication">{{ etf.replication_method }}</div>
+        <div v-if="etf.replication_method" class="etf-replication">{{ etf.replication_method }}</div>
       </div>
     </div>
     <div v-else-if="!loading && !error" class="empty-state">
@@ -312,12 +312,12 @@ let chartInstance = null
 const etfStats = computed(() => {
   const e = selectedETF.value; if (!e) return []
   return [
-    {label:'Provider',value:e.provider},{label:'Domicile',value:e.domicile},
-    {label:'Currency',value:e.currency},{label:'TER',value:e.ter?e.ter+'%':'—'},
+    {label:'Provider',value:e.provider||'—'},{label:'Domicile',value:e.domicile||'—'},
+    {label:'Currency',value:e.currency||'—'},{label:'TER',value:e.ter?e.ter+'%':'—'},
     {label:'Fund Size',value:e.fund_size?formatSize(e.fund_size):'—'},
     {label:'Replication',value:e.replication_method||'—'},
     {label:'Dividend Policy',value:e.dividend_policy||'—'},
-    {label:'Benchmark',value:e.benchmark||'—'},{label:'ISIN',value:e.isin},
+    {label:'Benchmark',value:e.benchmark||'—'},{label:'ISIN',value:e.isin||'—'},
   ]
 })
 const allocationGroups = computed(() => {

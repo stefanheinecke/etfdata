@@ -44,4 +44,8 @@ def init_db():
         conn.execute(text("ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS email VARCHAR(255)"))
         conn.execute(text("ALTER TABLE etfs ADD COLUMN IF NOT EXISTS dividend_policy VARCHAR(20)"))
         conn.execute(text("ALTER TABLE etfs ALTER COLUMN isin DROP NOT NULL"))
+        conn.execute(text("ALTER TABLE etfs ALTER COLUMN provider DROP NOT NULL"))
+        conn.execute(text("ALTER TABLE etfs ALTER COLUMN domicile DROP NOT NULL"))
+        conn.execute(text("ALTER TABLE etfs ALTER COLUMN currency DROP NOT NULL"))
+        conn.execute(text("ALTER TABLE performance ALTER COLUMN currency DROP NOT NULL"))
         conn.commit()

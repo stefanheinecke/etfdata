@@ -8,13 +8,13 @@ class ETFBase(BaseModel):
     isin: Optional[str] = None
     ticker: str
     name: str
-    provider: str
-    domicile: str
+    provider: Optional[str] = None
+    domicile: Optional[str] = None
     replication_method: Optional[str] = None
     ter: Optional[Decimal] = None
     fund_size: Optional[int] = None
     benchmark: Optional[str] = None
-    currency: str
+    currency: Optional[str] = None
     dividend_policy: Optional[str] = None
     listings: Optional[dict] = None
 
@@ -69,7 +69,7 @@ class PerformanceBase(BaseModel):
     date: date
     nav: Optional[Decimal] = None
     close_price: Optional[Decimal] = None
-    currency: str
+    currency: Optional[str] = None
     dividend: Optional[Decimal] = None
 
 class PerformanceCreate(PerformanceBase):
