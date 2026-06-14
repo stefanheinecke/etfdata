@@ -36,7 +36,7 @@ class Holding(Base):
     id = Column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
     etf_id = Column(PGUUID(as_uuid=True), ForeignKey("etfs.id"), nullable=False, index=True)
     date = Column(Date, nullable=False, index=True)
-    instrument_isin = Column(String(12), nullable=False)
+    instrument_isin = Column(String(50), nullable=False)
     instrument_name = Column(String(255), nullable=False)
     weight = Column(Numeric(8, 4), nullable=False)
     country = Column(String(2), index=True)

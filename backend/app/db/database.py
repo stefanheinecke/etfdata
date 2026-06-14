@@ -48,4 +48,5 @@ def init_db():
         conn.execute(text("ALTER TABLE etfs ALTER COLUMN domicile DROP NOT NULL"))
         conn.execute(text("ALTER TABLE etfs ALTER COLUMN currency DROP NOT NULL"))
         conn.execute(text("ALTER TABLE performance ALTER COLUMN currency DROP NOT NULL"))
+        conn.execute(text("ALTER TABLE holdings ALTER COLUMN instrument_isin TYPE VARCHAR(50)"))
         conn.commit()

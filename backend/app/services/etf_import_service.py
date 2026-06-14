@@ -344,7 +344,7 @@ def _process_csv(csv_bytes: bytes, etf: ETF, db, logs: list) -> dict:
     sector_totals:  dict[str, float] = {}
 
     for _, row in df.iterrows():
-        ident  = str(row[id_col]).strip()[:12]
+        ident  = str(row[id_col]).strip()[:50]
         sym    = str(row[ticker_col]).strip() if ticker_col and pd.notna(row.get(ticker_col, "")) else ident
         name   = str(row[name_col]).strip()[:255] if name_col else ident
         weight = float(row[weight_col])
@@ -573,7 +573,7 @@ def import_etf(
         for h in eodhd_holdings:
             db.add(Holding(
                 etf_id=etf.id, date=as_of,
-                instrument_isin=h["isin"][:12],
+                instrument_isin=h["isin"][:50],
                 instrument_name=h["name"][:255],
                 weight=h["weight"],
                 sector=h["sector"],
