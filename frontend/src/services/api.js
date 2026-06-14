@@ -76,12 +76,14 @@ export const adminService = {
   verify(adminSecret) {
     return api.get('/admin/verify', { headers: { 'x-admin-secret': adminSecret } })
   },
-  importETF(adminSecret, symbol, csvFile = null, name = null, ter = null, isin = null) {
+  importETF(adminSecret, symbol, csvFile = null, name = null, ter = null, isin = null, eohdToken = null) {
     const params = { symbol }
     if (isin) params.isin = isin
     if (name) params.name = name
     if (ter != null) params.ter = ter
-    const config = { params, headers: { 'x-admin-secret': adminSecret } }
+    const headers = { 'x-admin-secret': adminSecret }
+    if (eohdToken) headers['x-eodhd-token'] = eohdToken
+    const config = { params, headers }
     if (csvFile) {
       const form = new FormData()
       form.append('csv_file', csvFile)

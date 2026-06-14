@@ -110,6 +110,13 @@
         Use a USD-denominated listing (e.g. <code>.SW</code>) to store prices in USD.
       </p>
       <div style="margin-bottom:.75rem">
+        <label class="label">EODHD API Token <span style="font-weight:400;color:var(--text-muted)">(required — stored in session, never sent to our servers unencrypted)</span></label>
+        <div class="key-row">
+          <input :type="showEodhdToken ? 'text' : 'password'" class="input" v-model="eohdToken" placeholder="e.g. 5be49902b71187.60586218" />
+          <button class="btn btn-outline" @click="showEodhdToken=!showEodhdToken">{{ showEodhdToken ? 'Hide' : 'Show' }}</button>
+        </div>
+      </div>
+      <div style="margin-bottom:.75rem">
         <label class="label">EODHD Symbol</label>
         <input class="input" v-model="importSymbol" placeholder="e.g. EIMI.SW or SWDA.LSE" style="text-transform:uppercase" />
       </div>
@@ -565,6 +572,8 @@ const importLoading = ref(false)
 const importError = ref('')
 const importResult = ref(null)
 const importLogs = ref([])
+const eohdToken = ref(sessionStorage.getItem('eodhd_token') || '')
+const showEodhdToken = ref(false)
 
 const healthLoading = ref(false)
 const healthResult = ref(null)
@@ -616,6 +625,7 @@ async function createKey() {
 
 async function importETF() {
   importLoading.value = true; importError.value = ''; importResult.value = null; importLogs.value = []
+  if (eohdToken.value) sessionStorage.setItem('eodhd_token', eohdToken.value)
   try {
     const r = await adminService.importETF(
       adminSecret.value,
@@ -624,6 +634,7 @@ async function importETF() {
       importName.value.trim() || null,
       importTer.value != null && importTer.value !== '' ? importTer.value : null,
       importIsin.value.trim().toUpperCase() || null,
+      eohdToken.value.trim() || null,
     )
     importResult.value = r.data
     importLogs.value = r.data.logs || []
