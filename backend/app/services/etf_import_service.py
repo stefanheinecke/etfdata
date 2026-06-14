@@ -120,9 +120,12 @@ def _fetch_eodhd_meta(eodhd_sym: str, token: str, logs: list) -> dict:
         # Dividend policy from EODHD or inferred from fund name
         div_policy = None
         etf_type = (etf_data.get("Type") or etf_data.get("InvestmentType") or "").lower()
-        if "accum" in etf_type or "(acc)" in name.lower():
+        name_lower = name.lower()
+        if ("accum" in etf_type or "(acc)" in name_lower
+                or name_lower.endswith(" acc") or " acc " in name_lower):
             div_policy = "Accumulating"
-        elif "distrib" in etf_type or "(dist)" in name.lower():
+        elif ("distrib" in etf_type or "(dist)" in name_lower
+                or name_lower.endswith(" dist") or " dist " in name_lower):
             div_policy = "Distributing"
 
         # Holdings: dict keyed by ticker symbol
@@ -418,7 +421,6 @@ def import_etf(
     isin_override: str | None = None,
     name_override: str | None = None,
     ter_override: float | None = None,
-    eodhd_token: str | None = None,
 ) -> dict:
     """Full ETF import pipeline driven by an EODHD symbol (e.g. 'EIMI.SW', 'SWDA.LSE').
 
@@ -434,13 +436,9 @@ def import_etf(
         isin_override: Override ISIN if EODHD does not return one.
         name_override: Override the ETF name.
         ter_override:  Override the TER (%).
-        eodhd_token:   EODHD API token. Falls back to EODHD_TOKEN env var if not provided.
 
     Returns:
         Summary dict with etf_id, ticker, name, and optionally holdings/skipped counts.
-
-    Raises:
-        ValueError: ISIN could not be resolved.
     """
     eodhd_symbol = eodhd_symbol.strip().upper()
     ticker = eodhd_symbol.split(".")[0]
@@ -448,11 +446,10 @@ def import_etf(
     logs.append(f"Importing ETF from EODHD symbol: {eodhd_symbol}")
 
     # ---- Metadata: EODHD ----
-    token = (eodhd_token or "").strip() or _eodhd_token()
+    token = _eodhd_token()
     eodhd_meta: dict = {}
     if not token:
-        logs.append("  ERROR: No EODHD token provided. "
-                    "Enter your EODHD API token in the Admin UI import form.")
+        logs.append("  ERROR: EODHD_TOKEN environment variable is not set.")
     else:
         logs.append(f"Fetching metadata from EODHD ({eodhd_symbol})...")
         eodhd_meta = _fetch_eodhd_meta(eodhd_symbol, token, logs)

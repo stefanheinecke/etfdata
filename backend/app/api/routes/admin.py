@@ -69,7 +69,6 @@ def import_etf_endpoint(
     csv_file: Optional[UploadFile] = File(None),
     db: Session = Depends(get_db),
     _: None = Depends(verify_admin_secret),
-    x_eodhd_token: Optional[str] = Header(None),
 ):
     """Register or update an ETF by EODHD symbol (e.g. 'EIMI.SW', 'SWDA.LSE').
     All metadata is fetched from EODHD. Provide isin only if EODHD does not return it."""
@@ -77,8 +76,7 @@ def import_etf_endpoint(
     csv_bytes = csv_file.file.read() if csv_file else None
     logs: list = []
     try:
-        result = import_etf(symbol, csv_bytes, db, logs, isin_override=isin, name_override=name,
-                            ter_override=ter, eodhd_token=x_eodhd_token)
+        result = import_etf(symbol, csv_bytes, db, logs, isin_override=isin, name_override=name, ter_override=ter)
         return {"status": "ok", "logs": logs, **result}
     except (ValueError, RuntimeError) as exc:
         raise HTTPException(status_code=400, detail=str(exc))
