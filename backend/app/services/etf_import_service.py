@@ -584,14 +584,19 @@ def import_etf(
     if token:
         logs.append(f"Fetching metadata from EODHD ({eodhd_symbol})...")
         eodhd_meta = _fetch_eodhd_meta(eodhd_symbol, token, logs)
-        # EODHD fundamentals are often absent for Swiss/Xetra listings.
-        # Fall back to the LSE equivalent which carries richer data.
-        # Also falls back when the response was HTTP 200 but contained no ETF data (name empty).
+        # EODHD fundamentals are often absent for non-US exchange listings.
+        # Try a prioritised list of exchange fallbacks that carry richer ETF data.
         if not eodhd_meta or not eodhd_meta.get("name"):
-            lse_sym = f"{ticker}.LSE"
-            if lse_sym != eodhd_symbol:
-                logs.append(f"  No fundamentals for {eodhd_symbol}, retrying with {lse_sym}...")
-                eodhd_meta = _fetch_eodhd_meta(lse_sym, token, logs)
+            # Exchanges tried in order; stop at the first that returns a name.
+            eodhd_orig_exchange = eodhd_symbol.split(".")[-1] if "." in eodhd_symbol else ""
+            fallback_exchanges = [e for e in ["LSE", "XETRA", "MI", "PA", "AS"]
+                                  if e != eodhd_orig_exchange]
+            for fb_exch in fallback_exchanges:
+                fb_sym = f"{ticker}.{fb_exch}"
+                logs.append(f"  No fundamentals for {eodhd_symbol}, retrying with {fb_sym}...")
+                eodhd_meta = _fetch_eodhd_meta(fb_sym, token, logs)
+                if eodhd_meta and eodhd_meta.get("name"):
+                    break
         elif not eodhd_meta.get("isin"):
             # Got partial data but no ISIN — supplement missing fields from the LSE listing.
             # Currency is intentionally kept from the original symbol (e.g. USD for .SW).
@@ -611,29 +616,48 @@ def import_etf(
     else:
         logs.append("  Warning: EODHD_TOKEN not configured — cannot fetch metadata or prices.")
 
-    # If EODHD returned no usable metadata, fall back to yfinance for basic info.
-    # Construct the London yfinance symbol (ticker + ".L") which covers most UCITS ETFs.
+    # If EODHD returned no usable metadata, fall back to yfinance.
+    # Yahoo Finance uses the same exchange suffix as EODHD for many European exchanges
+    # (.SW for SIX, .PA for Euronext Paris, etc.), so try the original symbol first.
     if not eodhd_meta or not eodhd_meta.get("name"):
-        yf_sym = ticker + ".L"
-        logs.append(f"  All EODHD sources returned no data — falling back to yfinance ({yf_sym})...")
-        yf_meta = _fetch_yf_meta(yf_sym, logs)
+        # Build a list of yfinance symbols to try, in priority order.
+        # Mapping from EODHD exchange codes → Yahoo Finance suffixes.
+        _YF_EXCH_MAP = {"SW": "SW", "XETRA": "DE", "PA": "PA", "AS": "AS",
+                        "MI": "MI", "MC": "MC", "VI": "VI", "BE": "BE"}
+        eodhd_orig_exchange = eodhd_symbol.split(".")[-1] if "." in eodhd_symbol else ""
+        yf_candidates: list[str] = []
+        # Try the original exchange first (e.g. CSSX5E.SW → yfinance CSSX5E.SW)
+        yf_ext = _YF_EXCH_MAP.get(eodhd_orig_exchange)
+        if yf_ext:
+            yf_candidates.append(f"{ticker}.{yf_ext}")
+        # Always try London as a fallback for UCITS ETFs
+        if f"{ticker}.L" not in yf_candidates:
+            yf_candidates.append(f"{ticker}.L")
+
+        yf_meta: dict = {}
+        for yf_sym in yf_candidates:
+            logs.append(f"  EODHD returned no data — trying yfinance ({yf_sym})...")
+            yf_meta = _fetch_yf_meta(yf_sym, logs)
+            if yf_meta.get("name"):
+                break
+
         if yf_meta.get("name"):
             eodhd_meta = {
                 "name":            yf_meta["name"],
                 "currency":        yf_meta.get("currency") or "USD",
                 "ter":             yf_meta.get("ter"),
                 "fund_size":       yf_meta.get("fund_size"),
-                "isin":            (eodhd_meta or {}).get("isin", ""),
+                "isin":            yf_meta.get("isin") or (eodhd_meta or {}).get("isin", ""),
                 "benchmark":       None,
                 "domicile":        "IE",
                 "provider":        "iShares",
                 "dividend_policy": None,
                 "holdings":        _fetch_yf_holdings(yf_meta["ticker_obj"], logs),
             }
-            logs.append(f"  yfinance fallback: name='{yf_meta['name']}', currency={yf_meta.get('currency')}")
+            logs.append(f"  yfinance fallback: name='{yf_meta['name']}', "
+                        f"currency={yf_meta.get('currency')}, isin={yf_meta.get('isin')}")
         else:
-            logs.append(f"  yfinance ({yf_sym}) also returned no data. ETF created with minimal metadata.")
-
+            logs.append(f"  All sources returned no data. ETF created with minimal metadata.")
     # If EODHD gave us a name but is missing ISIN / TER / fund_size (common for European ETFs
     # where EODHD's ETF_Data section is sparse), supplement those fields from yfinance.
     if eodhd_meta.get("name") and (
