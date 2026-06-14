@@ -88,6 +88,33 @@
             <h3 class="doc-section-title">Example Response</h3>
             <pre>{{ active.response }}</pre>
           </div>
+
+          <!-- Try it out -->
+          <div v-if="activeTryoutConfig" class="doc-section">
+            <h3 class="doc-section-title">
+              Try it out
+              <code class="demo-key-pill">x-api-key: demo</code>
+            </h3>
+            <p class="doc-section-body">
+              Executes a live request using the public demo key — returns SWDA data only.
+            </p>
+            <button class="btn btn-primary try-btn" :disabled="activeTryout.loading" @click="runTryout">
+              {{ activeTryout.loading ? 'Loading\u2026' : '\u25b6\u2002Execute' }}
+            </button>
+            <transition name="fade">
+              <div v-if="activeTryout.result || activeTryout.error" class="tryout-response">
+                <div class="tryout-resp-header">
+                  <span :class="['tryout-status-badge',
+                    (activeTryout.status >= 200 && activeTryout.status < 300) ? 'status-ok' : 'status-err']">
+                    {{ activeTryout.status }}
+                  </span>
+                  <span class="tryout-live-label">live response</span>
+                </div>
+                <pre v-if="activeTryout.result" class="tryout-pre">{{ activeTryout.result }}</pre>
+                <div v-if="activeTryout.error" class="tryout-error-msg">{{ activeTryout.error }}</div>
+              </div>
+            </transition>
+          </div>
         </div>
       </div>
     </div>
@@ -111,6 +138,7 @@
 
 <script setup>
 import { ref, computed, inject } from 'vue'
+import axios from 'axios'
 const BASE = 'https://etfdata-production.up.railway.app'
 
 const showApiKeyModal = inject('showApiKeyModal')
@@ -229,6 +257,72 @@ const groups = [
 
 const allEndpoints = computed(() => groups.flatMap(g => g.endpoints))
 const active = computed(() => allEndpoints.value.find(e => e.id === activeId.value))
+
+// ── Try it out ─────────────────────────────────────────────────────────────
+const swdaId = ref(null)
+
+async function fetchSwdaId() {
+  if (swdaId.value) return swdaId.value
+  try {
+    const res = await axios.get(`${BASE}/etfs`, { headers: { 'x-api-key': 'demo' } })
+    swdaId.value = res.data[0]?.id ?? null
+  } catch {}
+  return swdaId.value
+}
+
+const tryoutConfigs = {
+  'list-etfs':    { build: ()    => ({ method: 'GET',  url: `${BASE}/etfs` }) },
+  'get-etf':      { build: (id)  => ({ method: 'GET',  url: `${BASE}/etfs/${id}` }) },
+  'holdings':     { build: (id)  => ({ method: 'GET',  url: `${BASE}/etfs/${id}/holdings` }) },
+  'allocations':  { build: (id)  => ({ method: 'GET',  url: `${BASE}/etfs/${id}/allocations` }) },
+  'overlap-post': { build: (id)  => ({ method: 'POST', url: `${BASE}/analytics/overlap`,
+                                        body: { etf_ids: [id, id] } }) },
+  'overlap-get':  { build: (id)  => ({ method: 'GET',  url: `${BASE}/analytics/overlap/${id}/${id}` }) },
+  'exposure':     { build: (id)  => ({ method: 'POST', url: `${BASE}/analytics/exposure`,
+                                        body: { portfolio: [{ etf_id: id, weight: 100 }] } }) },
+  'similar':      { build: (id)  => ({ method: 'GET',  url: `${BASE}/analytics/similar/${id}` }) },
+}
+
+const activeTryoutConfig = computed(() => tryoutConfigs[activeId.value])
+
+const tryoutStates = ref({})
+
+function getTryoutState(id) {
+  if (!tryoutStates.value[id])
+    tryoutStates.value[id] = { loading: false, status: null, result: null, error: null }
+  return tryoutStates.value[id]
+}
+
+const activeTryout = computed(() => getTryoutState(activeId.value))
+
+async function runTryout() {
+  const cfg = activeTryoutConfig.value
+  if (!cfg) return
+  const state = getTryoutState(activeId.value)
+  state.loading = true
+  state.result = null
+  state.error  = null
+  state.status = null
+  try {
+    const id  = await fetchSwdaId()
+    const req = cfg.build(id)
+    const axiosCfg = { method: req.method, url: req.url, headers: { 'x-api-key': 'demo' } }
+    if (req.body) { axiosCfg.data = req.body; axiosCfg.headers['Content-Type'] = 'application/json' }
+    if (req.params) axiosCfg.params = req.params
+    const res  = await axios(axiosCfg)
+    state.status = res.status
+    const data = res.data
+    if (Array.isArray(data) && data.length > 5)
+      state.result = JSON.stringify(data.slice(0, 5), null, 2) + `\n// … ${data.length - 5} more items`
+    else
+      state.result = JSON.stringify(data, null, 2)
+  } catch (e) {
+    state.status = e?.response?.status ?? 0
+    state.error  = e?.response?.data?.detail ?? e.message ?? 'Request failed'
+  } finally {
+    state.loading = false
+  }
+}
 </script>
 
 <style scoped>
@@ -265,4 +359,37 @@ const active = computed(() => allEndpoints.value.find(e => e.id === activeId.val
 .code-tabs { display: flex; gap: .25rem; }
 .code-tab { background: none; border: 1px solid var(--border); cursor: pointer; padding: .3rem .75rem; border-radius: 6px; font-size: .8rem; font-weight: 500; color: var(--text-muted); transition: all .15s; font-family: inherit; }
 .code-tab.active { background: var(--green-500); border-color: var(--green-500); color: #fff; }
+
+/* Try it out */
+.try-btn { width: fit-content; margin-bottom: .75rem; }
+.demo-key-pill {
+  display: inline-block; background: var(--green-50); border: 1px solid var(--green-200);
+  color: var(--green-700); padding: .1rem .5rem; border-radius: 20px;
+  font-size: .75rem; font-weight: 600; letter-spacing: .04em; margin-left: .5rem;
+  vertical-align: middle;
+}
+[data-theme="dark"] .demo-key-pill { background: #0d2d0d; border-color: #1a4d1a; color: #4ade80; }
+.tryout-response { display: flex; flex-direction: column; gap: .5rem; }
+.tryout-resp-header { display: flex; align-items: center; gap: .75rem; }
+.tryout-status-badge {
+  display: inline-block; font-size: .75rem; font-weight: 700;
+  padding: .15rem .55rem; border-radius: 4px;
+}
+.status-ok  { background: var(--green-50); border: 1px solid var(--green-200); color: var(--green-700); }
+.status-err { background: #fee2e2; border: 1px solid #fecaca; color: #dc2626; }
+[data-theme="dark"] .status-ok  { background: #0d2d0d; border-color: #1a4d1a; color: #4ade80; }
+[data-theme="dark"] .status-err { background: #2d0a0a; border-color: #7f1d1d; color: #f87171; }
+.tryout-live-label { font-size: .75rem; color: var(--text-muted); }
+.tryout-pre {
+  background: var(--bg-3); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 1rem 1.25rem; overflow-x: auto; font-size: .78rem; line-height: 1.6;
+  max-height: 420px; overflow-y: auto; white-space: pre; color: var(--text);
+}
+.tryout-error-msg {
+  color: #dc2626; background: #fef2f2; border: 1px solid #fecaca;
+  border-radius: 8px; padding: .65rem 1rem; font-size: .875rem;
+}
+[data-theme="dark"] .tryout-error-msg { background: #2d0a0a; border-color: #7f1d1d; color: #f87171; }
+.fade-enter-active { transition: opacity .3s, transform .3s; }
+.fade-enter-from { opacity: 0; transform: translateY(-4px); }
 </style>
