@@ -236,155 +236,25 @@ def _fetch_eodhd_history(eodhd_sym: str, token: str, logs: list):
         return None
 
 
-# ---------------------------------------------------------------------------
-# yfinance helpers (fallback when EODHD_TOKEN not set or EODHD fails)
-# ---------------------------------------------------------------------------
-
-def _fetch_yf_meta(yf_symbol: str, logs: list) -> dict:
-    import yfinance as yf
-    t = yf.Ticker(yf_symbol)
-    result: dict = {"ticker_obj": t}  # always present — history() may still work even when info is rate-limited
-    try:
-        info = t.info or {}
-        ter_raw = (info.get("totalExpenseRatio") or info.get("annualReportExpenseRatio"))
-        ter_pct = round(float(ter_raw) * 100, 4) if ter_raw else None
-        # totalNetAssets is the correct field for ETFs on yfinance; totalAssets is the fallback
-        fund_size = info.get("totalNetAssets") or info.get("totalAssets")
-        result.update({
-            "name":      info.get("longName") or info.get("shortName") or "",
-            "currency":  info.get("currency") or "",
-            "ter":       ter_pct,
-            "fund_size": int(fund_size) if fund_size else None,
-            "isin":      (info.get("isin") or "").strip(),
-        })
-    except Exception as exc:
-        logs.append(f"  yfinance metadata lookup failed for '{yf_symbol}' ({exc})")
-    return result
-
-
-def _fetch_yf_holdings(ticker_obj, logs: list) -> list:
-    """Fetch ETF top holdings from yfinance funds_data (best-effort, typically top-10).
-    Returns a list of holding dicts compatible with the EODHD holdings format.
-    Note: ISINs are not available via this path; a sanitised name is used as identifier.
-    """
-    try:
-        fd = ticker_obj.funds_data
-        top = getattr(fd, "top_holdings", None)
-        if top is None or (hasattr(top, "empty") and top.empty):
-            logs.append("  yfinance: no top_holdings data available.")
-            return []
-        holdings = []
-        for i, (_, row) in enumerate(top.iterrows()):
-            name = str(row.get("holdingName") or "").strip()
-            pct  = row.get("holdingPercent")
-            if not name or pct is None:
-                continue
-            weight = float(pct)
-            if weight < 1.0:   # fraction (0.05) → percentage (5.0)
-                weight *= 100
-            # No ISIN available — use sanitised name as 12-char identifier
-            ident = name.replace(" ", "").upper()[:12] or f"HOLD{i:04d}"
-            holdings.append({
-                "isin":    ident,
-                "name":    name[:255],
-                "weight":  round(weight, 4),
-                "sector":  "Equity",
-                "country": "",
-            })
-        logs.append(f"  yfinance top holdings: {len(holdings)} positions.")
-        return holdings
-    except Exception as exc:
-        logs.append(f"  yfinance holdings unavailable ({exc}).")
-        return []
-
-
-def _stooq_symbol(yf_sym: str) -> str:
-    """Convert a yfinance symbol to Stooq format (lowercase; US tickers get .us suffix)."""
-    sym = yf_sym.lower()
-    if "." not in sym:
-        sym = sym + ".us"
-    return sym
-
-
-def _fetch_stooq_history(stooq_sym: str, logs: list):
-    """Fetch 1-year daily price history from Stooq. Returns a DataFrame or None."""
-    import requests, io, pandas as pd
-    from datetime import date, timedelta
-    end = date.today()
-    start = end - timedelta(days=366)
-    url = "https://stooq.com/q/d/l/"
-    params = {"s": stooq_sym, "d1": start.strftime("%Y%m%d"),
-              "d2": end.strftime("%Y%m%d"), "i": "d"}
-    try:
-        resp = requests.get(url, params=params, timeout=15,
-                            headers={"User-Agent": "Mozilla/5.0"})
-        if resp.status_code != 200 or b"No data" in resp.content[:200]:
-            logs.append(f"  Stooq returned no data for '{stooq_sym}'.")
-            return None
-        df = pd.read_csv(io.BytesIO(resp.content))
-        # Normalise column names to title-case regardless of what Stooq returns
-        df.columns = [c.strip().title() for c in df.columns]
-        if "Date" not in df.columns or "Close" not in df.columns:
-            logs.append(f"  Stooq CSV has unexpected columns {list(df.columns)} for '{stooq_sym}'.")
-            return None
-        df["Date"] = pd.to_datetime(df["Date"])
-        df = df.dropna(subset=["Close"])
-        if df.empty:
-            logs.append(f"  Stooq returned empty data for '{stooq_sym}'.")
-            return None
-        logs.append(f"  Stooq fallback succeeded: {len(df)} rows for '{stooq_sym}'.")
-        return df
-    except Exception as exc:
-        logs.append(f"  Stooq fetch failed ({exc}).")
-        return None
-
-
-def _upload_performance(etf: ETF, ticker_obj, currency: str, db, logs: list,
-                        perf_yf_symbol: str | None = None) -> int:
-    import yfinance as yf
-
-    effective_sym = perf_yf_symbol or etf.ticker
-    if perf_yf_symbol:
-        logs.append(f"  Using alternate performance ticker: {perf_yf_symbol}")
-
-    ext_df = None       # DataFrame from EODHD
-    hist   = None       # yfinance DataFrame
-    actual_currency = currency
-
+def _upload_performance(etf: ETF, eodhd_symbol: str, currency: str, db, logs: list) -> int:
+    """Fetch price history from EODHD and insert Performance rows."""
     token = _eodhd_token()
-    if token:
-        # --- EODHD (primary when token is configured) ---
-        eodhd_sym = _to_eodhd_symbol(effective_sym)
-        logs.append(f"  Fetching prices from EODHD ({eodhd_sym})...")
-        ext_df = _fetch_eodhd_history(eodhd_sym, token, logs)
-        if ext_df is not None:
-            # Detect actual trading currency for this specific listing
-            detected = _fetch_eodhd_currency(eodhd_sym, token, logs)
-            if detected:
-                actual_currency = detected
-                logs.append(f"  Price currency for {eodhd_sym}: {actual_currency}")
-
-    if ext_df is None:
-        # --- yfinance fallback ---
-        price_ticker = yf.Ticker(perf_yf_symbol) if perf_yf_symbol else ticker_obj
-        try:
-            hist = price_ticker.history(period="max")
-            if hist is not None and not hist.empty:
-                try:
-                    reported = price_ticker.fast_info.currency or ""
-                    if reported:
-                        actual_currency = reported
-                except Exception:
-                    pass
-            else:
-                hist = None
-        except Exception as exc:
-            logs.append(f"  yfinance rate-limited ({exc}). No further fallback available.")
-            hist = None
-
-    if ext_df is None and (hist is None or hist.empty):
-        logs.append("  No price data available.")
+    if not token:
+        logs.append("  Skipping performance (EODHD_TOKEN not set).")
         return 0
+
+    actual_currency = currency
+    ext_df = _fetch_eodhd_history(eodhd_symbol, token, logs)
+    if ext_df is None:
+        logs.append("  No price data available from EODHD.")
+        return 0
+
+    # Detect the actual trading currency for this listing
+    detected = _fetch_eodhd_currency(eodhd_symbol, token, logs)
+    if detected:
+        actual_currency = detected
+        logs.append(f"  Price currency for {eodhd_symbol}: {actual_currency}")
+
     gbx_factor = 1.0
     if actual_currency in ("GBp", "GBX", "GBx"):
         gbx_factor = 0.01
@@ -393,36 +263,17 @@ def _upload_performance(etf: ETF, ticker_obj, currency: str, db, logs: list,
 
     db.query(Performance).filter_by(etf_id=etf.id).delete()
     count = 0
-
-    if ext_df is not None:
-        # EODHD path
-        for _, row in ext_df.iterrows():
-            close = float(row["Close"]) * gbx_factor
-            if close <= 0:
-                continue
-            db.add(Performance(
-                etf_id=etf.id,
-                date=row["Date"].date(),
-                close_price=round(close, 4),
-                currency=actual_currency[:3].upper(),
-            ))
-            count += 1
-    else:
-        # yfinance path
-        for idx, row in hist.iterrows():
-            close = float(row["Close"]) * gbx_factor
-            if close <= 0:
-                continue
-            div = float(row.get("Dividends", 0) or 0) * gbx_factor
-            db.add(Performance(
-                etf_id=etf.id,
-                date=idx.date(),
-                close_price=round(close, 4),
-                dividend=round(div, 6) if div else None,
-                currency=actual_currency[:3].upper(),
-            ))
-            count += 1
-
+    for _, row in ext_df.iterrows():
+        close = float(row["Close"]) * gbx_factor
+        if close <= 0:
+            continue
+        db.add(Performance(
+            etf_id=etf.id,
+            date=row["Date"].date(),
+            close_price=round(close, 4),
+            currency=actual_currency[:3].upper(),
+        ))
+        count += 1
     return count
 
 
@@ -635,78 +486,17 @@ def import_etf(
     else:
         logs.append("  Warning: EODHD_TOKEN not configured — cannot fetch metadata or prices.")
 
-    # If EODHD returned no usable metadata, fall back to yfinance.
-    # Yahoo Finance uses the same exchange suffix as EODHD for many European exchanges
-    # (.SW for SIX, .PA for Euronext Paris, etc.), so try the original symbol first.
     if not eodhd_meta or not eodhd_meta.get("name"):
-        # Build a list of yfinance symbols to try, in priority order.
-        # Mapping from EODHD exchange codes → Yahoo Finance suffixes.
-        _YF_EXCH_MAP = {"SW": "SW", "XETRA": "DE", "PA": "PA", "AS": "AS",
-                        "MI": "MI", "MC": "MC", "VI": "VI", "BE": "BE"}
-        eodhd_orig_exchange = eodhd_symbol.split(".")[-1] if "." in eodhd_symbol else ""
-        yf_candidates: list[str] = []
-        # Try the original exchange first (e.g. CSSX5E.SW → yfinance CSSX5E.SW)
-        yf_ext = _YF_EXCH_MAP.get(eodhd_orig_exchange)
-        if yf_ext:
-            yf_candidates.append(f"{ticker}.{yf_ext}")
-        # Always try London as a fallback for UCITS ETFs
-        if f"{ticker}.L" not in yf_candidates:
-            yf_candidates.append(f"{ticker}.L")
+        logs.append(f"  All EODHD exchange variants returned no data for '{eodhd_symbol}'. "
+                    f"ETF created with minimal metadata.")
 
-        yf_meta: dict = {}
-        for yf_sym in yf_candidates:
-            logs.append(f"  EODHD returned no data — trying yfinance ({yf_sym})...")
-            yf_meta = _fetch_yf_meta(yf_sym, logs)
-            if yf_meta.get("name"):
-                break
-
-        if yf_meta.get("name"):
-            eodhd_meta = {
-                "name":            yf_meta["name"],
-                "currency":        yf_meta.get("currency") or "USD",
-                "ter":             yf_meta.get("ter"),
-                "fund_size":       yf_meta.get("fund_size"),
-                "isin":            yf_meta.get("isin") or (eodhd_meta or {}).get("isin", ""),
-                "benchmark":       None,
-                "domicile":        "IE",
-                "provider":        "iShares",
-                "dividend_policy": None,
-                "holdings":        _fetch_yf_holdings(yf_meta["ticker_obj"], logs),
-            }
-            logs.append(f"  yfinance fallback: name='{yf_meta['name']}', "
-                        f"currency={yf_meta.get('currency')}, isin={yf_meta.get('isin')}")
-        else:
-            logs.append(f"  All sources returned no data. ETF created with minimal metadata.")
-    # If EODHD gave us a name but is missing ISIN / TER / fund_size (common for European ETFs
-    # where EODHD's ETF_Data section is sparse), supplement those fields from yfinance.
-    if eodhd_meta.get("name") and (
-        not eodhd_meta.get("isin")
-        or eodhd_meta.get("ter") is None
-        or not eodhd_meta.get("fund_size")
-    ):
-        # ISIN: EODHD search API is the most reliable source
-        if not eodhd_meta.get("isin") and token:
-            found_isin = _fetch_eodhd_isin(eodhd_symbol, token, logs)
-            if not found_isin:
-                # Also try the LSE listing symbol
-                found_isin = _fetch_eodhd_isin(f"{ticker}.LSE", token, logs)
-            if found_isin:
-                eodhd_meta["isin"] = found_isin
-
-        yf_supp_sym = ticker + ".L"
-        logs.append(f"  EODHD metadata incomplete — supplementing from yfinance ({yf_supp_sym})...")
-        yf_supp = _fetch_yf_meta(yf_supp_sym, logs)
-        for field in ["isin", "ter", "fund_size"]:
-            if not eodhd_meta.get(field) and yf_supp.get(field):
-                eodhd_meta[field] = yf_supp[field]
-                logs.append(f"    Supplemented {field}={yf_supp[field]} from yfinance.")
-        # Also infer dividend_policy from the yfinance longName if EODHD couldn't
-        if not eodhd_meta.get("dividend_policy") and yf_supp.get("name"):
-            n = yf_supp["name"].lower()
-            if "(acc)" in n or "accumul" in n:
-                eodhd_meta["dividend_policy"] = "Accumulating"
-            elif "(dist)" in n or "distribut" in n:
-                eodhd_meta["dividend_policy"] = "Distributing"
+    # If EODHD gave us a name but is still missing ISIN, try the EODHD search API
+    if eodhd_meta.get("name") and not eodhd_meta.get("isin") and token:
+        found_isin = _fetch_eodhd_isin(eodhd_symbol, token, logs)
+        if not found_isin:
+            found_isin = _fetch_eodhd_isin(f"{ticker}.LSE", token, logs)
+        if found_isin:
+            eodhd_meta["isin"] = found_isin
 
     isin = (isin_override or eodhd_meta.get("isin") or "").strip().upper() or None
     if not isin:
@@ -764,14 +554,10 @@ def import_etf(
         logs.append(f"Created new ETF: {etf.name} ({etf.ticker}), id={etf.id}")
 
     # ---- Performance ----
-    if token:
-        logs.append("Uploading performance data...")
-        perf_count = _upload_performance(etf, None, currency, db, logs,
-                                         perf_yf_symbol=eodhd_symbol)
-        db.commit()
-        logs.append(f"  {perf_count} daily price records inserted.")
-    else:
-        logs.append("Skipping performance (EODHD_TOKEN not set).")
+    logs.append("Uploading performance data...")
+    perf_count = _upload_performance(etf, eodhd_symbol, currency, db, logs)
+    db.commit()
+    logs.append(f"  {perf_count} daily price records inserted.")
 
     # ---- Holdings: CSV > EODHD > skip ----
     eodhd_holdings = eodhd_meta.get("holdings", [])
