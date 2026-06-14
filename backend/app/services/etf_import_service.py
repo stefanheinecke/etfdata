@@ -62,7 +62,9 @@ def _fetch_eodhd_meta(eodhd_sym: str, token: str, logs: list) -> dict:
         currency  = general.get("CurrencyCode") or general.get("Currency") or ""
         fund_size = (etf_data.get("Net_Assets") or etf_data.get("NetAssets") or
                      etf_data.get("TotalNetAssets") or etf_data.get("TotalAssets"))
-        isin      = (general.get("ISIN") or general.get("Isin") or
+        # ISIN: EODHD puts it in ETF_Data, not in General
+        isin      = (etf_data.get("ISIN") or etf_data.get("Isin") or
+                     general.get("ISIN") or general.get("Isin") or
                      general.get("isin") or "").strip()
 
         # Log which keys actually have values — helps diagnose field-name mismatches
@@ -72,13 +74,23 @@ def _fetch_eodhd_meta(eodhd_sym: str, token: str, logs: list) -> dict:
         logs.append(f"  EODHD ETF_Data non-empty keys: {non_empty_keys[:25]}")
 
         # Provider / fund family
-        provider = (general.get("Fund_Family") or general.get("FundFamily") or "iShares").strip() or "iShares"
+        provider = (general.get("Fund_Family") or general.get("FundFamily") or
+                    etf_data.get("Company_Name") or "iShares").strip() or "iShares"
 
-        # Domicile: EODHD returns ISO alpha-2 in CountryISO
-        domicile_raw = (general.get("CountryISO") or general.get("CountryCode") or "IE").strip()
-        domicile = domicile_raw[:2].upper() if domicile_raw else "IE"
+        # Domicile: ETF_Data.Domicile has the fund's legal domicile (e.g. "Ireland").
+        # General.CountryISO is the exchange country (e.g. "CH" for SIX) — not the fund domicile.
+        domicile_raw = etf_data.get("Domicile") or ""
+        if domicile_raw:
+            # Full country name → ISO-2 via the shared map ("Ireland" → "IE", etc.)
+            domicile = _COUNTRY_ISO.get(domicile_raw, domicile_raw[:2].upper())
+        else:
+            fallback = (general.get("CountryISO") or general.get("CountryCode") or "IE").strip()
+            domicile = fallback[:2].upper() if fallback else "IE"
 
-        # TER: EODHD returns as decimal fraction (e.g. 0.0018 = 0.18%)
+        # TER:
+        # - TotalExpenseRatio / Expense_Ratio / OngoingCharge / ManagementFee are decimal
+        #   fractions (0.0018 = 0.18%) — multiply by 100 if value < 1.
+        # - Ongoing_Charge (with underscore) is already in percent (0.1000 = 0.10%) — use as-is.
         ter_pct = None
         ter_raw = (etf_data.get("TotalExpenseRatio") or etf_data.get("Expense_Ratio") or
                    etf_data.get("OngoingCharge") or etf_data.get("ManagementFee") or
@@ -89,6 +101,13 @@ def _fetch_eodhd_meta(eodhd_sym: str, token: str, logs: list) -> dict:
                 ter_pct = round(f * 100, 4) if f < 1 else round(f, 4)
             except (ValueError, TypeError):
                 pass
+        if ter_pct is None:
+            ongoing = etf_data.get("Ongoing_Charge")
+            if ongoing is not None:
+                try:
+                    ter_pct = round(float(ongoing), 4)
+                except (ValueError, TypeError):
+                    pass
 
         # Benchmark index
         benchmark = (
