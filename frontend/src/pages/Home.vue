@@ -25,53 +25,63 @@
       </div>
     </section>
 
-    <!-- Stats -->
-    <section class="page">
-      <div class="grid-4">
-        <div class="stat-card" v-for="s in stats" :key="s.label">
-          <div class="stat-label">{{ s.label }}</div>
-          <div class="stat-value" :class="{ 'stat-loading': statsLoading && s.value === '—' }">{{ s.value }}</div>
-          <div class="stat-sub">{{ s.sub }}</div>
-        </div>
-      </div>
-    </section>
-
     <!-- Features -->
     <section class="features-section">
       <div class="page">
         <div class="section-header">
           <h2 class="section-title">What you can do</h2>
-          <p class="section-sub">Four powerful endpoints to analyse ETF data</p>
+          <p class="section-sub">Explore, analyse, and build with live ETF data</p>
         </div>
         <div class="grid-2">
-          <div class="feature-card" v-for="f in features" :key="f.title" @click="$emit('navigate', f.nav)">
-            <div class="feature-icon">{{ f.icon }}</div>
-            <div>
-              <h3 class="feature-title">{{ f.title }}</h3>
-              <p class="feature-desc">{{ f.desc }}</p>
+          <!-- ETF Explorer -->
+          <div class="feature-card" @click="$emit('navigate','etfs')">
+            <div class="feature-top">
+              <div class="feature-icon">📊</div>
+              <div style="flex:1">
+                <h3 class="feature-title">ETF Explorer</h3>
+                <p class="feature-desc">Browse all tracked ETFs, view holdings, allocations and performance metrics.</p>
+              </div>
+              <span class="feature-arrow">→</span>
             </div>
-            <span class="feature-arrow">→</span>
+            <div class="feature-preview">
+              <div class="fp-etf-row"><span class="fp-ticker">SWDA</span><span class="fp-name">iShares Core MSCI World</span><span class="fp-badge">Acc</span><span class="fp-ter">0.20%</span></div>
+              <div class="fp-etf-row"><span class="fp-ticker">VUSA</span><span class="fp-name">Vanguard S&amp;P 500 UCITS ETF</span><span class="fp-badge fp-dist">Dist</span><span class="fp-ter">0.07%</span></div>
+              <div class="fp-more">+ more ETFs tracked →</div>
+            </div>
+          </div>
+          <!-- Exposure Analysis -->
+          <div class="feature-card" @click="$emit('navigate','analytics')">
+            <div class="feature-top">
+              <div class="feature-icon">🌍</div>
+              <div style="flex:1">
+                <h3 class="feature-title">Exposure Analysis</h3>
+                <p class="feature-desc">Analyse sector, country and currency exposure of a custom portfolio.</p>
+              </div>
+              <span class="feature-arrow">→</span>
+            </div>
+            <div class="feature-preview">
+              <div class="fp-bar-row"><span class="fp-bar-lbl">North America</span><div class="fp-bar-track"><div class="fp-bar-fill" style="width:68%"></div></div><span class="fp-bar-val">68%</span></div>
+              <div class="fp-bar-row"><span class="fp-bar-lbl">Europe</span><div class="fp-bar-track"><div class="fp-bar-fill" style="width:22%"></div></div><span class="fp-bar-val">22%</span></div>
+              <div class="fp-bar-row"><span class="fp-bar-lbl">Asia Pacific</span><div class="fp-bar-track"><div class="fp-bar-fill" style="width:10%"></div></div><span class="fp-bar-val">10%</span></div>
+            </div>
+          </div>
+          <!-- API Reference -->
+          <div class="feature-card" @click="$emit('navigate','docs')">
+            <div class="feature-top">
+              <div class="feature-icon">📖</div>
+              <div style="flex:1">
+                <h3 class="feature-title">API Reference</h3>
+                <p class="feature-desc">Full documentation with per-endpoint code examples for Python, JavaScript and cURL.</p>
+              </div>
+              <span class="feature-arrow">→</span>
+            </div>
+            <div class="feature-preview fp-api-preview">
+              <div class="fp-api-row"><span class="fp-get">GET</span><code class="fp-path">/etfs</code></div>
+              <div class="fp-api-row"><span class="fp-get">GET</span><code class="fp-path">/etfs/{id}/holdings</code></div>
+              <div class="fp-api-row"><span class="fp-post">POST</span><code class="fp-path">/analytics/overlap</code></div>
+            </div>
           </div>
         </div>
-      </div>
-    </section>
-
-    <!-- Quick API intro -->
-    <section class="page">
-      <div class="card">
-        <div class="qapi-header">
-          <div>
-            <h2 class="card-title" style="font-size:1.2rem;margin:0">Quick Start</h2>
-            <p style="font-size:.875rem;color:var(--text-muted);margin-top:.25rem">Integrate the API in minutes</p>
-          </div>
-          <button class="btn btn-outline" @click="$emit('navigate','docs')">Full Docs →</button>
-        </div>
-        <div class="code-tabs">
-          <button v-for="tab in codeTabs" :key="tab.label"
-            :class="['code-tab', { active: activeTab === tab.label }]"
-            @click="activeTab = tab.label">{{ tab.label }}</button>
-        </div>
-        <pre>{{ currentCode }}</pre>
       </div>
     </section>
 
@@ -80,36 +90,36 @@
       <div class="card tryout-card">
         <div class="tryout-header">
           <div>
-            <h2 class="card-title" style="font-size:1.2rem;margin:0">Try it out — no sign-up needed</h2>
+            <h2 class="card-title" style="font-size:1.2rem;margin:0">Live API Explorer</h2>
             <p style="font-size:.875rem;color:var(--text-muted);margin-top:.25rem">
-              Use the public demo key to fetch live SWDA ETF data right now
+              Live SWDA data · public <code class="tryout-key" style="font-size:.8rem;display:inline">demo</code> key · no sign-up needed
             </p>
           </div>
           <span class="live-badge">LIVE</span>
         </div>
-        <div class="tryout-meta">
-          <div class="tryout-row">
-            <span class="tryout-label">Demo API Key</span>
-            <code class="tryout-key">demo</code>
-          </div>
-          <div class="tryout-row">
-            <span class="tryout-label">Endpoint</span>
-            <code class="tryout-endpoint">GET /etfs</code>
-          </div>
+        <div class="demo-tabs">
+          <button v-for="ep in demoEndpoints" :key="ep.key"
+            :class="['demo-tab', { active: activeDemo === ep.key }]"
+            @click="switchDemo(ep.key)">
+            <span class="demo-method">GET</span>{{ ep.short }}
+          </button>
         </div>
-        <button class="btn btn-primary" :disabled="tryoutLoading" @click="runDemo" style="width:fit-content">
-          {{ tryoutLoading ? 'Loading…' : '▶  Execute' }}
-        </button>
+        <div v-if="currentDemo.loading" class="loading" style="font-size:.875rem">
+          <div class="spinner"></div> Fetching live data…
+        </div>
         <transition name="fade">
-          <div v-if="tryoutResult" class="tryout-result">
+          <div v-if="!currentDemo.loading && currentDemo.result" class="tryout-result">
             <div class="tryout-result-header">
               <span class="tryout-status">200 OK</span>
-              <span style="font-size:.75rem;color:var(--text-muted)">SWDA — iShares MSCI World</span>
+              <span style="font-size:.75rem;color:var(--text-muted)">SWDA · iShares Core MSCI World</span>
             </div>
-            <pre class="tryout-pre">{{ tryoutResult }}</pre>
+            <pre class="tryout-pre">{{ currentDemo.result }}</pre>
           </div>
         </transition>
-        <div v-if="tryoutError" class="tryout-error">{{ tryoutError }}</div>
+        <div v-if="currentDemo.error" class="tryout-error">{{ currentDemo.error }}</div>
+        <button class="btn btn-outline" style="width:fit-content" @click="$emit('navigate','docs')">
+          See all APIs →
+        </button>
       </div>
     </section>
 
@@ -131,46 +141,16 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import axios from 'axios'
-import { etfService } from '../services/api.js'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'https://etfdata-production.up.railway.app'
 
 defineEmits(['navigate'])
 
-const etfCount = ref('—')
-const holdingsCount = ref('—')
-const statsLoading = ref(true)
-
-const stats = computed(() => [
-  { label: 'ETFs Tracked', value: etfCount.value, sub: 'iShares funds' },
-  { label: 'API Endpoints', value: '12+', sub: 'REST JSON' },
-  { label: 'Holdings Tracked', value: holdingsCount.value, sub: 'Top positions per ETF' },
-  { label: 'Uptime', value: '99%', sub: 'Railway hosted' },
-])
-
-onMounted(async () => {
-  try {
-    const r = await etfService.getETFs(0, 100)
-    const etfs = r.data
-    etfCount.value = etfs.length.toString()
-    holdingsCount.value = (etfs.length * 10).toLocaleString() + '+'
-  } catch {
-    etfCount.value = '—'
-    holdingsCount.value = '—'
-  } finally {
-    statsLoading.value = false
-  }
+onMounted(() => {
   fetchDemo('etfs')
 })
-
-const features = [
-  { icon: '📊', title: 'ETF Explorer', desc: 'Browse all tracked ETFs, view holdings, allocations and performance metrics.', nav: 'etfs' },
-  { icon: '🔬', title: 'Overlap Analysis', desc: 'Calculate the percentage overlap between two or more ETFs based on their holdings.', nav: 'analytics' },
-  { icon: '🌍', title: 'Exposure Analysis', desc: 'Analyse sector, country and currency exposure of a custom portfolio.', nav: 'analytics' },
-  { icon: '📖', title: 'API Reference', desc: 'Full documentation with code examples for Python, JavaScript and cURL.', nav: 'docs' },
-]
 
 const codeTabs = [
   {
@@ -215,19 +195,6 @@ const overlap = await fetch(
 ).then(r => r.json());`
   },
 ]
-
-const activeTab = ref('cURL')
-const currentCode = ref(codeTabs[0].code)
-
-function setTab(tab) {
-  activeTab.value = tab.label
-  currentCode.value = tab.code
-}
-
-// watch activeTab
-watch(activeTab, val => {
-  currentCode.value = codeTabs.find(t => t.label === val)?.code ?? ''
-})
 
 // Live API Explorer
 const swdaId = ref(null)
@@ -324,32 +291,46 @@ function switchDemo(key) {
 .section-sub { color: var(--text-muted); margin-top: .35rem; }
 .features-section { background: var(--bg-2); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 3rem 0; }
 .feature-card {
-  display: flex; align-items: flex-start; gap: 1rem;
+  display: flex; flex-direction: column; gap: 0;
   background: var(--surface); border: 1px solid var(--border);
   border-radius: var(--radius); padding: 1.5rem;
   cursor: pointer; transition: all .2s; box-shadow: var(--shadow);
 }
 .feature-card:hover { border-color: var(--green-400); box-shadow: var(--shadow-md); transform: translateY(-2px); }
+.feature-top { display: flex; align-items: flex-start; gap: 1rem; }
 .feature-icon { font-size: 2rem; flex-shrink: 0; }
 .feature-title { font-size: 1rem; font-weight: 600; color: var(--text); margin-bottom: .25rem; }
 .feature-desc { font-size: .875rem; color: var(--text-muted); line-height: 1.5; }
 .feature-arrow { margin-left: auto; font-size: 1.25rem; color: var(--green-400); flex-shrink: 0; align-self: center; }
-.qapi-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.25rem; }
-.code-tabs { display: flex; gap: .25rem; margin-bottom: 1rem; }
-.code-tab {
-  background: none; border: 1px solid var(--border); cursor: pointer;
-  padding: .3rem .75rem; border-radius: 6px; font-size: .8rem; font-weight: 500;
-  color: var(--text-muted); transition: all .15s; font-family: inherit;
-}
-.code-tab.active { background: var(--green-500); border-color: var(--green-500); color: #fff; }
+.feature-preview { border-top: 1px solid var(--border); margin-top: 1rem; padding-top: .85rem; }
+.fp-etf-row { display: flex; align-items: center; gap: .4rem; padding: .25rem 0; border-bottom: 1px solid var(--border); font-size: .75rem; }
+.fp-etf-row:last-child { border-bottom: none; }
+.fp-ticker { font-family: monospace; font-weight: 700; color: var(--text); min-width: 40px; }
+.fp-name { color: var(--text-muted); flex: 1; }
+.fp-badge { font-size: .62rem; font-weight: 600; background: #d1fae5; color: #065f46; padding: .05rem .35rem; border-radius: 10px; flex-shrink: 0; }
+.fp-dist { background: #dbeafe; color: #1e40af; }
+.fp-ter { color: var(--text-muted); margin-left: auto; flex-shrink: 0; }
+.fp-more { color: var(--green-600); font-weight: 500; padding-top: .3rem; font-size: .72rem; }
+.fp-bar-row { display: flex; align-items: center; gap: .5rem; margin-bottom: .35rem; }
+.fp-bar-lbl { font-size: .7rem; color: var(--text-muted); width: 95px; flex-shrink: 0; }
+.fp-bar-track { flex: 1; height: 4px; background: var(--border); border-radius: 2px; }
+.fp-bar-fill { height: 100%; background: var(--green-500); border-radius: 2px; }
+.fp-bar-val { font-size: .7rem; font-weight: 600; color: var(--text); width: 28px; text-align: right; }
+.fp-api-preview { display: flex; flex-direction: column; gap: .3rem; }
+.fp-api-row { display: flex; align-items: center; gap: .5rem; font-size: .75rem; }
+.fp-get { font-weight: 700; font-size: .63rem; color: #1d4ed8; background: #dbeafe; padding: .05rem .3rem; border-radius: 3px; flex-shrink: 0; }
+.fp-post { font-weight: 700; font-size: .63rem; color: #15803d; background: #dcfce7; padding: .05rem .3rem; border-radius: 3px; flex-shrink: 0; }
+.fp-path { font-family: monospace; color: var(--text-muted); }
+[data-theme="dark"] .fp-badge { background: #064e3b; color: #6ee7b7; }
+[data-theme="dark"] .fp-dist { background: #1e3a8a; color: #93c5fd; }
+[data-theme="dark"] .fp-get { background: #1e3a8a; color: #93c5fd; }
+[data-theme="dark"] .fp-post { background: #14532d; color: #86efac; }
 .disclaimer-card {
   background: var(--bg-3); border: 1px solid var(--green-200);
   border-radius: var(--radius); padding: 1.5rem;
 }
 .disclaimer-card h3 { font-size: 1rem; font-weight: 600; color: var(--text); margin-bottom: .75rem; }
 .disclaimer-card p { font-size: .875rem; color: var(--text-muted); line-height: 1.7; }
-.stat-loading { opacity: .35; }
-
 /* Try it out */
 .tryout-card { display: flex; flex-direction: column; gap: 1.25rem; }
 .tryout-header { display: flex; justify-content: space-between; align-items: flex-start; }
@@ -378,19 +359,6 @@ function switchDemo(key) {
 }
 .tryout-result { display: flex; flex-direction: column; gap: .5rem; }
 .tryout-result-header { display: flex; align-items: center; gap: 1rem; }
-.demo-tabs { display:flex; gap:.4rem; flex-wrap:wrap; }
-.demo-tab {
-  display:flex; align-items:center; gap:.35rem;
-  background:var(--bg-3); border:1px solid var(--border);
-  cursor:pointer; padding:.3rem .85rem; border-radius:20px;
-  font-size:.78rem; font-weight:500; color:var(--text-muted);
-  font-family:inherit; transition:all .15s;
-}
-.demo-tab:hover { border-color:var(--green-400); color:var(--text); }
-.demo-tab.active { background:var(--green-100); border-color:var(--green-400); color:var(--green-700); font-weight:600; }
-[data-theme="dark"] .demo-tab.active { background:#0d2d0d; border-color:#1a5c1a; color:#4ade80; }
-.demo-method { font-weight:700; font-size:.65rem; color:#1d4ed8; background:#dbeafe; padding:.05rem .3rem; border-radius:3px; flex-shrink:0; }
-[data-theme="dark"] .demo-method { background:#1e3a8a; color:#93c5fd; }
 .demo-tabs { display:flex; gap:.4rem; flex-wrap:wrap; }
 .demo-tab {
   display:flex; align-items:center; gap:.35rem;

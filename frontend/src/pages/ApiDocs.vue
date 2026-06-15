@@ -73,6 +73,16 @@
             <pre>{{ active.body }}</pre>
           </div>
 
+          <!-- Code Example -->
+          <div v-if="codeSnippets[activeId]" class="doc-section">
+            <h3 class="doc-section-title">Code Example</h3>
+            <div class="code-tabs" style="margin-bottom:.75rem">
+              <button v-for="lang in ['cURL','Python','JavaScript']" :key="lang"
+                :class="['code-tab', { active: activeCodeTab === lang }]"
+                @click="activeCodeTab = lang">{{ lang }}</button>
+            </div>
+            <pre>{{ activeCodeSnippet }}</pre>
+          </div>
 
           <!-- Try it out -->
           <div v-if="activeTryoutConfig" class="doc-section">
@@ -264,6 +274,156 @@ async function runTryout() {
     state.loading = false
   }
 }
+
+// ── Code Examples ─────────────────────────────────────────────────────────
+const activeCodeTab = ref('cURL')
+
+const codeSnippets = {
+  'list-etfs': {
+    cURL: `curl https://etfdata-production.up.railway.app/etfs \\
+  -H "x-api-key: YOUR_API_KEY"`,
+    Python: `import requests
+
+r = requests.get(
+    "https://etfdata-production.up.railway.app/etfs",
+    headers={"x-api-key": "YOUR_API_KEY"}
+)
+etfs = r.json()`,
+    JavaScript: `const etfs = await fetch(
+  "https://etfdata-production.up.railway.app/etfs",
+  { headers: { "x-api-key": "YOUR_API_KEY" } }
+).then(r => r.json());`,
+  },
+  'get-etf': {
+    cURL: `curl https://etfdata-production.up.railway.app/etfs/{ETF_ID} \\
+  -H "x-api-key: YOUR_API_KEY"`,
+    Python: `import requests
+
+r = requests.get(
+    "https://etfdata-production.up.railway.app/etfs/{ETF_ID}",
+    headers={"x-api-key": "YOUR_API_KEY"}
+)
+etf = r.json()`,
+    JavaScript: `const etf = await fetch(
+  "https://etfdata-production.up.railway.app/etfs/{ETF_ID}",
+  { headers: { "x-api-key": "YOUR_API_KEY" } }
+).then(r => r.json());`,
+  },
+  'holdings': {
+    cURL: `curl https://etfdata-production.up.railway.app/etfs/{ETF_ID}/holdings \\
+  -H "x-api-key: YOUR_API_KEY"`,
+    Python: `import requests
+
+r = requests.get(
+    "https://etfdata-production.up.railway.app/etfs/{ETF_ID}/holdings",
+    headers={"x-api-key": "YOUR_API_KEY"}
+)
+holdings = r.json()
+for h in holdings[:5]:
+    print(h["instrument_name"], h["weight"])`,
+    JavaScript: `const holdings = await fetch(
+  "https://etfdata-production.up.railway.app/etfs/{ETF_ID}/holdings",
+  { headers: { "x-api-key": "YOUR_API_KEY" } }
+).then(r => r.json());`,
+  },
+  'allocations': {
+    cURL: `curl https://etfdata-production.up.railway.app/etfs/{ETF_ID}/allocations \\
+  -H "x-api-key: YOUR_API_KEY"`,
+    Python: `import requests
+
+r = requests.get(
+    "https://etfdata-production.up.railway.app/etfs/{ETF_ID}/allocations",
+    headers={"x-api-key": "YOUR_API_KEY"}
+)
+allocs = r.json()`,
+    JavaScript: `const allocs = await fetch(
+  "https://etfdata-production.up.railway.app/etfs/{ETF_ID}/allocations",
+  { headers: { "x-api-key": "YOUR_API_KEY" } }
+).then(r => r.json());`,
+  },
+  'overlap-post': {
+    cURL: `curl -X POST https://etfdata-production.up.railway.app/analytics/overlap \\
+  -H "x-api-key: YOUR_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{"etf_ids": ["ETF_ID_A", "ETF_ID_B"]}'`,
+    Python: `import requests
+
+r = requests.post(
+    "https://etfdata-production.up.railway.app/analytics/overlap",
+    headers={"x-api-key": "YOUR_API_KEY"},
+    json={"etf_ids": ["ETF_ID_A", "ETF_ID_B"]}
+)
+result = r.json()`,
+    JavaScript: `const result = await fetch(
+  "https://etfdata-production.up.railway.app/analytics/overlap",
+  {
+    method: "POST",
+    headers: {
+      "x-api-key": "YOUR_API_KEY",
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ etf_ids: ["ETF_ID_A", "ETF_ID_B"] })
+  }
+).then(r => r.json());`,
+  },
+  'overlap-get': {
+    cURL: `curl "https://etfdata-production.up.railway.app/analytics/overlap/ETF_ID_A/ETF_ID_B" \\
+  -H "x-api-key: YOUR_API_KEY"`,
+    Python: `import requests
+
+r = requests.get(
+    "https://etfdata-production.up.railway.app/analytics/overlap/ETF_ID_A/ETF_ID_B",
+    headers={"x-api-key": "YOUR_API_KEY"}
+)
+overlap = r.json()`,
+    JavaScript: `const overlap = await fetch(
+  "https://etfdata-production.up.railway.app/analytics/overlap/ETF_ID_A/ETF_ID_B",
+  { headers: { "x-api-key": "YOUR_API_KEY" } }
+).then(r => r.json());`,
+  },
+  'exposure': {
+    cURL: `curl -X POST https://etfdata-production.up.railway.app/analytics/exposure \\
+  -H "x-api-key: YOUR_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{"portfolio": [{"etf_id": "ETF_ID", "weight": 100}]}'`,
+    Python: `import requests
+
+r = requests.post(
+    "https://etfdata-production.up.railway.app/analytics/exposure",
+    headers={"x-api-key": "YOUR_API_KEY"},
+    json={"portfolio": [{"etf_id": "ETF_ID", "weight": 100}]}
+)
+exposure = r.json()`,
+    JavaScript: `const exposure = await fetch(
+  "https://etfdata-production.up.railway.app/analytics/exposure",
+  {
+    method: "POST",
+    headers: {
+      "x-api-key": "YOUR_API_KEY",
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ portfolio: [{ etf_id: "ETF_ID", weight: 100 }] })
+  }
+).then(r => r.json());`,
+  },
+  'similar': {
+    cURL: `curl "https://etfdata-production.up.railway.app/analytics/similar/ETF_ID?top_n=5" \\
+  -H "x-api-key: YOUR_API_KEY"`,
+    Python: `import requests
+
+r = requests.get(
+    "https://etfdata-production.up.railway.app/analytics/similar/ETF_ID",
+    params={"top_n": 5},
+    headers={"x-api-key": "YOUR_API_KEY"}
+)
+similar = r.json()`,
+    JavaScript: `const similar = await fetch(
+  "https://etfdata-production.up.railway.app/analytics/similar/ETF_ID?top_n=5",
+  { headers: { "x-api-key": "YOUR_API_KEY" } }
+).then(r => r.json());`,
+  },
+}
+const activeCodeSnippet = computed(() => codeSnippets[activeId.value]?.[activeCodeTab.value] ?? '')
 
 watch(activeId, (id) => {
   if (tryoutConfigs[id]) {
