@@ -3,25 +3,49 @@
     <!-- Hero -->
     <section class="hero">
       <div class="hero-inner">
-        <div class="hero-badge">◈ ETF Data Platform</div>
+        <div class="hero-badge">ETF Data API</div>
         <h1 class="hero-title">ETF Portfolio<br/><span class="gradient-text">Analytics API</span></h1>
         <p class="hero-sub">
-          Explore ETF holdings, calculate portfolio overlap, analyze sector exposure
-          and find similar funds — all through a clean REST API.
+          Build portfolio tools with clean REST API access to ETF holdings,
+          allocations and overlap analysis. Free demo key, no sign-up.
         </p>
         <div class="hero-actions">
           <button class="btn btn-primary btn-lg" @click="$emit('navigate','etfs')">Browse ETFs</button>
-          <button class="btn btn-outline btn-lg" @click="$emit('navigate','docs')">API Documentation</button>
+          <button class="btn btn-outline btn-lg" @click="$emit('navigate','docs')">View Docs</button>
         </div>
-        <p class="hero-disclaimer">
-          ⚠ For informational purposes only. Not investment advice.
-        </p>
+        <p class="hero-disclaimer">For informational purposes only. Not investment advice.</p>
       </div>
-      <div class="hero-art" aria-hidden="true">
-        <div class="art-ring r1"></div>
-        <div class="art-ring r2"></div>
-        <div class="art-ring r3"></div>
-        <div class="art-center">◈</div>
+      <div class="hero-data" aria-hidden="true">
+        <div class="hd-chrome">
+          <span class="hd-dot hd-r"></span>
+          <span class="hd-dot hd-y"></span>
+          <span class="hd-dot hd-g"></span>
+          <code class="hd-url">GET /etfs &middot; demo key</code>
+        </div>
+        <div class="hd-row">
+          <span class="hd-ticker">SWDA</span>
+          <span class="hd-name">iShares Core MSCI World <span class="hd-pill">Acc</span></span>
+          <span class="hd-ter">0.20%</span>
+        </div>
+        <div class="hd-row">
+          <span class="hd-ticker">CSSPX</span>
+          <span class="hd-name">iShares Core S&amp;P 500 <span class="hd-pill">Acc</span></span>
+          <span class="hd-ter">0.07%</span>
+        </div>
+        <div class="hd-row">
+          <span class="hd-ticker">ISF</span>
+          <span class="hd-name">iShares Core FTSE 100 <span class="hd-pill hd-pill-dist">Dist</span></span>
+          <span class="hd-ter">0.07%</span>
+        </div>
+        <div class="hd-row">
+          <span class="hd-ticker">EXSA</span>
+          <span class="hd-name">iShares Core MSCI EM IMI <span class="hd-pill hd-pill-dist">Dist</span></span>
+          <span class="hd-ter">0.18%</span>
+        </div>
+        <div class="hd-footer">
+          <span class="hd-status">200 OK</span>
+          <span class="hd-count">10 ETFs tracked</span>
+        </div>
       </div>
     </section>
 
@@ -30,13 +54,13 @@
       <div class="page">
         <div class="section-header">
           <h2 class="section-title">What you can do</h2>
-          <p class="section-sub">Explore, analyse, and build with live ETF data</p>
+          <p class="section-sub">Clean data endpoints for developers and researchers</p>
         </div>
         <div class="grid-2">
           <!-- ETF Explorer -->
           <div class="feature-card" @click="$emit('navigate','etfs')">
             <div class="feature-top">
-              <div class="feature-icon">📊</div>
+              <div class="feature-chip fi-etf">ETF</div>
               <div style="flex:1">
                 <h3 class="feature-title">ETF Explorer</h3>
                 <p class="feature-desc">Browse all tracked ETFs, view holdings, allocations and performance metrics.</p>
@@ -52,7 +76,7 @@
           <!-- Exposure Analysis -->
           <div class="feature-card" @click="$emit('navigate','analytics')">
             <div class="feature-top">
-              <div class="feature-icon">🌍</div>
+              <div class="feature-chip fi-geo">GEO</div>
               <div style="flex:1">
                 <h3 class="feature-title">Exposure Analysis</h3>
                 <p class="feature-desc">Analyse sector, country and currency exposure of a custom portfolio.</p>
@@ -68,7 +92,7 @@
           <!-- API Reference -->
           <div class="feature-card" @click="$emit('navigate','docs')">
             <div class="feature-top">
-              <div class="feature-icon">📖</div>
+              <div class="feature-chip fi-api">API</div>
               <div style="flex:1">
                 <h3 class="feature-title">API Reference</h3>
                 <p class="feature-desc">Full documentation with per-endpoint code examples for Python, JavaScript and cURL.</p>
@@ -255,53 +279,101 @@ function switchDemo(key) {
 
 <style scoped>
 .hero {
-  background: linear-gradient(135deg, var(--green-50) 0%, #fff 60%);
+  background: linear-gradient(135deg, var(--green-50) 0%, #fff 55%);
   border-bottom: 1px solid var(--border);
-  padding: 5rem 1.5rem 4rem;
+  padding: 2.5rem 1.5rem;
   display: flex; align-items: center; justify-content: center;
-  gap: 4rem; flex-wrap: wrap; position: relative; overflow: hidden;
+  gap: 3rem; flex-wrap: wrap; overflow: hidden;
 }
-[data-theme="dark"] .hero { background: linear-gradient(135deg, #0a1a0a 0%, #0a0f0a 60%); }
-.hero-inner { max-width: 560px; z-index: 1; }
+[data-theme="dark"] .hero { background: linear-gradient(135deg, #0a1a0a 0%, #0a0f0a 55%); }
+.hero-inner { max-width: 500px; }
 .hero-badge {
-  display: inline-block; padding: .35rem .85rem; border-radius: 20px;
+  display: inline-block; padding: .2rem .65rem; border-radius: 5px;
   background: var(--green-100); color: var(--green-700);
-  font-size: .8rem; font-weight: 600; letter-spacing: .05em;
-  margin-bottom: 1.25rem;
+  font-size: .72rem; font-weight: 700; letter-spacing: .07em; text-transform: uppercase;
+  margin-bottom: 1rem;
 }
-.hero-title { font-size: clamp(2rem, 5vw, 3rem); font-weight: 800; line-height: 1.1; letter-spacing: -.04em; color: var(--text); }
+[data-theme="dark"] .hero-badge { background: #064e3b; color: #6ee7b7; }
+.hero-title { font-size: clamp(1.85rem, 4.5vw, 2.75rem); font-weight: 800; line-height: 1.1; letter-spacing: -.04em; color: var(--text); }
 .gradient-text { background: linear-gradient(135deg, #22c55e, #16a34a); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
-.hero-sub { font-size: 1.05rem; color: var(--text-muted); margin: 1.25rem 0 2rem; line-height: 1.7; }
+.hero-sub { font-size: .95rem; color: var(--text-muted); margin: .85rem 0 1.5rem; line-height: 1.65; }
 .hero-actions { display: flex; gap: .75rem; flex-wrap: wrap; }
-.btn-lg { padding: .7rem 1.5rem; font-size: 1rem; }
-.hero-disclaimer { margin-top: 1.5rem; font-size: .8rem; color: var(--text-muted); }
-.hero-art { position: relative; width: 260px; height: 260px; flex-shrink: 0; }
-.art-ring {
-  position: absolute; border-radius: 50%; border: 2px solid;
-  top: 50%; left: 50%; transform: translate(-50%,-50%);
-  animation: rot 20s linear infinite;
+.btn-lg { padding: .6rem 1.35rem; font-size: .95rem; }
+.hero-disclaimer { margin-top: 1.1rem; font-size: .72rem; color: var(--text-muted); opacity: .8; }
+
+/* Hero data card */
+.hero-data {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); overflow: hidden;
+  box-shadow: var(--shadow-lg); width: 330px; flex-shrink: 0;
 }
-.r1 { width: 260px; height: 260px; border-color: var(--green-200); opacity: .5; }
-.r2 { width: 180px; height: 180px; border-color: var(--green-300); opacity: .6; animation-duration: 14s; animation-direction: reverse; }
-.r3 { width: 100px; height: 100px; border-color: var(--green-400); opacity: .7; animation-duration: 9s; }
-.art-center { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); font-size: 2.5rem; color: var(--green-500); }
-@keyframes rot { to { transform: translate(-50%,-50%) rotate(360deg); } }
+.hd-chrome {
+  display: flex; align-items: center; gap: .45rem;
+  padding: .5rem .8rem;
+  background: var(--bg-2); border-bottom: 1px solid var(--border);
+}
+.hd-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.hd-r { background: #ff5f57; }
+.hd-y { background: #febc2e; }
+.hd-g { background: #28c840; }
+.hd-url {
+  flex: 1; text-align: center; font-size: .65rem;
+  color: var(--text-muted); white-space: nowrap;
+}
+.hd-row {
+  display: flex; align-items: center; gap: .55rem;
+  padding: .55rem .8rem; border-bottom: 1px solid var(--border);
+  font-size: .76rem;
+}
+.hd-ticker { font-family: monospace; font-weight: 700; color: var(--text); min-width: 42px; }
+.hd-name { flex: 1; color: var(--text-muted); font-size: .72rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hd-pill {
+  display: inline-block; font-size: .57rem; font-weight: 700;
+  background: #d1fae5; color: #065f46;
+  padding: .02rem .28rem; border-radius: 5px; margin-left: .25rem; vertical-align: middle;
+}
+.hd-pill-dist { background: #dbeafe; color: #1e40af; }
+[data-theme="dark"] .hd-pill { background: #064e3b; color: #6ee7b7; }
+[data-theme="dark"] .hd-pill-dist { background: #1e3a8a; color: #93c5fd; }
+.hd-ter { font-weight: 600; color: var(--text); font-size: .74rem; flex-shrink: 0; }
+.hd-footer {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: .45rem .8rem; background: var(--bg-2);
+}
+.hd-status {
+  font-size: .66rem; font-weight: 700; color: var(--green-700);
+  background: var(--green-50); border: 1px solid var(--green-200);
+  padding: .07rem .38rem; border-radius: 4px;
+}
+[data-theme="dark"] .hd-status { background: #0d2d0d; border-color: #1a4d1a; color: #4ade80; }
+.hd-count { font-size: .66rem; color: var(--text-muted); }
 .section-header { text-align: center; margin-bottom: 2rem; }
 .section-title { font-size: 1.5rem; font-weight: 700; color: var(--text); letter-spacing: -.03em; }
 .section-sub { color: var(--text-muted); margin-top: .35rem; }
-.features-section { background: var(--bg-2); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 3rem 0; }
+.features-section { background: var(--bg-2); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 2.25rem 0; }
 .feature-card {
   display: flex; flex-direction: column; gap: 0;
   background: var(--surface); border: 1px solid var(--border);
-  border-radius: var(--radius); padding: 1.5rem;
+  border-radius: var(--radius); padding: 1.25rem;
   cursor: pointer; transition: all .2s; box-shadow: var(--shadow);
 }
 .feature-card:hover { border-color: var(--green-400); box-shadow: var(--shadow-md); transform: translateY(-2px); }
-.feature-top { display: flex; align-items: flex-start; gap: 1rem; }
-.feature-icon { font-size: 2rem; flex-shrink: 0; }
-.feature-title { font-size: 1rem; font-weight: 600; color: var(--text); margin-bottom: .25rem; }
-.feature-desc { font-size: .875rem; color: var(--text-muted); line-height: 1.5; }
-.feature-arrow { margin-left: auto; font-size: 1.25rem; color: var(--green-400); flex-shrink: 0; align-self: center; }
+.feature-top { display: flex; align-items: flex-start; gap: .85rem; }
+.feature-chip {
+  display: flex; align-items: center; justify-content: center;
+  width: 38px; height: 38px; border-radius: 8px;
+  font-size: .65rem; font-weight: 800; letter-spacing: .06em;
+  flex-shrink: 0; font-family: monospace;
+}
+.fi-etf { background: var(--green-100); color: var(--green-700); }
+.fi-geo { background: #dbeafe; color: #1d4ed8; }
+.fi-api { background: #f3e8ff; color: #7e22ce; }
+[data-theme="dark"] .fi-etf { background: #064e3b; color: #6ee7b7; }
+[data-theme="dark"] .fi-geo { background: #1e3a8a; color: #93c5fd; }
+[data-theme="dark"] .fi-api { background: #3b0764; color: #d8b4fe; }
+.feature-title { font-size: .95rem; font-weight: 600; color: var(--text); margin-bottom: .2rem; }
+.feature-desc { font-size: .83rem; color: var(--text-muted); line-height: 1.5; }
+.feature-arrow { margin-left: auto; font-size: 1rem; color: var(--green-400); flex-shrink: 0; align-self: center; padding-left: .25rem; }
 .feature-preview { border-top: 1px solid var(--border); margin-top: 1rem; padding-top: .85rem; }
 .fp-etf-row { display: flex; align-items: center; gap: .4rem; padding: .25rem 0; border-bottom: 1px solid var(--border); font-size: .75rem; }
 .fp-etf-row:last-child { border-bottom: none; }
