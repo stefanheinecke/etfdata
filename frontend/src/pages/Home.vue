@@ -162,6 +162,7 @@ onMounted(async () => {
   } finally {
     statsLoading.value = false
   }
+  fetchDemo('etfs')
 })
 
 const features = [
@@ -228,30 +229,60 @@ watch(activeTab, val => {
   currentCode.value = codeTabs.find(t => t.label === val)?.code ?? ''
 })
 
-// Demo try-out
-const tryoutLoading = ref(false)
-const tryoutResult = ref('')
-const tryoutError = ref('')
+// Live API Explorer
+const swdaId = ref(null)
+const activeDemo = ref('etfs')
+const demoEndpoints = [
+  { key: 'etfs',        short: '/etfs' },
+  { key: 'holdings',    short: '/etfs/{id}/holdings' },
+  { key: 'allocations', short: '/etfs/{id}/allocations' },
+]
+const demoStates = ref({
+  etfs:        { loading: false, result: null, error: null },
+  holdings:    { loading: false, result: null, error: null },
+  allocations: { loading: false, result: null, error: null },
+})
+const currentDemo = computed(() => demoStates.value[activeDemo.value])
 
-async function runDemo() {
-  tryoutLoading.value = true
-  tryoutResult.value = ''
-  tryoutError.value = ''
+async function fetchDemo(key) {
+  const state = demoStates.value[key]
+  if (state.result !== null || state.loading) return
+  state.loading = true; state.error = null
   try {
-    const res = await axios.get(`${API_BASE}/etfs`, {
-      headers: { 'x-api-key': 'demo' }
-    })
-    const etf = res.data[0]
-    if (etf) {
-      tryoutResult.value = JSON.stringify(etf, null, 2)
+    let url
+    if (key === 'etfs') {
+      url = `${API_BASE}/etfs`
     } else {
-      tryoutError.value = 'No data returned — SWDA may not be imported yet.'
+      if (!swdaId.value) {
+        const r = await axios.get(`${API_BASE}/etfs`, { headers: { 'x-api-key': 'demo' } })
+        swdaId.value = r.data[0]?.id ?? null
+        if (!demoStates.value.etfs.result && r.data[0]) {
+          demoStates.value.etfs.result = JSON.stringify(r.data[0], null, 2)
+        }
+      }
+      url = `${API_BASE}/etfs/${swdaId.value}/${key}`
+    }
+    const res = await axios.get(url, { headers: { 'x-api-key': 'demo' } })
+    const data = res.data
+    if (key === 'etfs') {
+      state.result = data[0] ? JSON.stringify(data[0], null, 2) : '[]'
+      if (!swdaId.value) swdaId.value = data[0]?.id ?? null
+    } else if (Array.isArray(data)) {
+      state.result = JSON.stringify(data.slice(0, 5), null, 2) +
+        (data.length > 5 ? `\n// … ${data.length - 5} more items` : '')
+    } else {
+      state.result = JSON.stringify(data, null, 2)
     }
   } catch (e) {
-    tryoutError.value = e?.response?.data?.detail || 'Request failed. Is the API reachable?'
+    state.error = e?.response?.data?.detail || 'Request failed. Is the API reachable?'
   } finally {
-    tryoutLoading.value = false
+    state.loading = false
   }
+}
+
+function switchDemo(key) {
+  activeDemo.value = key
+  fetchDemo(key)
 }
 </script>
 
@@ -347,6 +378,32 @@ async function runDemo() {
 }
 .tryout-result { display: flex; flex-direction: column; gap: .5rem; }
 .tryout-result-header { display: flex; align-items: center; gap: 1rem; }
+.demo-tabs { display:flex; gap:.4rem; flex-wrap:wrap; }
+.demo-tab {
+  display:flex; align-items:center; gap:.35rem;
+  background:var(--bg-3); border:1px solid var(--border);
+  cursor:pointer; padding:.3rem .85rem; border-radius:20px;
+  font-size:.78rem; font-weight:500; color:var(--text-muted);
+  font-family:inherit; transition:all .15s;
+}
+.demo-tab:hover { border-color:var(--green-400); color:var(--text); }
+.demo-tab.active { background:var(--green-100); border-color:var(--green-400); color:var(--green-700); font-weight:600; }
+[data-theme="dark"] .demo-tab.active { background:#0d2d0d; border-color:#1a5c1a; color:#4ade80; }
+.demo-method { font-weight:700; font-size:.65rem; color:#1d4ed8; background:#dbeafe; padding:.05rem .3rem; border-radius:3px; flex-shrink:0; }
+[data-theme="dark"] .demo-method { background:#1e3a8a; color:#93c5fd; }
+.demo-tabs { display:flex; gap:.4rem; flex-wrap:wrap; }
+.demo-tab {
+  display:flex; align-items:center; gap:.35rem;
+  background:var(--bg-3); border:1px solid var(--border);
+  cursor:pointer; padding:.3rem .85rem; border-radius:20px;
+  font-size:.78rem; font-weight:500; color:var(--text-muted);
+  font-family:inherit; transition:all .15s;
+}
+.demo-tab:hover { border-color:var(--green-400); color:var(--text); }
+.demo-tab.active { background:var(--green-100); border-color:var(--green-400); color:var(--green-700); font-weight:600; }
+[data-theme="dark"] .demo-tab.active { background:#0d2d0d; border-color:#1a5c1a; color:#4ade80; }
+.demo-method { font-weight:700; font-size:.65rem; color:#1d4ed8; background:#dbeafe; padding:.05rem .3rem; border-radius:3px; flex-shrink:0; }
+[data-theme="dark"] .demo-method { background:#1e3a8a; color:#93c5fd; }
 .tryout-status {
   background: var(--green-50); border: 1px solid var(--green-200);
   color: var(--green-700); font-size: .75rem; font-weight: 700;

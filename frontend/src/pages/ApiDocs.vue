@@ -73,37 +73,30 @@
             <pre>{{ active.body }}</pre>
           </div>
 
-          <!-- Response -->
-          <div v-if="active.response" class="doc-section">
-            <h3 class="doc-section-title">Example Response</h3>
-            <pre>{{ active.response }}</pre>
-          </div>
 
           <!-- Try it out -->
           <div v-if="activeTryoutConfig" class="doc-section">
             <h3 class="doc-section-title">
-              Try it out
+              Live Response
               <code class="demo-key-pill">x-api-key: demo</code>
             </h3>
-            <p class="doc-section-body">
-              Executes a live request using the public demo key — returns SWDA data only.
-            </p>
-            <button class="btn btn-primary try-btn" :disabled="activeTryout.loading" @click="runTryout">
-              {{ activeTryout.loading ? 'Loading\u2026' : '\u25b6\u2002Execute' }}
-            </button>
-            <transition name="fade">
-              <div v-if="activeTryout.result || activeTryout.error" class="tryout-response">
+            <div class="tryout-response">
+              <div v-if="activeTryout.loading" style="display:flex;align-items:center;gap:.6rem;color:var(--text-muted);font-size:.875rem;padding:.35rem 0">
+                <div class="spinner" style="width:14px;height:14px;border-width:2px"></div> Loading live data…
+              </div>
+              <template v-else-if="activeTryout.result || activeTryout.error">
                 <div class="tryout-resp-header">
                   <span :class="['tryout-status-badge',
                     (activeTryout.status >= 200 && activeTryout.status < 300) ? 'status-ok' : 'status-err']">
                     {{ activeTryout.status }}
                   </span>
-                  <span class="tryout-live-label">live response</span>
+                  <span class="tryout-live-label">live · SWDA · demo key</span>
+                  <button class="refresh-btn" @click="runTryout" :disabled="activeTryout.loading" title="Re-run">↺ Refresh</button>
                 </div>
                 <pre v-if="activeTryout.result" class="tryout-pre">{{ activeTryout.result }}</pre>
                 <div v-if="activeTryout.error" class="tryout-error-msg">{{ activeTryout.error }}</div>
-              </div>
-            </transition>
+              </template>
+            </div>
           </div>
         </div>
       </div>
@@ -127,7 +120,7 @@
 </template>
 
 <script setup>
-import { ref, computed, inject } from 'vue'
+import { ref, computed, inject, watch } from 'vue'
 import axios from 'axios'
 const BASE = 'https://etfdata-production.up.railway.app'
 
@@ -147,7 +140,6 @@ const groups = [
           {name:'limit',in:'query',type:'integer',required:false,desc:'Max records to return (default 50)'},
           {name:'provider',in:'query',type:'string',required:false,desc:'Filter by provider name'},
         ],
-        response: `[\n  {\n    "id": "uuid",\n    "isin": "IE00B4L5Y983",\n    "ticker": "VWRL",\n    "name": "Vanguard FTSE All-World",\n    "provider": "Vanguard",\n    "ter": 0.22,\n    "fund_size": 15000000000,\n    "currency": "EUR"\n  }\n]`,
       },
       { id: 'get-etf', method: 'GET', short: '/etfs/{id}', path: '/etfs/{etf_id}',
         title: 'Get ETF by ID', desc: 'Returns full details of a single ETF.',
@@ -160,7 +152,6 @@ const groups = [
           {name:'etf_id',in:'path',type:'UUID',required:true,desc:'The ETF UUID'},
           {name:'date',in:'query',type:'date',required:false,desc:'Date in YYYY-MM-DD format'},
         ],
-        response: `[\n  {\n    "id": "uuid",\n    "instrument_isin": "US0378331005",\n    "instrument_name": "Apple Inc.",\n    "weight": 4.23,\n    "country": "US",\n    "sector": "Technology"\n  }\n]`,
       },
       { id: 'allocations', method: 'GET', short: '/etfs/{id}/allocations', path: '/etfs/{etf_id}/allocations',
         title: 'Get Allocations', desc: 'Returns sector, country and currency allocations for an ETF.',
@@ -179,7 +170,6 @@ const groups = [
       { id: 'overlap-post', method: 'POST', short: '/analytics/overlap', path: '/analytics/overlap',
         title: 'Multi-ETF Overlap', desc: 'Calculates the holdings overlap matrix between multiple ETFs.',
         body: `{\n  "etf_ids": ["uuid-a", "uuid-b", "uuid-c"],\n  "date": "2026-05-24"  // optional\n}`,
-        response: `{\n  "matrix": {\n    "uuid-a": {\n      "uuid-b": {"common_count":14,"overlap_percentage":46.7}\n    }\n  },\n  "common_holdings": [\n    {"isin":"US0378331005","name":"Apple Inc."}\n  ]\n}`,
       },
       { id: 'overlap-get', method: 'GET', short: '/analytics/overlap/{a}/{b}', path: '/analytics/overlap/{etf_a}/{etf_b}',
         title: 'Pairwise Overlap', desc: 'Quick overlap calculation between exactly two ETFs.',
@@ -193,7 +183,6 @@ const groups = [
       { id: 'exposure', method: 'POST', short: '/analytics/exposure', path: '/analytics/exposure',
         title: 'Portfolio Exposure', desc: 'Analyses the combined sector, country and currency exposure of a weighted portfolio of ETFs.',
         body: `{\n  "portfolio": [\n    {"etf_id": "uuid-a", "weight": 60},\n    {"etf_id": "uuid-b", "weight": 40}\n  ]\n}`,
-        response: `{\n  "sectors": {"Technology": 28.4, "Healthcare": 12.1},\n  "countries": {"US": 65.2, "DE": 8.3},\n  "currencies": {"USD": 70.1, "EUR": 18.2}\n}`,
       },
       { id: 'similar', method: 'GET', short: '/analytics/similar/{id}', path: '/analytics/similar/{etf_id}',
         title: 'Find Similar ETFs', desc: 'Returns the top N most similar ETFs to a reference ETF based on holdings overlap.',
@@ -275,6 +264,13 @@ async function runTryout() {
     state.loading = false
   }
 }
+
+watch(activeId, (id) => {
+  if (tryoutConfigs[id]) {
+    const state = getTryoutState(id)
+    if (!state.result && !state.loading) runTryout()
+  }
+}, { immediate: true })
 </script>
 
 <style scoped>
@@ -314,6 +310,14 @@ async function runTryout() {
 
 /* Try it out */
 .try-btn { width: fit-content; margin-bottom: .75rem; }
+.refresh-btn {
+  background: none; border: 1px solid var(--border); cursor: pointer;
+  padding: .15rem .55rem; border-radius: 6px; font-size: .75rem;
+  color: var(--text-muted); font-family: inherit; transition: all .15s;
+  margin-left: auto;
+}
+.refresh-btn:hover:not(:disabled) { border-color: var(--green-400); color: var(--green-600); }
+.refresh-btn:disabled { opacity: .5; cursor: not-allowed; }
 .demo-key-pill {
   display: inline-block; background: var(--green-50); border: 1px solid var(--green-200);
   color: var(--green-700); padding: .1rem .5rem; border-radius: 20px;
