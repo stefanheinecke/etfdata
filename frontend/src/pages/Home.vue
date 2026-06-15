@@ -45,12 +45,12 @@
               <div class="hd-alloc-row"><span class="hd-alloc-lbl">Asia Pacific</span><div class="hd-bar-track"><div class="hd-bar" style="width:10%"></div></div><span class="hd-alloc-val">10%</span></div>
               <div class="hd-footer"><span class="hd-status">200 OK</span><span class="hd-count">country breakdown</span></div>
             </template>
-            <!-- Slide 3: Overlap -->
+            <!-- Slide 3: Portfolio Exposure -->
             <template v-else>
-              <div class="hd-row"><span class="hd-overlap-pct">67.3%</span><span class="hd-overlap-desc">holdings overlap &middot; SWDA vs CSSPX</span></div>
-              <div class="hd-row"><span class="hd-rank">#1</span><span class="hd-hold-name">Apple Inc.</span><span class="hd-ter">5.81%</span></div>
-              <div class="hd-row"><span class="hd-rank">#2</span><span class="hd-hold-name">Microsoft Corp.</span><span class="hd-ter">5.43%</span></div>
-              <div class="hd-footer"><span class="hd-status">200 OK</span><span class="hd-count">503 shared holdings</span></div>
+              <div class="hd-expo-header"><span class="hd-expo-port">SWDA 60% + CSSPX 40%</span><span class="hd-expo-lbl">portfolio</span></div>
+              <div class="hd-alloc-row"><span class="hd-alloc-lbl">North America</span><div class="hd-bar-track"><div class="hd-bar" style="width:72%"></div></div><span class="hd-alloc-val">72%</span></div>
+              <div class="hd-alloc-row"><span class="hd-alloc-lbl">Technology</span><div class="hd-bar-track"><div class="hd-bar hd-bar-sec" style="width:28%"></div></div><span class="hd-alloc-val">28%</span></div>
+              <div class="hd-footer"><span class="hd-status">200 OK</span><span class="hd-count">exposure analysis</span></div>
             </template>
           </div>
         </transition>
@@ -190,7 +190,7 @@ const carouselSlides = [
   { label: 'GET /etfs' },
   { label: 'GET /etfs/{id}/holdings' },
   { label: 'GET /etfs/{id}/allocations' },
-  { label: 'POST /analytics/overlap' },
+  { label: 'POST /analytics/exposure' },
 ]
 let _carouselTimer = null
 
@@ -311,35 +311,35 @@ function switchDemo(key) {
 .hero {
   background: linear-gradient(135deg, var(--green-50) 0%, #fff 55%);
   border-bottom: 1px solid var(--border);
-  padding: 2.5rem 1.5rem;
+  padding: 1.5rem 1.5rem;
   display: flex; align-items: center; justify-content: center;
-  gap: 3rem; flex-wrap: wrap; overflow: hidden;
+  gap: 2.5rem; flex-wrap: wrap; overflow: hidden;
 }
 [data-theme="dark"] .hero { background: linear-gradient(135deg, #0a1a0a 0%, #0a0f0a 55%); }
 .hero-inner { max-width: 500px; }
 .hero-badge {
-  display: inline-block; padding: .2rem .65rem; border-radius: 5px;
+  display: inline-block; padding: .15rem .55rem; border-radius: 5px;
   background: var(--green-100); color: var(--green-700);
-  font-size: .72rem; font-weight: 700; letter-spacing: .07em; text-transform: uppercase;
-  margin-bottom: 1rem;
+  font-size: .68rem; font-weight: 700; letter-spacing: .07em; text-transform: uppercase;
+  margin-bottom: .6rem;
 }
 [data-theme="dark"] .hero-badge { background: #064e3b; color: #6ee7b7; }
-.hero-title { font-size: clamp(1.85rem, 4.5vw, 2.75rem); font-weight: 800; line-height: 1.1; letter-spacing: -.04em; color: var(--text); }
+.hero-title { font-size: clamp(1.5rem, 3.5vw, 2.1rem); font-weight: 800; line-height: 1.1; letter-spacing: -.04em; color: var(--text); }
 .gradient-text { background: linear-gradient(135deg, #22c55e, #16a34a); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
-.hero-sub { font-size: .95rem; color: var(--text-muted); margin: .85rem 0 1.5rem; line-height: 1.65; }
+.hero-sub { font-size: .875rem; color: var(--text-muted); margin: .6rem 0 1rem; line-height: 1.55; }
 .hero-actions { display: flex; gap: .75rem; flex-wrap: wrap; }
-.btn-lg { padding: .6rem 1.35rem; font-size: .95rem; }
-.hero-disclaimer { margin-top: 1.1rem; font-size: .72rem; color: var(--text-muted); opacity: .8; }
+.btn-lg { padding: .5rem 1.1rem; font-size: .875rem; }
+.hero-disclaimer { margin-top: .7rem; font-size: .68rem; color: var(--text-muted); opacity: .8; }
 
 /* Hero API carousel */
 .hero-carousel {
   background: var(--surface); border: 1px solid var(--border);
   border-radius: var(--radius); overflow: hidden;
-  box-shadow: var(--shadow-lg); width: 340px; flex-shrink: 0;
+  box-shadow: var(--shadow-lg); width: 300px; flex-shrink: 0;
 }
 .hd-chrome {
   display: flex; align-items: center; gap: .45rem;
-  padding: .5rem .8rem;
+  padding: .35rem .7rem;
   background: var(--bg-2); border-bottom: 1px solid var(--border);
 }
 .hd-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
@@ -352,7 +352,7 @@ function switchDemo(key) {
 }
 .hd-row {
   display: flex; align-items: center; gap: .55rem;
-  padding: .55rem .8rem; border-bottom: 1px solid var(--border);
+  padding: .38rem .7rem; border-bottom: 1px solid var(--border);
   font-size: .76rem;
 }
 .hd-ticker { font-family: monospace; font-weight: 700; color: var(--text); min-width: 42px; }
@@ -368,7 +368,7 @@ function switchDemo(key) {
 .hd-ter { font-weight: 600; color: var(--text); font-size: .74rem; flex-shrink: 0; }
 .hd-footer {
   display: flex; align-items: center; justify-content: space-between;
-  padding: .45rem .8rem; background: var(--bg-2);
+  padding: .3rem .7rem; background: var(--bg-2);
 }
 .hd-status {
   font-size: .66rem; font-weight: 700; color: var(--green-700);
@@ -381,7 +381,7 @@ function switchDemo(key) {
 .hc-body { min-height: 124px; }
 .hc-dots {
   display: flex; align-items: center; justify-content: center; gap: .4rem;
-  padding: .45rem; border-top: 1px solid var(--border); background: var(--bg-2);
+  padding: .3rem; border-top: 1px solid var(--border); background: var(--bg-2);
 }
 .hc-dot-btn {
   width: 6px; height: 6px; border-radius: 50%;
@@ -398,22 +398,27 @@ function switchDemo(key) {
 /* Allocations slide */
 .hd-alloc-row {
   display: flex; align-items: center; gap: .5rem;
-  padding: .55rem .8rem; border-bottom: 1px solid var(--border);
+  padding: .38rem .7rem; border-bottom: 1px solid var(--border);
 }
 .hd-alloc-lbl { font-size: .71rem; color: var(--text-muted); width: 90px; flex-shrink: 0; }
 .hd-bar-track { flex: 1; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
 .hd-bar { height: 100%; background: var(--green-500); border-radius: 2px; }
 .hd-alloc-val { font-size: .69rem; font-weight: 600; color: var(--text); width: 26px; text-align: right; flex-shrink: 0; }
-/* Overlap slide */
-.hd-overlap-pct { font-size: 1.05rem; font-weight: 800; color: var(--green-600); flex-shrink: 0; }
-.hd-overlap-desc { flex: 1; font-size: .7rem; color: var(--text-muted); padding-left: .3rem; }
+/* Overlap/exposure slide */
+.hd-expo-header {
+  display: flex; align-items: baseline; justify-content: space-between;
+  padding: .38rem .7rem; border-bottom: 1px solid var(--border);
+}
+.hd-expo-port { font-family: monospace; font-size: .72rem; font-weight: 700; color: var(--text); }
+.hd-expo-lbl { font-size: .65rem; color: var(--text-muted); }
+.hd-bar-sec { background: #6366f1; }
 /* Live API Explorer button */
 .hero-live-btn {
   display: inline-flex; align-items: center; gap: .45rem;
-  margin-top: .9rem;
+  margin-top: .6rem;
   background: var(--green-50); border: 1px solid var(--green-200);
-  color: var(--green-700); font-size: .8rem; font-weight: 600;
-  padding: .45rem 1rem; border-radius: 8px;
+  color: var(--green-700); font-size: .75rem; font-weight: 600;
+  padding: .35rem .85rem; border-radius: 8px;
   cursor: pointer; font-family: inherit; transition: all .15s;
 }
 .hero-live-btn:hover { background: var(--green-100); border-color: var(--green-400); }
