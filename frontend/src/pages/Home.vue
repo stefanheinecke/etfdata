@@ -5,7 +5,7 @@
       <div class="hero-inner">
         <div class="hero-badge">ETF Data API</div>
         <h1 class="hero-title">ETF Portfolio<br/><span class="gradient-text">Analytics API</span></h1>
-        <p class="hero-sub">Real ETF data via REST API. Query holdings, allocations and overlap analysis. Free demo key.</p>
+        <p class="hero-sub">Real ETF data via REST API. Query holdings, allocations and portfolio exposure analysis. Free demo key.</p>
         <div class="hero-actions">
           <button class="btn btn-primary btn-lg" @click="$emit('navigate','etfs')">Browse ETFs</button>
           <button class="btn btn-outline btn-lg" @click="$emit('navigate','docs')">View Docs</button>
