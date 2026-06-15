@@ -1,6 +1,6 @@
 import axios from 'axios'
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://etfdata-production.up.railway.app'
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://api.goetf.ch'
 
 function getApiKey() {
   return localStorage.getItem('api_key') || ''

@@ -15,7 +15,7 @@ def is_email_configured() -> bool:
     return bool(os.getenv("RESEND_API_KEY") and os.getenv("RESEND_FROM_EMAIL"))
 
 
-def send_api_key_email(to_email: str, api_key: str, app_name: str = "ETF Data API") -> None:
+def send_api_key_email(to_email: str, api_key: str, app_name: str = "GoETF.ch API") -> None:
     """Send the newly created API key via Resend.
 
     Raises RuntimeError if credentials are missing.
@@ -75,7 +75,7 @@ def send_confirmation_email(
     to_email: str,
     confirm_url: str,
     is_replacement: bool,
-    app_name: str = "ETF Data API",
+    app_name: str = "GoETF.ch API",
 ) -> None:
     """Send a confirmation email with a button to claim (or replace) an API key."""
     resend_key = os.getenv("RESEND_API_KEY", "")

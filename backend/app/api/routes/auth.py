@@ -21,7 +21,7 @@ from app.schemas import APIKey, PendingKeyRequest
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
-_APP_NAME = "ETF Data API"
+_APP_NAME = "GoETF.ch API"
 
 
 # ── HTML templates ────────────────────────────────────────────────────────────
@@ -91,7 +91,7 @@ def request_key(email: str, db: Session = Depends(get_db)):
         db.commit()
 
         # Build the confirmation URL (backend endpoint — returns an HTML page)
-        base_url    = os.getenv("API_BASE_URL", "https://etfdata-production.up.railway.app")
+        base_url    = os.getenv("API_BASE_URL", "https://api.goetf.ch")
         confirm_url = f"{base_url}/auth/confirm-key?token={token}"
 
         try:

@@ -5,7 +5,7 @@
       <div class="nav-inner">
         <div class="nav-brand" @click="currentPage = 'home'">
           <span class="brand-icon">◈</span>
-          <span class="brand-name">ETF Data</span>
+          <span class="brand-name">GoETF.ch</span>
         </div>
         <ul class="nav-links">
           <li v-for="item in navItems" :key="item.id">
@@ -55,7 +55,7 @@
 
     <!-- Disclaimer -->
     <div class="disclaimer-bar">
-      ⚠ Disclaimer: ETF Data is for informational purposes only. Nothing on this platform constitutes financial or investment advice.
+      ⚠ Disclaimer: GoETF.ch is for informational purposes only. Nothing on this platform constitutes financial or investment advice.
       Past performance is not indicative of future results. Always consult a qualified financial adviser before making investment decisions.
     </div>
 
@@ -64,7 +64,7 @@
       <div class="footer-inner">
         <div class="footer-brand">
           <span class="brand-icon">◈</span>
-          <strong>ETF Data</strong>
+          <strong>GoETF.ch</strong>
         </div>
         <div class="footer-links">
           <button @click="currentPage = 'home'">Home</button>
@@ -74,7 +74,7 @@
           <button v-if="adminActive" @click="currentPage = 'admin'">Admin</button>
           <button v-else @click="showAdminLogin = true" class="admin-lock-btn" title="Admin login">🔒</button>
         </div>
-        <p class="footer-copy">© {{ new Date().getFullYear() }} ETF Data. Not investment advice.</p>
+        <p class="footer-copy">© {{ new Date().getFullYear() }} GoETF.ch. Not investment advice.</p>
       </div>
     </footer>
     <!-- Get API Key Modal -->

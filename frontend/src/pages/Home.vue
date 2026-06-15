@@ -3,7 +3,7 @@
     <!-- Hero -->
     <section class="hero">
       <div class="hero-inner">
-        <div class="hero-badge">ETF Data API</div>
+        <div class="hero-badge">GoETF.ch API</div>
         <h1 class="hero-title">ETF Portfolio<br/><span class="gradient-text">Analytics API</span></h1>
         <p class="hero-sub">Real ETF data via REST API. Query holdings, allocations and portfolio exposure analysis. Free demo key.</p>
         <div class="hero-actions">
@@ -165,9 +165,9 @@
       <div class="disclaimer-card">
         <h3>📋 Important Disclaimer</h3>
         <p>
-          ETF Data is provided strictly for <strong>informational and educational purposes</strong>.
+          GoETF.ch is provided strictly for <strong>informational and educational purposes</strong>.
           None of the data, analysis, or tools on this platform constitute financial, investment,
-          legal, or tax advice. ETF Data does not recommend any specific ETF, fund, or investment
+          legal, or tax advice. GoETF.ch does not recommend any specific ETF, fund, or investment
           strategy. Past performance is not indicative of future results. Investment in ETFs involves
           risk, including the possible loss of principal. Always consult a qualified financial adviser,
           accountant, or legal professional before making any investment decisions.
@@ -181,7 +181,7 @@
 import { ref, computed, onMounted, onUnmounted, inject } from 'vue'
 import axios from 'axios'
 
-const API_BASE = import.meta.env.VITE_API_URL || 'https://etfdata-production.up.railway.app'
+const API_BASE = import.meta.env.VITE_API_URL || 'https://api.goetf.ch'
 
 defineEmits(['navigate'])
 
@@ -212,18 +212,18 @@ const codeTabs = [
   {
     label: 'cURL', code:
 `# List all ETFs
-curl https://etfdata-production.up.railway.app/etfs \\
+curl https://api.goetf.ch/etfs \\
   -H "x-api-key: YOUR_API_KEY"
 
 # Overlap between two ETFs
-curl https://etfdata-production.up.railway.app/analytics/overlap/ETF_A/ETF_B \\
+curl https://api.goetf.ch/analytics/overlap/ETF_A/ETF_B \\
   -H "x-api-key: YOUR_API_KEY"`
   },
   {
     label: 'Python', code:
 `import requests
 
-BASE = "https://etfdata-production.up.railway.app"
+BASE = "https://api.goetf.ch"
 HEADERS = {"x-api-key": "YOUR_API_KEY"}
 
 # List ETFs
@@ -237,7 +237,7 @@ overlap = requests.get(
   },
   {
     label: 'JavaScript', code:
-`const BASE = "https://etfdata-production.up.railway.app";
+`const BASE = "https://api.goetf.ch";
 const HEADERS = { "x-api-key": "YOUR_API_KEY" };
 
 // List ETFs
