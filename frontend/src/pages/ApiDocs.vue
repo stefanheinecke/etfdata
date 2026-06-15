@@ -73,16 +73,6 @@
             <pre>{{ active.body }}</pre>
           </div>
 
-          <!-- Examples -->
-          <div class="doc-section">
-            <h3 class="doc-section-title">Examples</h3>
-            <div class="code-tabs" style="margin-bottom:.75rem">
-              <button v-for="lang in langs" :key="lang"
-                :class="['code-tab',{active:activeLang===lang}]" @click="activeLang=lang">{{ lang }}</button>
-            </div>
-            <pre>{{ active.examples[activeLang] }}</pre>
-          </div>
-
           <!-- Response -->
           <div v-if="active.response" class="doc-section">
             <h3 class="doc-section-title">Example Response</h3>
@@ -144,8 +134,6 @@ const BASE = 'https://etfdata-production.up.railway.app'
 const showApiKeyModal = inject('showApiKeyModal')
 const hasApiKey = ref(!!localStorage.getItem('api_key'))
 window.addEventListener('storage', e => { if (e.key === 'api_key') hasApiKey.value = !!e.newValue })
-const langs = ['cURL', 'Python', 'JavaScript']
-const activeLang = ref('cURL')
 const activeId = ref('list-etfs')
 
 const groups = [
@@ -159,21 +147,12 @@ const groups = [
           {name:'limit',in:'query',type:'integer',required:false,desc:'Max records to return (default 50)'},
           {name:'provider',in:'query',type:'string',required:false,desc:'Filter by provider name'},
         ],
-        examples: {
-          'cURL': `curl "${BASE}/etfs?limit=10" \\\n  -H "x-api-key: YOUR_KEY"`,
-          'Python': `import requests\nr = requests.get("${BASE}/etfs", params={"limit":10},\n    headers={"x-api-key":"YOUR_KEY"})\nprint(r.json())`,
-          'JavaScript': `const r = await fetch("${BASE}/etfs?limit=10",\n  {headers:{"x-api-key":"YOUR_KEY"}})\nconsole.log(await r.json())`,
-        },
         response: `[\n  {\n    "id": "uuid",\n    "isin": "IE00B4L5Y983",\n    "ticker": "VWRL",\n    "name": "Vanguard FTSE All-World",\n    "provider": "Vanguard",\n    "ter": 0.22,\n    "fund_size": 15000000000,\n    "currency": "EUR"\n  }\n]`,
       },
       { id: 'get-etf', method: 'GET', short: '/etfs/{id}', path: '/etfs/{etf_id}',
         title: 'Get ETF by ID', desc: 'Returns full details of a single ETF.',
         params: [{name:'etf_id',in:'path',type:'UUID',required:true,desc:'The ETF UUID'}],
-        examples: {
-          'cURL': `curl "${BASE}/etfs/ETF_UUID" \\\n  -H "x-api-key: YOUR_KEY"`,
-          'Python': `r = requests.get(f"${BASE}/etfs/{'{ETF_UUID}'}",\n    headers={"x-api-key":"YOUR_KEY"})`,
-          'JavaScript': `const r = await fetch(\`${BASE}/etfs/\${id}\`,\n  {headers:{"x-api-key":"YOUR_KEY"}})`,
-        },
+
       },
       { id: 'holdings', method: 'GET', short: '/etfs/{id}/holdings', path: '/etfs/{etf_id}/holdings',
         title: 'Get Holdings', desc: 'Returns all holdings for an ETF on a given date (defaults to latest available date).',
@@ -181,11 +160,6 @@ const groups = [
           {name:'etf_id',in:'path',type:'UUID',required:true,desc:'The ETF UUID'},
           {name:'date',in:'query',type:'date',required:false,desc:'Date in YYYY-MM-DD format'},
         ],
-        examples: {
-          'cURL': `curl "${BASE}/etfs/ETF_UUID/holdings" \\\n  -H "x-api-key: YOUR_KEY"`,
-          'Python': `r = requests.get(f"${BASE}/etfs/{'{id}'}/holdings",\n    headers={"x-api-key":"YOUR_KEY"})`,
-          'JavaScript': `const r = await fetch(\`${BASE}/etfs/\${id}/holdings\`,\n  {headers:{"x-api-key":"YOUR_KEY"}})`,
-        },
         response: `[\n  {\n    "id": "uuid",\n    "instrument_isin": "US0378331005",\n    "instrument_name": "Apple Inc.",\n    "weight": 4.23,\n    "country": "US",\n    "sector": "Technology"\n  }\n]`,
       },
       { id: 'allocations', method: 'GET', short: '/etfs/{id}/allocations', path: '/etfs/{etf_id}/allocations',
@@ -195,11 +169,7 @@ const groups = [
           {name:'type',in:'query',type:'string',required:false,desc:'Filter: sector | country | currency'},
           {name:'date',in:'query',type:'date',required:false,desc:'Date in YYYY-MM-DD format'},
         ],
-        examples: {
-          'cURL': `curl "${BASE}/etfs/ETF_UUID/allocations?type=sector" \\\n  -H "x-api-key: YOUR_KEY"`,
-          'Python': `r = requests.get(f"${BASE}/etfs/{'{id}'}/allocations",\n    params={"type":"sector"},\n    headers={"x-api-key":"YOUR_KEY"})`,
-          'JavaScript': `const r = await fetch(\`${BASE}/etfs/\${id}/allocations?type=sector\`,\n  {headers:{"x-api-key":"YOUR_KEY"}})`,
-        },
+
       },
     ]
   },
@@ -209,11 +179,6 @@ const groups = [
       { id: 'overlap-post', method: 'POST', short: '/analytics/overlap', path: '/analytics/overlap',
         title: 'Multi-ETF Overlap', desc: 'Calculates the holdings overlap matrix between multiple ETFs.',
         body: `{\n  "etf_ids": ["uuid-a", "uuid-b", "uuid-c"],\n  "date": "2026-05-24"  // optional\n}`,
-        examples: {
-          'cURL': `curl -X POST "${BASE}/analytics/overlap" \\\n  -H "x-api-key: YOUR_KEY" \\\n  -H "Content-Type: application/json" \\\n  -d '{"etf_ids":["ID_A","ID_B"]}'`,
-          'Python': `r = requests.post("${BASE}/analytics/overlap",\n    json={"etf_ids":["ID_A","ID_B"]},\n    headers={"x-api-key":"YOUR_KEY"})`,
-          'JavaScript': `const r = await fetch("${BASE}/analytics/overlap",{\n  method:"POST",\n  headers:{"x-api-key":"YOUR_KEY","Content-Type":"application/json"},\n  body:JSON.stringify({etf_ids:[idA,idB]})\n})`,
-        },
         response: `{\n  "matrix": {\n    "uuid-a": {\n      "uuid-b": {"common_count":14,"overlap_percentage":46.7}\n    }\n  },\n  "common_holdings": [\n    {"isin":"US0378331005","name":"Apple Inc."}\n  ]\n}`,
       },
       { id: 'overlap-get', method: 'GET', short: '/analytics/overlap/{a}/{b}', path: '/analytics/overlap/{etf_a}/{etf_b}',
@@ -223,20 +188,11 @@ const groups = [
           {name:'etf_b',in:'path',type:'UUID',required:true,desc:'Second ETF UUID'},
           {name:'date',in:'query',type:'date',required:false,desc:'Date in YYYY-MM-DD format'},
         ],
-        examples: {
-          'cURL': `curl "${BASE}/analytics/overlap/UUID_A/UUID_B" \\\n  -H "x-api-key: YOUR_KEY"`,
-          'Python': `r = requests.get(f"${BASE}/analytics/overlap/{'{a}'}/{'{b}'}",\n    headers={"x-api-key":"YOUR_KEY"})`,
-          'JavaScript': `const r = await fetch(\`${BASE}/analytics/overlap/\${a}/\${b}\`,\n  {headers:{"x-api-key":"YOUR_KEY"}})`,
-        },
+
       },
       { id: 'exposure', method: 'POST', short: '/analytics/exposure', path: '/analytics/exposure',
         title: 'Portfolio Exposure', desc: 'Analyses the combined sector, country and currency exposure of a weighted portfolio of ETFs.',
         body: `{\n  "portfolio": [\n    {"etf_id": "uuid-a", "weight": 60},\n    {"etf_id": "uuid-b", "weight": 40}\n  ]\n}`,
-        examples: {
-          'cURL': `curl -X POST "${BASE}/analytics/exposure" \\\n  -H "x-api-key: YOUR_KEY" \\\n  -H "Content-Type: application/json" \\\n  -d '{"portfolio":[{"etf_id":"ID_A","weight":60},{"etf_id":"ID_B","weight":40}]}'`,
-          'Python': `r = requests.post("${BASE}/analytics/exposure",\n    json={"portfolio":[{"etf_id":"ID_A","weight":60}]},\n    headers={"x-api-key":"YOUR_KEY"})`,
-          'JavaScript': `const r = await fetch("${BASE}/analytics/exposure",{\n  method:"POST",\n  headers:{"x-api-key":"YOUR_KEY","Content-Type":"application/json"},\n  body:JSON.stringify({portfolio:[{etf_id:id,weight:100}]})\n})`,
-        },
         response: `{\n  "sectors": {"Technology": 28.4, "Healthcare": 12.1},\n  "countries": {"US": 65.2, "DE": 8.3},\n  "currencies": {"USD": 70.1, "EUR": 18.2}\n}`,
       },
       { id: 'similar', method: 'GET', short: '/analytics/similar/{id}', path: '/analytics/similar/{etf_id}',
@@ -245,11 +201,7 @@ const groups = [
           {name:'etf_id',in:'path',type:'UUID',required:true,desc:'Reference ETF UUID'},
           {name:'top_n',in:'query',type:'integer',required:false,desc:'Number of results (default 5)'},
         ],
-        examples: {
-          'cURL': `curl "${BASE}/analytics/similar/ETF_UUID?top_n=5" \\\n  -H "x-api-key: YOUR_KEY"`,
-          'Python': `r = requests.get(f"${BASE}/analytics/similar/{'{id}'}",\n    params={"top_n":5},\n    headers={"x-api-key":"YOUR_KEY"})`,
-          'JavaScript': `const r = await fetch(\`${BASE}/analytics/similar/\${id}?top_n=5\`,\n  {headers:{"x-api-key":"YOUR_KEY"}})`,
-        },
+
       },
     ]
   }

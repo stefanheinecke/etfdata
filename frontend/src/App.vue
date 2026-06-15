@@ -9,7 +9,7 @@
         </div>
         <ul class="nav-links">
           <li v-for="item in navItems" :key="item.id">
-            <button :class="['nav-btn', { active: currentPage === item.id }]" @click="currentPage = item.id">
+            <button :class="['nav-btn', { active: currentPage === item.id || (item.id === 'etfs' && currentPage === 'etf-detail') }]" @click="currentPage = item.id">
               {{ item.label }}
             </button>
           </li>
@@ -31,6 +31,7 @@
     <main class="main">
       <Home v-if="currentPage === 'home'" @navigate="currentPage = $event" />
       <ETFList v-else-if="currentPage === 'etfs'" />
+      <ETFDetail v-else-if="currentPage === 'etf-detail'" />
       <Analytics v-else-if="currentPage === 'analytics'" />
       <ApiDocs v-else-if="currentPage === 'docs'" />
       <Admin v-else-if="currentPage === 'admin' && adminActive" />
@@ -128,6 +129,7 @@ async function doAdminLogin() {
 }
 import Home from './pages/Home.vue'
 import ETFList from './pages/ETFList.vue'
+import ETFDetail from './pages/ETFDetail.vue'
 import Analytics from './pages/Analytics.vue'
 import ApiDocs from './pages/ApiDocs.vue'
 import Admin from './pages/Admin.vue'
@@ -141,6 +143,11 @@ const showApiKeyModal = ref(false)
 const hasApiKey = ref(!!localStorage.getItem('api_key'))
 
 provide('showApiKeyModal', showApiKeyModal)
+
+const selectedETF = ref(null)
+provide('selectedETF', selectedETF)
+provide('navigateToETF', (etf) => { selectedETF.value = etf; currentPage.value = 'etf-detail' })
+provide('navigateTo', (page) => { currentPage.value = page })
 
 // Reflect key changes from the modal's "Use this key" button
 window.addEventListener('storage', (e) => {
