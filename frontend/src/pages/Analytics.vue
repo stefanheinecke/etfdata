@@ -204,6 +204,7 @@ import { ref, computed, onMounted, inject } from 'vue'
 import { etfService, analyticsService } from '../services/api.js'
 
 const showApiKeyModal = inject('showApiKeyModal')
+const analyticsInitTab = inject('analyticsInitTab', ref(null))
 const hasApiKey = ref(!!localStorage.getItem('api_key'))
 window.addEventListener('storage', (e) => { if (e.key === 'api_key') hasApiKey.value = !!e.newValue })
 
@@ -326,7 +327,10 @@ async function loadRisk() {
     riskLoading.value = false
   }
 }
-onMounted(() => { loadETFs(); loadRisk() })
+onMounted(() => {
+  loadETFs(); loadRisk()
+  if (analyticsInitTab.value) { activeTab.value = analyticsInitTab.value; analyticsInitTab.value = null }
+})
 </script>
 
 <style scoped>

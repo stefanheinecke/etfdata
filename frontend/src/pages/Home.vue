@@ -87,7 +87,7 @@
             </div>
           </div>
           <!-- Exposure Analysis -->
-          <div class="feature-card" @click="$emit('navigate','analytics')">
+          <div class="feature-card" @click="navigateTo('analytics','exposure')">
             <div class="feature-top">
               <div class="feature-chip fi-geo">GEO</div>
               <div style="flex:1">
@@ -178,12 +178,14 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, inject } from 'vue'
 import axios from 'axios'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'https://etfdata-production.up.railway.app'
 
 defineEmits(['navigate'])
+
+const navigateTo = inject('navigateTo')
 
 const carouselIdx = ref(0)
 const carouselSlides = [

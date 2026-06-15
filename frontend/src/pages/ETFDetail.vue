@@ -188,7 +188,7 @@ const etfRisk = ref(null)
 const expandedGroups = ref(new Set())
 const chartCanvas = ref(null)
 let chartInstance = null
-const activePeriod = ref('1Y')
+const activePeriod = ref('1M')
 const periods = [
   { label: '1M', days: 30 },
   { label: '3M', days: 90 },
@@ -402,19 +402,19 @@ async function loadTab(tab) {
     } else if (tab === 'Performance') {
       const r = await etfService.getPerformance(etf.value.id)
       performance.value = r.data
-      await renderChart()
     } else if (tab === 'Risk') {
       const r = await etfService.getETFRiskMetrics(etf.value.id)
       etfRisk.value = r.data
     }
   } catch (e) { console.error(e) } finally { detailLoading.value = false }
+  if (tab === 'Performance') await renderChart()
 }
 
 watch(() => etf.value?.id, () => {
   activeTab.value = 'Overview'
   holdings.value = []; allocations.value = []
   performance.value = []; etfRisk.value = null
-  expandedGroups.value = new Set(); activePeriod.value = '1Y'
+  expandedGroups.value = new Set(); activePeriod.value = '1M'
   if (chartInstance) { chartInstance.destroy(); chartInstance = null }
 }, { immediate: false })
 </script>

@@ -147,7 +147,9 @@ provide('showApiKeyModal', showApiKeyModal)
 const selectedETF = ref(null)
 provide('selectedETF', selectedETF)
 provide('navigateToETF', (etf) => { selectedETF.value = etf; currentPage.value = 'etf-detail' })
-provide('navigateTo', (page) => { currentPage.value = page })
+const analyticsInitTab = ref(null)
+provide('analyticsInitTab', analyticsInitTab)
+provide('navigateTo', (page, tab) => { currentPage.value = page; if (tab) analyticsInitTab.value = tab })
 
 // Reflect key changes from the modal's "Use this key" button
 window.addEventListener('storage', (e) => {
