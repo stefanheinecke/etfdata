@@ -5,46 +5,59 @@
       <div class="hero-inner">
         <div class="hero-badge">ETF Data API</div>
         <h1 class="hero-title">ETF Portfolio<br/><span class="gradient-text">Analytics API</span></h1>
-        <p class="hero-sub">
-          Build portfolio tools with clean REST API access to ETF holdings,
-          allocations and overlap analysis. Free demo key, no sign-up.
-        </p>
+        <p class="hero-sub">Real ETF data via REST API. Query holdings, allocations and overlap analysis. Free demo key.</p>
         <div class="hero-actions">
           <button class="btn btn-primary btn-lg" @click="$emit('navigate','etfs')">Browse ETFs</button>
           <button class="btn btn-outline btn-lg" @click="$emit('navigate','docs')">View Docs</button>
         </div>
+        <button class="hero-live-btn" @click="scrollToTryout">
+          <span class="live-dot"></span> Live API Explorer
+        </button>
         <p class="hero-disclaimer">For informational purposes only. Not investment advice.</p>
       </div>
-      <div class="hero-data" aria-hidden="true">
+      <div class="hero-carousel">
         <div class="hd-chrome">
           <span class="hd-dot hd-r"></span>
           <span class="hd-dot hd-y"></span>
           <span class="hd-dot hd-g"></span>
-          <code class="hd-url">GET /etfs &middot; demo key</code>
+          <code class="hd-url">{{ carouselSlides[carouselIdx].label }}</code>
         </div>
-        <div class="hd-row">
-          <span class="hd-ticker">SWDA</span>
-          <span class="hd-name">iShares Core MSCI World <span class="hd-pill">Acc</span></span>
-          <span class="hd-ter">0.20%</span>
-        </div>
-        <div class="hd-row">
-          <span class="hd-ticker">CSSPX</span>
-          <span class="hd-name">iShares Core S&amp;P 500 <span class="hd-pill">Acc</span></span>
-          <span class="hd-ter">0.07%</span>
-        </div>
-        <div class="hd-row">
-          <span class="hd-ticker">ISF</span>
-          <span class="hd-name">iShares Core FTSE 100 <span class="hd-pill hd-pill-dist">Dist</span></span>
-          <span class="hd-ter">0.07%</span>
-        </div>
-        <div class="hd-row">
-          <span class="hd-ticker">EXSA</span>
-          <span class="hd-name">iShares Core MSCI EM IMI <span class="hd-pill hd-pill-dist">Dist</span></span>
-          <span class="hd-ter">0.18%</span>
-        </div>
-        <div class="hd-footer">
-          <span class="hd-status">200 OK</span>
-          <span class="hd-count">10 ETFs tracked</span>
+        <transition name="cs" mode="out-in">
+          <div :key="carouselIdx" class="hc-body">
+            <!-- Slide 0: ETF list -->
+            <template v-if="carouselIdx === 0">
+              <div class="hd-row"><span class="hd-ticker">SWDA</span><span class="hd-name">iShares Core MSCI World <span class="hd-pill">Acc</span></span><span class="hd-ter">0.20%</span></div>
+              <div class="hd-row"><span class="hd-ticker">CSSPX</span><span class="hd-name">iShares Core S&amp;P 500 <span class="hd-pill">Acc</span></span><span class="hd-ter">0.07%</span></div>
+              <div class="hd-row"><span class="hd-ticker">ISF</span><span class="hd-name">iShares Core FTSE 100 <span class="hd-pill hd-pill-dist">Dist</span></span><span class="hd-ter">0.07%</span></div>
+              <div class="hd-footer"><span class="hd-status">200 OK</span><span class="hd-count">10 ETFs tracked</span></div>
+            </template>
+            <!-- Slide 1: Holdings -->
+            <template v-else-if="carouselIdx === 1">
+              <div class="hd-row"><span class="hd-rank">#1</span><span class="hd-hold-name">Apple Inc.</span><span class="hd-ter">5.81%</span></div>
+              <div class="hd-row"><span class="hd-rank">#2</span><span class="hd-hold-name">Microsoft Corp.</span><span class="hd-ter">5.43%</span></div>
+              <div class="hd-row"><span class="hd-rank">#3</span><span class="hd-hold-name">NVIDIA Corp.</span><span class="hd-ter">4.92%</span></div>
+              <div class="hd-footer"><span class="hd-status">200 OK</span><span class="hd-count">1,340 holdings</span></div>
+            </template>
+            <!-- Slide 2: Allocations -->
+            <template v-else-if="carouselIdx === 2">
+              <div class="hd-alloc-row"><span class="hd-alloc-lbl">North America</span><div class="hd-bar-track"><div class="hd-bar" style="width:68%"></div></div><span class="hd-alloc-val">68%</span></div>
+              <div class="hd-alloc-row"><span class="hd-alloc-lbl">Europe</span><div class="hd-bar-track"><div class="hd-bar" style="width:22%"></div></div><span class="hd-alloc-val">22%</span></div>
+              <div class="hd-alloc-row"><span class="hd-alloc-lbl">Asia Pacific</span><div class="hd-bar-track"><div class="hd-bar" style="width:10%"></div></div><span class="hd-alloc-val">10%</span></div>
+              <div class="hd-footer"><span class="hd-status">200 OK</span><span class="hd-count">country breakdown</span></div>
+            </template>
+            <!-- Slide 3: Overlap -->
+            <template v-else>
+              <div class="hd-row"><span class="hd-overlap-pct">67.3%</span><span class="hd-overlap-desc">holdings overlap &middot; SWDA vs CSSPX</span></div>
+              <div class="hd-row"><span class="hd-rank">#1</span><span class="hd-hold-name">Apple Inc.</span><span class="hd-ter">5.81%</span></div>
+              <div class="hd-row"><span class="hd-rank">#2</span><span class="hd-hold-name">Microsoft Corp.</span><span class="hd-ter">5.43%</span></div>
+              <div class="hd-footer"><span class="hd-status">200 OK</span><span class="hd-count">503 shared holdings</span></div>
+            </template>
+          </div>
+        </transition>
+        <div class="hc-dots">
+          <button v-for="(_, i) in carouselSlides" :key="i"
+            :class="['hc-dot-btn', { active: carouselIdx === i }]"
+            @click="carouselIdx = i"></button>
         </div>
       </div>
     </section>
@@ -110,7 +123,7 @@
     </section>
 
     <!-- Try it out -->
-    <section class="page">
+    <section class="page" id="live-explorer">
       <div class="card tryout-card">
         <div class="tryout-header">
           <div>
@@ -165,16 +178,33 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import axios from 'axios'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'https://etfdata-production.up.railway.app'
 
 defineEmits(['navigate'])
 
+const carouselIdx = ref(0)
+const carouselSlides = [
+  { label: 'GET /etfs' },
+  { label: 'GET /etfs/{id}/holdings' },
+  { label: 'GET /etfs/{id}/allocations' },
+  { label: 'POST /analytics/overlap' },
+]
+let _carouselTimer = null
+
+function scrollToTryout() {
+  document.getElementById('live-explorer')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
 onMounted(() => {
   fetchDemo('etfs')
+  _carouselTimer = setInterval(() => {
+    carouselIdx.value = (carouselIdx.value + 1) % carouselSlides.length
+  }, 3600)
 })
+onUnmounted(() => clearInterval(_carouselTimer))
 
 const codeTabs = [
   {
@@ -301,11 +331,11 @@ function switchDemo(key) {
 .btn-lg { padding: .6rem 1.35rem; font-size: .95rem; }
 .hero-disclaimer { margin-top: 1.1rem; font-size: .72rem; color: var(--text-muted); opacity: .8; }
 
-/* Hero data card */
-.hero-data {
+/* Hero API carousel */
+.hero-carousel {
   background: var(--surface); border: 1px solid var(--border);
   border-radius: var(--radius); overflow: hidden;
-  box-shadow: var(--shadow-lg); width: 330px; flex-shrink: 0;
+  box-shadow: var(--shadow-lg); width: 340px; flex-shrink: 0;
 }
 .hd-chrome {
   display: flex; align-items: center; gap: .45rem;
@@ -347,7 +377,52 @@ function switchDemo(key) {
 }
 [data-theme="dark"] .hd-status { background: #0d2d0d; border-color: #1a4d1a; color: #4ade80; }
 .hd-count { font-size: .66rem; color: var(--text-muted); }
-.section-header { text-align: center; margin-bottom: 2rem; }
+/* Carousel body, dots, transitions */
+.hc-body { min-height: 124px; }
+.hc-dots {
+  display: flex; align-items: center; justify-content: center; gap: .4rem;
+  padding: .45rem; border-top: 1px solid var(--border); background: var(--bg-2);
+}
+.hc-dot-btn {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--border); border: none; cursor: pointer;
+  padding: 0; transition: all .25s;
+}
+.hc-dot-btn.active { background: var(--green-500); width: 18px; border-radius: 3px; }
+.cs-enter-active, .cs-leave-active { transition: opacity .2s ease, transform .2s ease; }
+.cs-enter-from { opacity: 0; transform: translateX(10px); }
+.cs-leave-to   { opacity: 0; transform: translateX(-10px); }
+/* Holdings slide */
+.hd-rank { font-family: monospace; font-size: .67rem; color: var(--text-muted); min-width: 22px; flex-shrink: 0; }
+.hd-hold-name { flex: 1; color: var(--text); font-size: .75rem; }
+/* Allocations slide */
+.hd-alloc-row {
+  display: flex; align-items: center; gap: .5rem;
+  padding: .55rem .8rem; border-bottom: 1px solid var(--border);
+}
+.hd-alloc-lbl { font-size: .71rem; color: var(--text-muted); width: 90px; flex-shrink: 0; }
+.hd-bar-track { flex: 1; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
+.hd-bar { height: 100%; background: var(--green-500); border-radius: 2px; }
+.hd-alloc-val { font-size: .69rem; font-weight: 600; color: var(--text); width: 26px; text-align: right; flex-shrink: 0; }
+/* Overlap slide */
+.hd-overlap-pct { font-size: 1.05rem; font-weight: 800; color: var(--green-600); flex-shrink: 0; }
+.hd-overlap-desc { flex: 1; font-size: .7rem; color: var(--text-muted); padding-left: .3rem; }
+/* Live API Explorer button */
+.hero-live-btn {
+  display: inline-flex; align-items: center; gap: .45rem;
+  margin-top: .9rem;
+  background: var(--green-50); border: 1px solid var(--green-200);
+  color: var(--green-700); font-size: .8rem; font-weight: 600;
+  padding: .45rem 1rem; border-radius: 8px;
+  cursor: pointer; font-family: inherit; transition: all .15s;
+}
+.hero-live-btn:hover { background: var(--green-100); border-color: var(--green-400); }
+[data-theme="dark"] .hero-live-btn { background: #052e16; border-color: #14532d; color: #86efac; }
+[data-theme="dark"] .hero-live-btn:hover { background: #064e3b; }
+.live-dot {
+  width: 7px; height: 7px; border-radius: 50%; background: var(--green-500);
+  flex-shrink: 0; animation: pulse-badge 1.5s ease-in-out infinite;
+} text-align: center; margin-bottom: 2rem; }
 .section-title { font-size: 1.5rem; font-weight: 700; color: var(--text); letter-spacing: -.03em; }
 .section-sub { color: var(--text-muted); margin-top: .35rem; }
 .features-section { background: var(--bg-2); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 2.25rem 0; }
