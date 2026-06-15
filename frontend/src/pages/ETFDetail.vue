@@ -539,4 +539,21 @@ watch(() => etf.value?.id, () => {
 .rl-mid  { color: #ca8a04; font-weight: 600; }
 .rl-high { color: #ef4444; font-weight: 600; }
 .risk-note { font-size: .72rem; color: var(--text-muted); line-height: 1.5; }
+
+/* ── Mobile responsive ── */
+@media (max-width: 640px) {
+  .tabbar { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .tabs-inner { min-width: max-content; padding-top: 0; padding-bottom: 0; }
+  .dtab { flex-shrink: 0; font-size: .82rem; padding: .6rem .9rem; }
+  .chart-box { height: 220px; }
+  .perf-toolbar { flex-direction: column; align-items: flex-start; gap: .5rem; }
+  .perf-kpis { gap: 1rem; }
+  .pkpi-label { font-size: .65rem; }
+  .pkpi-value { font-size: .85rem; }
+  .risk-grid { grid-template-columns: repeat(2, 1fr); }
+  .risk-val { font-size: 1.35rem; }
+  .alloc-cols { grid-template-columns: 1fr; }
+  .alloc-label { width: 110px; }
+  .header-kpis { gap: 1rem; }
+}
 </style>

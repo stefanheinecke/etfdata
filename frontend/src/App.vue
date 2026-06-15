@@ -24,8 +24,23 @@
           <button class="btn-get-key" @click="showApiKeyModal = true">Get API Key</button>
           <button v-if="adminActive" class="nav-btn admin-btn" @click="currentPage = 'admin'">⚙ Admin</button>
         </div>
+        <button class="hamburger" :class="{open: mobileMenuOpen}" @click="mobileMenuOpen = !mobileMenuOpen" aria-label="Menu">
+          <span></span><span></span><span></span>
+        </button>
       </div>
     </nav>
+
+    <!-- Mobile menu -->
+    <Transition name="slide-down">
+      <div v-if="mobileMenuOpen" class="mobile-menu">
+        <button v-for="item in navItems" :key="item.id"
+          :class="['mobile-menu-item', { active: currentPage === item.id || (item.id === 'etfs' && currentPage === 'etf-detail') }]"
+          @click="currentPage = item.id; mobileMenuOpen = false">{{ item.label }}</button>
+        <button class="mobile-menu-item mobile-menu-getkey" @click="showApiKeyModal = true; mobileMenuOpen = false">🔑 Get API Key</button>
+        <button v-if="adminActive" class="mobile-menu-item" @click="currentPage = 'admin'; mobileMenuOpen = false">⚙ Admin</button>
+        <button v-else class="mobile-menu-item" @click="showAdminLogin = true; mobileMenuOpen = false">🔒 Admin Login</button>
+      </div>
+    </Transition>
 
     <!-- Main -->
     <main class="main">
@@ -140,6 +155,7 @@ const theme = ref(localStorage.getItem('theme') || 'light')
 const apiStatus = ref('checking')
 const apiStatusText = ref('Checking...')
 const showApiKeyModal = ref(false)
+const mobileMenuOpen = ref(false)
 const hasApiKey = ref(!!localStorage.getItem('api_key'))
 
 provide('showApiKeyModal', showApiKeyModal)
@@ -398,5 +414,55 @@ pre {
   overflow-x: auto; font-size: .8rem; line-height: 1.7;
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
   color: var(--text-2);
+}
+
+/* ── Mobile hamburger ── */
+.hamburger {
+  display: none; flex-direction: column; align-items: center; justify-content: center;
+  gap: 5px; background: none; border: 1px solid var(--border);
+  cursor: pointer; padding: 0; width: 36px; height: 36px; border-radius: 8px;
+  flex-shrink: 0; transition: border-color .15s;
+}
+.hamburger:hover { border-color: var(--green-400); }
+.hamburger span { display: block; width: 18px; height: 2px; background: var(--text); border-radius: 1px; transition: all .25s; }
+.hamburger.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+.hamburger.open span:nth-child(2) { opacity: 0; transform: scaleX(0); }
+.hamburger.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+
+/* Mobile menu panel */
+.mobile-menu {
+  position: fixed; top: 64px; left: 0; right: 0; z-index: 99;
+  background: var(--surface); border-bottom: 1px solid var(--border);
+  box-shadow: var(--shadow); padding: .5rem .75rem .75rem;
+  display: flex; flex-direction: column; gap: .15rem;
+}
+.mobile-menu-item {
+  display: block; width: 100%; text-align: left; background: none; border: none;
+  cursor: pointer; padding: .75rem 1rem; border-radius: 8px;
+  font-size: .95rem; font-weight: 500; color: var(--text-muted); font-family: inherit;
+  transition: all .15s;
+}
+.mobile-menu-item:hover { background: var(--bg-3); color: var(--text); }
+.mobile-menu-item.active { background: var(--green-100); color: var(--green-700); font-weight: 600; }
+[data-theme="dark"] .mobile-menu-item.active { background: #052e16; color: #6ee7b7; }
+.mobile-menu-getkey { color: #667eea; font-weight: 700; }
+.slide-down-enter-active, .slide-down-leave-active { transition: all .2s ease; }
+.slide-down-enter-from, .slide-down-leave-to { opacity: 0; transform: translateY(-10px); }
+
+/* ── Responsive breakpoints ── */
+@media (max-width: 640px) {
+  .hamburger { display: flex; }
+  .nav-links { display: none; }
+  .api-status { display: none; }
+  .btn-get-key { display: none; }
+  .admin-btn { display: none; }
+  .nav-inner { padding: 0 1rem; gap: .5rem; }
+  .page { padding: 1.25rem 1rem; }
+  .footer { padding: 1.25rem 1rem; }
+  .footer-inner { flex-direction: column; align-items: flex-start; gap: .75rem; }
+  .admin-login-modal { width: calc(100% - 2rem); padding: 1.5rem; }
+  .disclaimer-bar { padding: .6rem 1rem; font-size: .75rem; }
+  .page-title { font-size: 1.4rem; }
+  pre { font-size: .75rem; padding: 1rem; }
 }
 </style>

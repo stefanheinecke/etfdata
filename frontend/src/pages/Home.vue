@@ -546,4 +546,15 @@ function switchDemo(key) {
 [data-theme="dark"] .tryout-error { background: #2d0a0a; border-color: #7f1d1d; color: #f87171; }
 .fade-enter-active { transition: opacity .35s, transform .35s; }
 .fade-enter-from { opacity: 0; transform: translateY(-6px); }
+
+/* ── Mobile responsive ── */
+@media (max-width: 640px) {
+  .hero { flex-direction: column; padding: 1.5rem 1rem; gap: 1.5rem; align-items: stretch; }
+  .hero-inner { max-width: 100%; }
+  .hero-carousel { width: 100%; flex-shrink: 1; }
+  .section-title { font-size: 1.2rem; }
+  .section-header { margin-bottom: 1.25rem; }
+  .demo-tabs { gap: .2rem; }
+  .demo-tab { padding: .25rem .6rem; font-size: .72rem; }
+}
 </style>
