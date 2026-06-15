@@ -422,7 +422,8 @@ function switchDemo(key) {
 .live-dot {
   width: 7px; height: 7px; border-radius: 50%; background: var(--green-500);
   flex-shrink: 0; animation: pulse-badge 1.5s ease-in-out infinite;
-} text-align: center; margin-bottom: 2rem; }
+}
+.section-header { text-align: center; margin-bottom: 2rem; }
 .section-title { font-size: 1.5rem; font-weight: 700; color: var(--text); letter-spacing: -.03em; }
 .section-sub { color: var(--text-muted); margin-top: .35rem; }
 .features-section { background: var(--bg-2); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 2.25rem 0; }
