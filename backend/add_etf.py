@@ -196,8 +196,6 @@ def main() -> None:
                         help="Fund AUM in base currency. Auto-fetched if omitted.")
     parser.add_argument("--benchmark", default=None,
                         help="Benchmark index name (e.g. 'MSCI World')")
-    parser.add_argument("--replication", default="Physical", dest="replication_method",
-                        help="Replication method (default: Physical)")
     parser.add_argument("--no-country", action="store_true",
                         help="Skip yfinance country lookups during holdings upload (faster)")
     parser.add_argument("--no-performance", action="store_true",
@@ -249,7 +247,6 @@ def main() -> None:
     print(f"  ter:         {ter}%"       if ter        else "  ter:         (not found)")
     print(f"  fund_size:   {fund_size:,}" if fund_size  else "  fund_size:   (not found)")
     print(f"  benchmark:   {benchmark}" if benchmark else "  benchmark:   (not provided - pass --benchmark)")
-    print(f"  replication: {args.replication_method}")
 
     # -- Connect to DB --
     engine = create_engine(db_url, echo=False, poolclass=NullPool, pool_pre_ping=True)
@@ -261,7 +258,6 @@ def main() -> None:
         if existing:
             # Update all resolvable fields so re-running the script refreshes metadata
             existing.name              = name[:255]
-            existing.replication_method = args.replication_method or existing.replication_method
             if ter is not None:
                 existing.ter           = Decimal(str(ter))
             if fund_size is not None:
@@ -281,7 +277,6 @@ def main() -> None:
                 name=name[:255],
                 provider=args.provider,
                 domicile=args.domicile.strip().upper(),
-                replication_method=args.replication_method,
                 ter=Decimal(str(ter)) if ter is not None else None,
                 fund_size=fund_size,
                 benchmark=benchmark,

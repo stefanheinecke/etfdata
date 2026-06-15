@@ -10,7 +10,6 @@ class ETFBase(BaseModel):
     name: str
     provider: Optional[str] = None
     domicile: Optional[str] = None
-    replication_method: Optional[str] = None
     ter: Optional[Decimal] = None
     fund_size: Optional[int] = None
     benchmark: Optional[str] = None

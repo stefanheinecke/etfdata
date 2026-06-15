@@ -16,7 +16,6 @@ class ETF(Base):
     name = Column(String(255), nullable=False)
     provider = Column(String(50), nullable=True, index=True)
     domicile = Column(String(2), nullable=True)
-    replication_method = Column(String(50))
     ter = Column(Numeric(5, 3))
     fund_size = Column(BigInteger)
     benchmark = Column(String(255))

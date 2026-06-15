@@ -225,7 +225,6 @@ const strategyRows = computed(() => {
   const e = etf.value; if (!e) return []
   return [
     { label: 'Benchmark / Index', value: e.benchmark || '—' },
-    { label: 'Replication', value: e.replication_method || '—' },
     { label: 'Fund Size', value: e.fund_size ? fmtSize(e.fund_size) : '—' },
   ]
 })
