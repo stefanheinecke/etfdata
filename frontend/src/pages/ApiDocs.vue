@@ -132,7 +132,7 @@
 <script setup>
 import { ref, computed, inject, watch } from 'vue'
 import axios from 'axios'
-const BASE = 'https://api.goetf.ch'
+const BASE = import.meta.env.VITE_API_URL || 'https://etfdata-production.up.railway.app'
 
 const showApiKeyModal = inject('showApiKeyModal')
 const hasApiKey = ref(!!localStorage.getItem('api_key'))

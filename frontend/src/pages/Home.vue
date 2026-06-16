@@ -181,7 +181,7 @@
 import { ref, computed, onMounted, onUnmounted, inject } from 'vue'
 import axios from 'axios'
 
-const API_BASE = import.meta.env.VITE_API_URL || 'https://api.goetf.ch'
+const API_BASE = import.meta.env.VITE_API_URL || 'https://etfdata-production.up.railway.app'
 
 defineEmits(['navigate'])
 
