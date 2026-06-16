@@ -52,11 +52,44 @@
       </div>
 
       <!-- Portfolio Risk Metrics -->
-      <div v-if="portfolioRiskResult" class="card" style="margin-top:1.5rem;padding:0;overflow:hidden">
-        <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--border)">
-          <h3 class="card-title" style="margin:0">Portfolio Risk Metrics</h3>
+      <div v-if="portfolioRiskResult">
+
+        <!-- Portfolio-level summary -->
+        <div v-if="portfolioSummary" class="card" style="margin-top:1.5rem">
+          <h3 class="card-title" style="margin-bottom:1rem">Portfolio Summary <span style="font-size:.75rem;font-weight:400;color:var(--text-muted)">(weighted average across ETFs)</span></h3>
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:.75rem">
+            <div class="stat-box">
+              <div class="stat-label">1Y Return</div>
+              <div class="stat-value" :class="signClass(portfolioSummary.ann_return)">{{ fmtPct(portfolioSummary.ann_return) }}</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-label">Volatility</div>
+              <div class="stat-value" :class="volClass(portfolioSummary.volatility)">{{ fmtPct(portfolioSummary.volatility) }}</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-label">Sharpe Ratio</div>
+              <div class="stat-value" :class="sharpeClass(portfolioSummary.sharpe_ratio)">{{ portfolioSummary.sharpe_ratio !== null ? portfolioSummary.sharpe_ratio.toFixed(2) : '—' }}</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-label">Max Drawdown</div>
+              <div class="stat-value" :class="ddClass(portfolioSummary.max_drawdown)">{{ fmtPct(portfolioSummary.max_drawdown) }}</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-label">Avg HHI</div>
+              <div class="stat-value" :class="hhiClass(portfolioSummary.hhi)">{{ portfolioSummary.hhi.toFixed(0) }}</div>
+            </div>
+          </div>
+          <p style="font-size:.7rem;color:var(--text-muted);margin-top:.75rem;margin-bottom:0">
+            Weighted by portfolio allocation &nbsp;·&nbsp; Rf = {{ riskFreeRate }}% &nbsp;·&nbsp; Volatility is a weighted average (not true portfolio volatility, which requires correlation data)
+          </p>
         </div>
-        <div class="table-wrap">
+
+        <!-- Per-ETF breakdown -->
+        <div class="card" style="margin-top:1rem;padding:0;overflow:hidden">
+          <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--border)">
+            <h3 class="card-title" style="margin:0">Per-ETF Risk Breakdown</h3>
+          </div>
+          <div class="table-wrap">
           <table class="risk-table">
             <thead>
               <tr>
@@ -85,8 +118,7 @@
         <div style="padding:.6rem 1.25rem;font-size:.72rem;color:var(--text-muted);border-top:1px solid var(--border)">
           Rf = {{ riskFreeRate }}% &nbsp;·&nbsp; HHI: Herfindahl–Hirschman Index (0–10 000; lower = more diversified)
         </div>
-      </div>
-    </div>
+      </div>      </div>    </div>
 
     <!-- RISK METRICS -->
     <div v-if="activeTab==='risk'">
@@ -169,8 +201,8 @@ window.addEventListener('storage', (e) => { if (e.key === 'api_key') hasApiKey.v
 
 const activeTab = ref('exposure')
 const tabs = [
-  {id:'risk',label:'Risk Metrics',icon:'📉'},
   {id:'exposure',label:'Portfolio Exposure',icon:'🌍'},
+  {id:'risk',label:'Risk Metrics',icon:'📉'},
 ]
 const allEtfs = ref([])
 const etfsLoading = ref(false)
@@ -181,6 +213,26 @@ const exposureLoading = ref(false)
 const exposureResult = ref(null)
 const exposureError = ref('')
 const portfolioRiskResult = ref(null)
+
+const portfolioSummary = computed(() => {
+  if (!portfolioRiskResult.value?.length) return null
+  const p = portfolio.value.filter(x => x.etf_id)
+  const totalW = p.reduce((s, x) => s + (x.weight || 0), 0)
+  if (!totalW) return null
+  let wReturn = 0, wVol = 0, wDD = 0, wHHI = 0
+  for (const row of portfolioRiskResult.value) {
+    const pw = p.find(x => x.etf_id === row.etf_id)
+    const w = pw ? (pw.weight || 0) / totalW : 0
+    if (row.ann_return   !== null) wReturn += w * row.ann_return
+    if (row.volatility   !== null) wVol    += w * row.volatility
+    if (row.max_drawdown !== null) wDD     += w * row.max_drawdown
+    if (row.hhi          !== null) wHHI    += w * row.hhi
+  }
+  const rfDecimal = riskFreeRate.value / 100
+  const sharpe = wVol > 0 ? ((wReturn - rfDecimal) / wVol).toFixed(2) : null
+  return { ann_return: wReturn, volatility: wVol, sharpe_ratio: sharpe !== null ? Number(sharpe) : null, max_drawdown: wDD, hhi: wHHI }
+})
+
 const exposureGroups = computed(() => {
   if (!exposureResult.value) return []
   const r = exposureResult.value
@@ -281,6 +333,8 @@ onMounted(() => {
 .risk-table th,.risk-table td{padding:.6rem 1rem;text-align:left;border-bottom:1px solid var(--border)}
 .risk-table tbody tr:hover{background:var(--bg-3)}
 .sortable-th{cursor:pointer;user-select:none;white-space:nowrap}
+.stat-box{background:var(--bg-3);border-radius:10px;padding:.75rem 1rem;display:flex;flex-direction:column}
+.stat-box .stat-value{font-size:1.25rem}
 .sortable-th:hover{color:var(--green-600)}
 .sort-arrow{margin-left:.25rem;font-size:.7rem}
 .cell-green{color:#16a34a;font-weight:600}
