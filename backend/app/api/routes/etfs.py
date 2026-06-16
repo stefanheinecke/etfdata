@@ -1,4 +1,3 @@
-from uuid import UUID
 from datetime import date as date_type
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException
@@ -9,6 +8,7 @@ from app.db.database import get_db
 from app.core.auth import verify_api_key
 from app.schemas import ETF, APIKey
 from app.models import ETFCreate, ETFResponse
+from app.api.utils import resolve_etf
 
 router = APIRouter(prefix="/etfs", tags=["etfs"])
 
@@ -32,39 +32,35 @@ async def list_etfs(
 
 @router.get("/{etf_id}", response_model=ETFResponse)
 async def get_etf(
-    etf_id: UUID,
+    etf_id: str,
     db: Session = Depends(get_db),
     api_key: APIKey = Depends(verify_api_key)
 ):
-    etf = db.query(ETF).filter(ETF.id == etf_id).first()
-    if not etf:
-        raise HTTPException(status_code=404, detail="ETF not found")
+    etf = resolve_etf(db, etf_id)
     if _is_demo(api_key) and etf.ticker != "SWDA":
         raise HTTPException(status_code=403, detail="Demo key only allows access to SWDA ETF")
     return etf
 
 @router.get("/{etf_id}/holdings")
 async def get_holdings(
-    etf_id: UUID,
+    etf_id: str,
     date: Optional[date_type] = None,
     db: Session = Depends(get_db),
     api_key: APIKey = Depends(verify_api_key)
 ):
     from app.schemas import Holding
 
-    etf = db.query(ETF).filter(ETF.id == etf_id).first()
-    if not etf:
-        raise HTTPException(status_code=404, detail="ETF not found")
+    etf = resolve_etf(db, etf_id)
     if _is_demo(api_key) and etf.ticker != "SWDA":
         raise HTTPException(status_code=403, detail="Demo key only allows access to SWDA ETF")
 
-    query = db.query(Holding).filter(Holding.etf_id == etf_id)
+    query = db.query(Holding).filter(Holding.etf_id == etf.id)
 
     if date:
         query = query.filter(Holding.date == date)
     else:
         latest_date = db.query(func.max(Holding.date)).filter(
-            Holding.etf_id == etf_id
+            Holding.etf_id == etf.id
         ).scalar()
         if latest_date:
             query = query.filter(Holding.date == latest_date)
@@ -74,7 +70,7 @@ async def get_holdings(
 
 @router.get("/{etf_id}/allocations")
 async def get_allocations(
-    etf_id: UUID,
+    etf_id: str,
     type: Optional[str] = None,
     date: Optional[date_type] = None,
     db: Session = Depends(get_db),
@@ -82,13 +78,11 @@ async def get_allocations(
 ):
     from app.schemas import Allocation
 
-    etf = db.query(ETF).filter(ETF.id == etf_id).first()
-    if not etf:
-        raise HTTPException(status_code=404, detail="ETF not found")
+    etf = resolve_etf(db, etf_id)
     if _is_demo(api_key) and etf.ticker != "SWDA":
         raise HTTPException(status_code=403, detail="Demo key only allows access to SWDA ETF")
 
-    query = db.query(Allocation).filter(Allocation.etf_id == etf_id)
+    query = db.query(Allocation).filter(Allocation.etf_id == etf.id)
 
     if type:
         query = query.filter(Allocation.type == type)
@@ -97,7 +91,7 @@ async def get_allocations(
         query = query.filter(Allocation.date == date)
     else:
         latest_date = db.query(func.max(Allocation.date)).filter(
-            Allocation.etf_id == etf_id
+            Allocation.etf_id == etf.id
         ).scalar()
         if latest_date:
             query = query.filter(Allocation.date == latest_date)
@@ -107,7 +101,7 @@ async def get_allocations(
 
 @router.get("/{etf_id}/performance")
 async def get_performance(
-    etf_id: UUID,
+    etf_id: str,
     from_date: Optional[date_type] = None,
     to_date: Optional[date_type] = None,
     db: Session = Depends(get_db),
@@ -115,13 +109,11 @@ async def get_performance(
 ):
     from app.schemas import Performance
 
-    etf = db.query(ETF).filter(ETF.id == etf_id).first()
-    if not etf:
-        raise HTTPException(status_code=404, detail="ETF not found")
+    etf = resolve_etf(db, etf_id)
     if _is_demo(api_key) and etf.ticker != "SWDA":
         raise HTTPException(status_code=403, detail="Demo key only allows access to SWDA ETF")
 
-    query = db.query(Performance).filter(Performance.etf_id == etf_id)
+    query = db.query(Performance).filter(Performance.etf_id == etf.id)
 
     if from_date:
         query = query.filter(Performance.date >= from_date)
@@ -133,17 +125,16 @@ async def get_performance(
 
 @router.get("/{etf_id}/risk-metrics")
 async def get_etf_risk_metrics(
-    etf_id: UUID,
+    etf_id: str,
     rf_rate: float = 0.04,
     db: Session = Depends(get_db),
     api_key: APIKey = Depends(verify_api_key)
 ):
-    if _is_demo(api_key):
-        etf = db.query(ETF).filter(ETF.id == etf_id).first()
-        if not etf or etf.ticker != "SWDA":
-            raise HTTPException(status_code=403, detail="Demo key only allows access to SWDA ETF")
+    etf = resolve_etf(db, etf_id)
+    if _is_demo(api_key) and etf.ticker != "SWDA":
+        raise HTTPException(status_code=403, detail="Demo key only allows access to SWDA ETF")
     from app.services.analytics_service import AnalyticsService
-    result = AnalyticsService.calculate_risk_metrics(db, rf_rate, etf_id)
+    result = AnalyticsService.calculate_risk_metrics(db, rf_rate, etf.id)
     if not result:
         raise HTTPException(status_code=404, detail="ETF not found")
     return result[0]

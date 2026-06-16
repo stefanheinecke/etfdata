@@ -1,4 +1,3 @@
-from uuid import UUID
 from datetime import date as date_type
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
@@ -9,6 +8,7 @@ from app.core.auth import verify_api_key
 from app.schemas import APIKey
 from app.models import OverlapRequest, ExposureRequest
 from app.services.analytics_service import AnalyticsService
+from app.api.utils import resolve_etf
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])
 
@@ -18,18 +18,21 @@ async def calculate_overlap(
     db: Session = Depends(get_db),
     api_key: APIKey = Depends(verify_api_key)
 ):
-    result = AnalyticsService.calculate_overlap(db, request.etf_ids, request.date)
+    resolved_ids = [resolve_etf(db, ref).id for ref in request.etf_ids]
+    result = AnalyticsService.calculate_overlap(db, resolved_ids, request.date)
     return result
 
 @router.get("/overlap/{etf_a}/{etf_b}")
 async def pairwise_overlap(
-    etf_a: UUID,
-    etf_b: UUID,
+    etf_a: str,
+    etf_b: str,
     date: Optional[date_type] = None,
     db: Session = Depends(get_db),
     api_key: APIKey = Depends(verify_api_key)
 ):
-    result = AnalyticsService.calculate_overlap(db, [etf_a, etf_b], date)
+    id_a = resolve_etf(db, etf_a).id
+    id_b = resolve_etf(db, etf_b).id
+    result = AnalyticsService.calculate_overlap(db, [id_a, id_b], date)
     return result
 
 @router.post("/exposure")
@@ -39,17 +42,22 @@ async def calculate_exposure(
     db: Session = Depends(get_db),
     api_key: APIKey = Depends(verify_api_key)
 ):
-    result = AnalyticsService.calculate_portfolio_exposure(db, request.portfolio, date)
+    resolved_portfolio = [
+        {"etf_id": str(resolve_etf(db, item["etf_id"]).id), "weight": item["weight"]}
+        for item in request.portfolio
+    ]
+    result = AnalyticsService.calculate_portfolio_exposure(db, resolved_portfolio, date)
     return result
 
 @router.get("/similar/{etf_id}")
 async def find_similar(
-    etf_id: UUID,
+    etf_id: str,
     top_n: int = 5,
     db: Session = Depends(get_db),
     api_key: APIKey = Depends(verify_api_key)
 ):
-    result = AnalyticsService.find_similar_etfs(db, etf_id, top_n)
+    resolved_id = resolve_etf(db, etf_id).id
+    result = AnalyticsService.find_similar_etfs(db, resolved_id, top_n)
     return result
 
 @router.get("/risk-metrics")

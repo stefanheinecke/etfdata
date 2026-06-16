@@ -83,7 +83,7 @@ class PerformanceResponse(PerformanceBase):
         from_attributes = True
 
 class OverlapRequest(BaseModel):
-    etf_ids: List[UUID]
+    etf_ids: List[str]
     date: Optional[date] = None
 
 class OverlapResponse(BaseModel):
