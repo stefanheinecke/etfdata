@@ -10,7 +10,7 @@ from sqlalchemy import text
 
 from app.db.database import get_db, init_db, SessionLocal
 from app.models import HealthResponse
-from app.api.routes import etfs, analytics, admin, auth
+from app.api.routes import etfs, analytics, admin, auth, scores
 from app.core.auth import verify_api_key, hash_api_key
 from app.schemas import APIKey, RequestLog
 
@@ -130,6 +130,7 @@ app.include_router(etfs.router)
 app.include_router(analytics.router)
 app.include_router(admin.router)
 app.include_router(auth.router)
+app.include_router(scores.router)
 
 if __name__ == "__main__":
     import uvicorn

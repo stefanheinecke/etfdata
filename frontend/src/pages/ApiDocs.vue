@@ -198,6 +198,25 @@ const groups = [
         ],
       },
     ]
+  },
+  {
+    label: 'Scores',
+    endpoints: [
+      { id: 'score-etfs', method: 'GET', short: '/scores/etfs', path: '/scores/etfs',
+        title: 'GoETF Score — Individual ETFs', desc: 'Returns the GoETF Score (1–10) for all ETFs or a ticker-filtered subset. Each score is a weighted percentile rank across 8 metrics: Sortino ratio (20%), Calmar ratio (15%), CVaR 95% (15%), HHI (10%), Effective N (10%), Geographic Diversity (10%), Hit Ratio (10%), Max Time Under Water (10%).',
+        params: [
+          {name:'tickers',in:'query',type:'string',required:false,desc:'Comma-separated tickers (e.g. SWDA,CSSPX). Omit to score all ETFs.'},
+          {name:'rf_rate',in:'query',type:'float',required:false,desc:'Annual risk-free rate as decimal (default 0.04 = 4%)'},
+        ],
+      },
+      { id: 'score-portfolio', method: 'POST', short: '/scores/portfolio', path: '/scores/portfolio',
+        title: 'GoETF Score — Portfolio', desc: 'Computes a composite GoETF Portfolio Score (1–10) from: weighted average of individual GoETF Scores (base), minus pairwise holdings overlap penalty (up to −2 pts), plus geographic diversification bonus (up to +1 pt). Also returns a single-ETF swap tip that maximises improvement.',
+        body: `{\n  "portfolio": [\n    {"etf_id": "SWDA", "weight": 60},\n    {"etf_id": "CSSPX", "weight": 40}\n  ]\n}`,
+        params: [
+          {name:'rf_rate',in:'query',type:'float',required:false,desc:'Annual risk-free rate as decimal (default 0.04 = 4%)'},
+        ],
+      },
+    ]
   }
 ]
 
@@ -236,6 +255,9 @@ const tryoutConfigs = {
                                         body: { portfolio: [{ etf_id: id, weight: 60 }, { etf_id: id2, weight: 40 }] } }) },
   'etf-risk-metrics':  { build: ()    => ({ method: 'GET',  url: `${BASE}/etfs/risk-metrics`, params: { tickers: 'SWDA' } }) },
   'etf-performance':   { build: (id)  => ({ method: 'GET',  url: `${BASE}/etfs/${id}/performance` }) },
+  'score-etfs':        { build: ()    => ({ method: 'GET',  url: `${BASE}/scores/etfs`, params: { tickers: 'SWDA' } }) },
+  'score-portfolio':   { build: (id, id2) => ({ method: 'POST', url: `${BASE}/scores/portfolio`,
+                                        body: { portfolio: [{ etf_id: id, weight: 60 }, { etf_id: id2, weight: 40 }] } }) },
 }
 
 const activeTryoutConfig = computed(() => tryoutConfigs[activeId.value])

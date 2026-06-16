@@ -122,7 +122,65 @@
         <div style="padding:.6rem 1.25rem;font-size:.72rem;color:var(--text-muted);border-top:1px solid var(--border)">
           Rf = {{ riskFreeRate }}% &nbsp;·&nbsp; HHI: Herfindahl–Hirschman Index (0–10 000; lower = more diversified)
         </div>
-      </div>      </div>    </div>
+      </div>
+
+      <!-- GoETF Portfolio Score -->
+      <div v-if="portfolioScoreResult" class="card" style="margin-top:1rem">
+        <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;margin-bottom:1rem">
+          <h3 class="card-title" style="margin:0">GoETF Portfolio Score</h3>
+          <span class="score-badge score-lg" :class="scoreBadgeClass(portfolioScoreResult.portfolio_score)">
+            {{ portfolioScoreResult.portfolio_score?.toFixed(1) }}
+          </span>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:.75rem;margin-bottom:1rem">
+          <div class="stat-box">
+            <div class="stat-label">Base Score</div>
+            <div class="stat-value">{{ portfolioScoreResult.base_score?.toFixed(1) }}</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-label">Overlap Penalty</div>
+            <div class="stat-value" style="color:#ef4444">−{{ portfolioScoreResult.overlap_penalty?.toFixed(2) }}</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-label">Diversification Bonus</div>
+            <div class="stat-value" style="color:#0b6aa5">+{{ portfolioScoreResult.allocation_bonus?.toFixed(2) }}</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-label">Avg Holdings Overlap</div>
+            <div class="stat-value" :class="portfolioScoreResult.avg_overlap_pct > 50 ? 'cell-red' : portfolioScoreResult.avg_overlap_pct > 20 ? 'cell-yellow' : 'cell-green'">
+              {{ portfolioScoreResult.avg_overlap_pct?.toFixed(1) }}%
+            </div>
+          </div>
+        </div>
+        <!-- Pairwise overlaps -->
+        <div v-if="portfolioScoreResult.pairwise_overlaps?.length" style="margin-bottom:1rem">
+          <div style="font-size:.8rem;font-weight:600;color:var(--text-muted);margin-bottom:.5rem">Holdings Overlap by Pair</div>
+          <div v-for="ov in portfolioScoreResult.pairwise_overlaps" :key="ov.etf_a_id+ov.etf_b_id" style="display:flex;align-items:center;gap:.75rem;margin-bottom:.4rem">
+            <span style="font-size:.85rem;font-weight:600;color:var(--green-600)">{{ ov.etf_a_ticker }}</span>
+            <span style="font-size:.75rem;color:var(--text-muted)">↔</span>
+            <span style="font-size:.85rem;font-weight:600;color:var(--green-600)">{{ ov.etf_b_ticker }}</span>
+            <div class="alloc-track" style="flex:1;max-width:180px"><div class="alloc-fill" :style="{width:Math.min(ov.weight_overlap_pct,100)+'%',background:ov.weight_overlap_pct>50?'#ef4444':ov.weight_overlap_pct>20?'#ca8a04':'#0b6aa5'}"></div></div>
+            <span style="font-size:.85rem;font-weight:600">{{ ov.weight_overlap_pct?.toFixed(1) }}%</span>
+          </div>
+        </div>
+        <!-- Swap tip -->
+        <div v-if="portfolioScoreResult.tip" class="tip-box">
+          <span class="tip-icon">💡</span>
+          <div>
+            <strong>Swap Tip:</strong> Replace <strong style="color:var(--green-600)">{{ portfolioScoreResult.tip.replace_ticker }}</strong>
+            with <strong style="color:var(--green-600)">{{ portfolioScoreResult.tip.with_ticker }}</strong>
+            → new portfolio score <strong>{{ portfolioScoreResult.tip.new_score }}</strong>
+            (<span style="color:#0b6aa5">+{{ portfolioScoreResult.tip.improvement }}</span> pts)
+            <div style="font-size:.8rem;color:var(--text-muted);margin-top:.2rem">{{ portfolioScoreResult.tip.reason }}</div>
+          </div>
+        </div>
+        <div v-else-if="portfolioScoreResult.tip === null" style="font-size:.8rem;color:var(--text-muted)">No single-ETF swap improves the portfolio score by more than 0.1 pts.</div>
+        <p style="font-size:.7rem;color:var(--text-muted);margin-top:.75rem;margin-bottom:0">
+          Base = weighted avg of individual GoETF Scores &nbsp;·&nbsp; Overlap Penalty: max −2 pts for 100% overlap &nbsp;·&nbsp; Bonus: portfolio country diversification vs individual weighted avg
+        </p>
+      </div>
+      <div v-if="portfolioScoreLoading" style="margin-top:1rem;font-size:.875rem;color:var(--text-muted)">Computing GoETF Portfolio Score…</div>
+      </div>    </div>
 
     <!-- RISK METRICS -->
     <div v-if="activeTab==='risk'">
@@ -173,12 +231,76 @@
         </div>
       </div>
     </div>
+
+    <!-- GOETF SCORE -->
+    <div v-if="activeTab==='goetf'">
+      <div class="card" style="margin-bottom:1.5rem;display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+        <div>
+          <h2 class="card-title" style="margin:0">GoETF Score</h2>
+          <p style="font-size:.8rem;color:var(--text-muted);margin:.2rem 0 0">Composite 1–10 score based on 8 risk &amp; diversification metrics, percentile-ranked across all ETFs</p>
+        </div>
+        <label style="font-size:.8rem;color:var(--text-muted);margin-left:auto">Risk-free rate</label>
+        <input class="input" type="number" v-model.number="goetfRfRate" min="0" max="20" step="0.5"
+          style="width:72px;padding:.3rem .5rem;font-size:.875rem" />
+        <span style="font-size:.8rem;color:var(--text-muted)">% p.a.</span>
+        <button class="btn btn-outline" style="font-size:.875rem" @click="runGoetfScores" :disabled="goetfLoading">
+          {{ goetfLoading ? 'Loading…' : '↻ Recalculate' }}
+        </button>
+      </div>
+      <div v-if="goetfError" class="error-box" style="margin-bottom:1rem">{{ goetfError }}</div>
+      <div v-if="goetfResult" class="card" style="padding:0;overflow:hidden">
+        <div style="padding:.75rem 1.25rem;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+          <h3 class="card-title" style="margin:0">{{ goetfResult.length }} ETF{{ goetfResult.length !== 1 ? 's' : '' }}</h3>
+          <span style="font-size:.75rem;color:var(--text-muted)">Rf = {{ goetfRfRate }}% &nbsp;·&nbsp; Click column header to sort</span>
+        </div>
+        <div class="table-wrap">
+          <table class="risk-table">
+            <thead>
+              <tr>
+                <th class="sortable-th" @click="toggleGoetfSort('goetf_score')">Score <span class="sort-arrow">{{ goetfSortKey==='goetf_score' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span></th>
+                <th class="sortable-th" @click="toggleGoetfSort('ticker')">Ticker <span class="sort-arrow">{{ goetfSortKey==='ticker' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span></th>
+                <th>Name</th>
+                <th class="sortable-th" @click="toggleGoetfSort('sortino')">Sortino <span class="sort-arrow">{{ goetfSortKey==='sortino' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span></th>
+                <th class="sortable-th" @click="toggleGoetfSort('calmar')">Calmar <span class="sort-arrow">{{ goetfSortKey==='calmar' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span></th>
+                <th class="sortable-th" @click="toggleGoetfSort('cvar')">CVaR 95% <span class="sort-arrow">{{ goetfSortKey==='cvar' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span></th>
+                <th class="sortable-th" @click="toggleGoetfSort('hit_ratio')">Hit Ratio <span class="sort-arrow">{{ goetfSortKey==='hit_ratio' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span></th>
+                <th class="sortable-th" @click="toggleGoetfSort('hhi')">HHI <span class="sort-arrow">{{ goetfSortKey==='hhi' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span></th>
+                <th class="sortable-th" @click="toggleGoetfSort('effective_n')">Eff. N <span class="sort-arrow">{{ goetfSortKey==='effective_n' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span></th>
+                <th class="sortable-th" @click="toggleGoetfSort('geo_div')">Geo Div <span class="sort-arrow">{{ goetfSortKey==='geo_div' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span></th>
+                <th class="sortable-th" @click="toggleGoetfSort('max_underwater')">Max UW <span class="sort-arrow">{{ goetfSortKey==='max_underwater' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="row in goetfSorted" :key="row.etf_id">
+                <td>
+                  <span v-if="row.goetf_score != null" class="score-badge" :class="scoreBadgeClass(row.goetf_score)">{{ row.goetf_score.toFixed(1) }}</span>
+                  <span v-else class="score-badge score-na">N/A</span>
+                </td>
+                <td><strong style="color:var(--green-600)">{{ row.ticker }}</strong></td>
+                <td style="font-size:.8rem;color:var(--text-muted);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ row.name }}</td>
+                <td :class="ratioClass(row.sortino)">{{ row.sortino != null ? row.sortino.toFixed(2) : '—' }}</td>
+                <td :class="ratioClass(row.calmar)">{{ row.calmar != null ? row.calmar.toFixed(2) : '—' }}</td>
+                <td :class="cvarClass(row.cvar)">{{ row.cvar != null ? row.cvar.toFixed(1) + '%' : '—' }}</td>
+                <td :class="hitClass(row.hit_ratio)">{{ row.hit_ratio != null ? (row.hit_ratio * 100).toFixed(1) + '%' : '—' }}</td>
+                <td :class="hhiClass(row.hhi)">{{ row.hhi != null ? row.hhi.toFixed(0) : '—' }}</td>
+                <td>{{ row.effective_n != null ? row.effective_n.toFixed(0) : '—' }}</td>
+                <td :class="geodivClass(row.geo_div)">{{ row.geo_div != null ? (row.geo_div * 100).toFixed(1) + '%' : '—' }}</td>
+                <td :class="uwClass(row.max_underwater)">{{ row.max_underwater != null ? row.max_underwater + 'd' : '—' }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div style="padding:.6rem 1.25rem;font-size:.72rem;color:var(--text-muted);border-top:1px solid var(--border)">
+          Score = weighted percentile rank (1–10) across 8 metrics &nbsp;·&nbsp; Sortino &amp; Calmar: higher = better &nbsp;·&nbsp; CVaR: less negative = better &nbsp;·&nbsp; HHI: lower = more diversified &nbsp;·&nbsp; Eff. N: effective number of holdings &nbsp;·&nbsp; Geo Div: geographic diversity (0–100%) &nbsp;·&nbsp; Max UW: max consecutive days under previous peak
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, inject } from 'vue'
-import { etfService, analyticsService } from '../services/api.js'
+import { etfService, analyticsService, scoreService } from '../services/api.js'
 
 const showApiKeyModal = inject('showApiKeyModal')
 const analyticsInitTab = inject('analyticsInitTab', ref(null))
@@ -189,6 +311,7 @@ const activeTab = ref('exposure')
 const tabs = [
   {id:'exposure',label:'Portfolio Exposure',icon:'🌍'},
   {id:'risk',label:'Risk Metrics',icon:'📊'},
+  {id:'goetf',label:'GoETF Score',icon:'⭐'},
 ]
 const allEtfs = ref([])
 const etfsLoading = ref(false)
@@ -199,6 +322,8 @@ const exposureLoading = ref(false)
 const exposureResult = ref(null)
 const exposureError = ref('')
 const portfolioRiskResult = ref(null)
+const portfolioScoreResult = ref(null)
+const portfolioScoreLoading = ref(false)
 
 const portfolioSummary = computed(() => {
   if (!portfolioRiskResult.value?.length) return null
@@ -234,16 +359,65 @@ async function loadETFs() {
   try { const r=await etfService.getETFs(0,50); allEtfs.value=r.data } catch(e){console.error(e)} finally{etfsLoading.value=false}
 }
 async function runExposure() {
-  exposureLoading.value=true; exposureError.value=''; exposureResult.value=null; portfolioRiskResult.value=null
+  exposureLoading.value=true; exposureError.value=''; exposureResult.value=null; portfolioRiskResult.value=null; portfolioScoreResult.value=null
   const p=portfolio.value.filter(x=>x.etf_id)
   try {
     const r = await analyticsService.calculateExposure(p, null, riskFreeRate.value / 100)
     exposureResult.value = r.data
     portfolioRiskResult.value = r.data.risk_metrics ?? null
+    if (p.length >= 1) {
+      portfolioScoreLoading.value = true
+      try {
+        const sr = await scoreService.getPortfolioScore(p, riskFreeRate.value / 100)
+        portfolioScoreResult.value = sr.data
+      } catch(e) { console.warn('Portfolio score failed:', e.message) }
+        finally { portfolioScoreLoading.value = false }
+    }
   } catch(e){exposureError.value=e.response?.data?.detail||e.message} finally{exposureLoading.value=false}
 }
 // Risk-free rate (used for portfolio Sharpe in summary)
 const riskFreeRate = ref(4.0)     // % per year
+
+// GoETF Score tab
+const goetfRfRate = ref(4.0)
+const goetfLoading = ref(false)
+const goetfResult = ref(null)
+const goetfError = ref('')
+const goetfSortKey = ref('goetf_score')
+const goetfSortDir = ref('desc')
+
+const goetfSorted = computed(() => {
+  if (!goetfResult.value) return []
+  return [...goetfResult.value].sort((a, b) => {
+    let va = a[goetfSortKey.value], vb = b[goetfSortKey.value]
+    if (va === null || va === undefined) va = goetfSortDir.value === 'asc' ? Infinity : -Infinity
+    if (vb === null || vb === undefined) vb = goetfSortDir.value === 'asc' ? Infinity : -Infinity
+    if (typeof va === 'string') return goetfSortDir.value === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va)
+    return goetfSortDir.value === 'asc' ? va - vb : vb - va
+  })
+})
+
+function toggleGoetfSort(key) {
+  if (goetfSortKey.value === key) goetfSortDir.value = goetfSortDir.value === 'asc' ? 'desc' : 'asc'
+  else { goetfSortKey.value = key; goetfSortDir.value = 'desc' }
+}
+
+async function runGoetfScores() {
+  goetfLoading.value = true; goetfError.value = ''; goetfResult.value = null
+  try {
+    const r = await scoreService.getEtfScores([], goetfRfRate.value / 100)
+    goetfResult.value = r.data
+  } catch (e) {
+    goetfError.value = e.response?.data?.detail || e.message
+  } finally { goetfLoading.value = false }
+}
+
+const scoreBadgeClass = (s) => s >= 8 ? 'score-high' : s >= 6 ? 'score-mid' : s >= 4 ? 'score-low' : 'score-poor'
+const ratioClass = (v) => v === null || v === undefined ? '' : v >= 1 ? 'cell-green' : v >= 0 ? 'cell-yellow' : 'cell-red'
+const cvarClass = (v) => v === null || v === undefined ? '' : v > -10 ? 'cell-green' : v > -20 ? 'cell-yellow' : 'cell-red'
+const hitClass = (v) => v === null || v === undefined ? '' : v >= 0.55 ? 'cell-green' : v >= 0.5 ? 'cell-yellow' : 'cell-red'
+const geodivClass = (v) => v === null || v === undefined ? '' : v >= 0.7 ? 'cell-green' : v >= 0.5 ? 'cell-yellow' : 'cell-red'
+const uwClass = (v) => v === null || v === undefined ? '' : v < 90 ? 'cell-green' : v < 180 ? 'cell-yellow' : 'cell-red'
 
 // Risk Metrics tab
 const riskSelectedEtfs = ref([])
@@ -294,6 +468,7 @@ const hhiClass  = v  => v === null ? '' : v < 500 ? 'cell-green' : v < 2000 ? 'c
 onMounted(() => {
   loadETFs()
   runRiskMetrics()
+  runGoetfScores()
   if (analyticsInitTab.value) { activeTab.value = analyticsInitTab.value; analyticsInitTab.value = null }
 })
 </script>
@@ -333,4 +508,17 @@ onMounted(() => {
 .alloc-track{flex:1;height:8px;background:var(--border);border-radius:4px;overflow:hidden}
 .alloc-fill{height:100%;background:var(--green-500);border-radius:4px;transition:width .4s}
 .alloc-pct{width:45px;text-align:right;font-size:.8rem;font-weight:600;color:var(--text)}
+.score-badge{display:inline-block;padding:.2rem .55rem;border-radius:6px;font-size:.85rem;font-weight:700;min-width:2.4rem;text-align:center}
+.score-badge.score-lg{font-size:1.5rem;padding:.35rem .9rem;border-radius:10px}
+.score-high{background:#dbeafe;color:#0b6aa5}
+.score-mid{background:#e0f2fe;color:#2d9ee0}
+.score-low{background:#fef3c7;color:#92400e}
+.score-poor{background:#fee2e2;color:#b91c1c}
+.score-na{background:var(--bg-3);color:var(--text-muted)}
+[data-theme="dark"] .score-high{background:#0b3a5e;color:#93d5f0}
+[data-theme="dark"] .score-mid{background:#0a2d4a;color:#7ec8e3}
+[data-theme="dark"] .score-low{background:#3d2900;color:#fcd34d}
+[data-theme="dark"] .score-poor{background:#3d0000;color:#fca5a5}
+.tip-box{display:flex;gap:.75rem;align-items:flex-start;background:var(--bg-3);border:1px solid var(--border);border-radius:10px;padding:.85rem 1rem;margin-top:.5rem}
+.tip-icon{font-size:1.2rem;flex-shrink:0}
 </style>
