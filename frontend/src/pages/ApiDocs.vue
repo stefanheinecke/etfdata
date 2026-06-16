@@ -153,24 +153,37 @@ const groups = [
       },
       { id: 'get-etf', method: 'GET', short: '/etfs/{id}', path: '/etfs/{etf_id}',
         title: 'Get ETF by ID', desc: 'Returns full details of a single ETF.',
-        params: [{name:'etf_id',in:'path',type:'UUID',required:true,desc:'The ETF UUID'}],
-
+        params: [{name:'etf_id',in:'path',type:'string',required:true,desc:'ETF UUID or ticker symbol (e.g. SWDA)'}],
       },
       { id: 'holdings', method: 'GET', short: '/etfs/{id}/holdings', path: '/etfs/{etf_id}/holdings',
         title: 'Get Holdings', desc: 'Returns all holdings for an ETF on a given date (defaults to latest available date).',
         params: [
-          {name:'etf_id',in:'path',type:'UUID',required:true,desc:'The ETF UUID'},
+          {name:'etf_id',in:'path',type:'string',required:true,desc:'ETF UUID or ticker symbol (e.g. SWDA)'},
           {name:'date',in:'query',type:'date',required:false,desc:'Date in YYYY-MM-DD format'},
         ],
       },
       { id: 'allocations', method: 'GET', short: '/etfs/{id}/allocations', path: '/etfs/{etf_id}/allocations',
         title: 'Get Allocations', desc: 'Returns sector, country and currency allocations for an ETF.',
         params: [
-          {name:'etf_id',in:'path',type:'UUID',required:true,desc:'The ETF UUID'},
+          {name:'etf_id',in:'path',type:'string',required:true,desc:'ETF UUID or ticker symbol (e.g. SWDA)'},
           {name:'type',in:'query',type:'string',required:false,desc:'Filter: sector | country | currency'},
           {name:'date',in:'query',type:'date',required:false,desc:'Date in YYYY-MM-DD format'},
         ],
-
+      },
+      { id: 'performance', method: 'GET', short: '/etfs/{id}/performance', path: '/etfs/{etf_id}/performance',
+        title: 'Get Performance History', desc: 'Returns daily NAV/price data for an ETF, optionally filtered to a date range.',
+        params: [
+          {name:'etf_id',in:'path',type:'string',required:true,desc:'ETF UUID or ticker symbol (e.g. SWDA)'},
+          {name:'from_date',in:'query',type:'date',required:false,desc:'Start date YYYY-MM-DD'},
+          {name:'to_date',in:'query',type:'date',required:false,desc:'End date YYYY-MM-DD'},
+        ],
+      },
+      { id: 'etf-risk-metrics', method: 'GET', short: '/etfs/{id}/risk-metrics', path: '/etfs/{etf_id}/risk-metrics',
+        title: 'ETF Risk Metrics', desc: 'Returns annualised risk statistics (volatility, Sharpe ratio, max drawdown, HHI) computed from 1-year price history for a single ETF.',
+        params: [
+          {name:'etf_id',in:'path',type:'string',required:true,desc:'ETF UUID or ticker symbol (e.g. SWDA)'},
+          {name:'rf_rate',in:'query',type:'float',required:false,desc:'Annual risk-free rate as decimal (default 0.04 = 4%)'},
+        ],
       },
     ]
   },
@@ -179,28 +192,39 @@ const groups = [
     endpoints: [
       { id: 'overlap-post', method: 'POST', short: '/analytics/overlap', path: '/analytics/overlap',
         title: 'Multi-ETF Overlap', desc: 'Calculates the holdings overlap matrix between multiple ETFs.',
-        body: `{\n  "etf_ids": ["uuid-a", "uuid-b", "uuid-c"],\n  "date": "2026-05-24"  // optional\n}`,
+        body: `{\n  "etf_ids": ["SWDA", "CSSPX", "CSNDX"],  // UUID or ticker\n  "date": "2026-05-24"  // optional\n}`,
       },
       { id: 'overlap-get', method: 'GET', short: '/analytics/overlap/{a}/{b}', path: '/analytics/overlap/{etf_a}/{etf_b}',
         title: 'Pairwise Overlap', desc: 'Quick overlap calculation between exactly two ETFs.',
         params: [
-          {name:'etf_a',in:'path',type:'UUID',required:true,desc:'First ETF UUID'},
-          {name:'etf_b',in:'path',type:'UUID',required:true,desc:'Second ETF UUID'},
+          {name:'etf_a',in:'path',type:'string',required:true,desc:'First ETF UUID or ticker'},
+          {name:'etf_b',in:'path',type:'string',required:true,desc:'Second ETF UUID or ticker'},
           {name:'date',in:'query',type:'date',required:false,desc:'Date in YYYY-MM-DD format'},
         ],
-
       },
       { id: 'exposure', method: 'POST', short: '/analytics/exposure', path: '/analytics/exposure',
         title: 'Portfolio Exposure', desc: 'Analyses the combined sector, country and currency exposure of a weighted portfolio of ETFs.',
-        body: `{\n  "portfolio": [\n    {"etf_id": "uuid-a", "weight": 60},\n    {"etf_id": "uuid-b", "weight": 40}\n  ]\n}`,
+        body: `{\n  "portfolio": [\n    {"etf_id": "SWDA", "weight": 60},  // UUID or ticker\n    {"etf_id": "CSSPX", "weight": 40}\n  ]\n}`,
       },
       { id: 'similar', method: 'GET', short: '/analytics/similar/{id}', path: '/analytics/similar/{etf_id}',
         title: 'Find Similar ETFs', desc: 'Returns the top N most similar ETFs to a reference ETF based on holdings overlap.',
         params: [
-          {name:'etf_id',in:'path',type:'UUID',required:true,desc:'Reference ETF UUID'},
+          {name:'etf_id',in:'path',type:'string',required:true,desc:'ETF UUID or ticker symbol'},
           {name:'top_n',in:'query',type:'integer',required:false,desc:'Number of results (default 5)'},
         ],
-
+      },
+      { id: 'risk-metrics-get', method: 'GET', short: '/analytics/risk-metrics', path: '/analytics/risk-metrics',
+        title: 'All ETFs Risk Metrics', desc: 'Returns annualised risk statistics (volatility, Sharpe, max drawdown, HHI) for every tracked ETF ordered by ticker. Ideal for building a screening table.',
+        params: [
+          {name:'rf_rate',in:'query',type:'float',required:false,desc:'Annual risk-free rate as decimal (default 0.04 = 4%)'},
+        ],
+      },
+      { id: 'risk-metrics-post', method: 'POST', short: '/analytics/risk-metrics', path: '/analytics/risk-metrics',
+        title: 'Portfolio Risk Metrics', desc: 'Returns risk metrics for a specific subset of ETFs (by ticker or UUID). Use this to compare the ETFs that make up a portfolio side by side.',
+        body: `{\n  "etf_ids": ["SWDA", "CSSPX"]  // UUID or ticker\n}`,
+        params: [
+          {name:'rf_rate',in:'query',type:'float',required:false,desc:'Annual risk-free rate as decimal (default 0.04 = 4%)'},
+        ],
       },
     ]
   }
@@ -241,7 +265,12 @@ const tryoutConfigs = {
   'overlap-get':  { build: (id)  => ({ method: 'GET',  url: `${BASE}/analytics/overlap/${id}/${id}` }) },
   'exposure':     { build: (id, id2)  => ({ method: 'POST', url: `${BASE}/analytics/exposure`,
                                         body: { portfolio: [{ etf_id: id, weight: 60 }, { etf_id: id2, weight: 40 }] } }) },
-  'similar':      { build: (id)  => ({ method: 'GET',  url: `${BASE}/analytics/similar/${id}` }) },
+  'similar':           { build: (id) => ({ method: 'GET',  url: `${BASE}/analytics/similar/${id}` }) },
+  'performance':       { build: (id) => ({ method: 'GET',  url: `${BASE}/etfs/${id}/performance`, params: { limit: 30 } }) },
+  'etf-risk-metrics':  { build: (id) => ({ method: 'GET',  url: `${BASE}/etfs/${id}/risk-metrics` }) },
+  'risk-metrics-get':  { build: ()   => ({ method: 'GET',  url: `${BASE}/analytics/risk-metrics` }) },
+  'risk-metrics-post': { build: (id) => ({ method: 'POST', url: `${BASE}/analytics/risk-metrics`,
+                                            body: { etf_ids: [id] } }) },
 }
 
 const activeTryoutConfig = computed(() => tryoutConfigs[activeId.value])
@@ -419,19 +448,92 @@ exposure = r.json()`,
 ).then(r => r.json());`,
   },
   'similar': {
-    cURL: `curl "https://api.goetf.ch/analytics/similar/ETF_ID?top_n=5" \\
+    cURL: `curl "https://api.goetf.ch/analytics/similar/SWDA?top_n=5" \\
   -H "x-api-key: YOUR_API_KEY"`,
     Python: `import requests
 
 r = requests.get(
-    "https://api.goetf.ch/analytics/similar/ETF_ID",
+    "https://api.goetf.ch/analytics/similar/SWDA",
     params={"top_n": 5},
     headers={"x-api-key": "YOUR_API_KEY"}
 )
 similar = r.json()`,
     JavaScript: `const similar = await fetch(
-  "https://api.goetf.ch/analytics/similar/ETF_ID?top_n=5",
+  "https://api.goetf.ch/analytics/similar/SWDA?top_n=5",
   { headers: { "x-api-key": "YOUR_API_KEY" } }
+).then(r => r.json());`,
+  },
+  'performance': {
+    cURL: `curl "https://api.goetf.ch/etfs/SWDA/performance" \\
+  -H "x-api-key: YOUR_API_KEY"`,
+    Python: `import requests
+
+r = requests.get(
+    "https://api.goetf.ch/etfs/SWDA/performance",
+    params={"from_date": "2025-01-01"},
+    headers={"x-api-key": "YOUR_API_KEY"}
+)
+history = r.json()`,
+    JavaScript: `const history = await fetch(
+  "https://api.goetf.ch/etfs/SWDA/performance",
+  { headers: { "x-api-key": "YOUR_API_KEY" } }
+).then(r => r.json());`,
+  },
+  'etf-risk-metrics': {
+    cURL: `curl "https://api.goetf.ch/etfs/SWDA/risk-metrics" \\
+  -H "x-api-key: YOUR_API_KEY"`,
+    Python: `import requests
+
+r = requests.get(
+    "https://api.goetf.ch/etfs/SWDA/risk-metrics",
+    params={"rf_rate": 0.04},
+    headers={"x-api-key": "YOUR_API_KEY"}
+)
+metrics = r.json()`,
+    JavaScript: `const metrics = await fetch(
+  "https://api.goetf.ch/etfs/SWDA/risk-metrics?rf_rate=0.04",
+  { headers: { "x-api-key": "YOUR_API_KEY" } }
+).then(r => r.json());`,
+  },
+  'risk-metrics-get': {
+    cURL: `curl "https://api.goetf.ch/analytics/risk-metrics" \\
+  -H "x-api-key: YOUR_API_KEY"`,
+    Python: `import requests
+
+r = requests.get(
+    "https://api.goetf.ch/analytics/risk-metrics",
+    params={"rf_rate": 0.04},
+    headers={"x-api-key": "YOUR_API_KEY"}
+)
+all_metrics = r.json()`,
+    JavaScript: `const allMetrics = await fetch(
+  "https://api.goetf.ch/analytics/risk-metrics?rf_rate=0.04",
+  { headers: { "x-api-key": "YOUR_API_KEY" } }
+).then(r => r.json());`,
+  },
+  'risk-metrics-post': {
+    cURL: `curl -X POST https://api.goetf.ch/analytics/risk-metrics \\
+  -H "x-api-key: YOUR_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{"etf_ids": ["SWDA", "CSSPX"]}'`,
+    Python: `import requests
+
+r = requests.post(
+    "https://api.goetf.ch/analytics/risk-metrics",
+    headers={"x-api-key": "YOUR_API_KEY"},
+    json={"etf_ids": ["SWDA", "CSSPX"]}
+)
+metrics = r.json()`,
+    JavaScript: `const metrics = await fetch(
+  "https://api.goetf.ch/analytics/risk-metrics",
+  {
+    method: "POST",
+    headers: {
+      "x-api-key": "YOUR_API_KEY",
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ etf_ids: ["SWDA", "CSSPX"] })
+  }
 ).then(r => r.json());`,
   },
 }
