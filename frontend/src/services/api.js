@@ -28,8 +28,11 @@ export const etfService = {
   getAllocations(etfId, type = null, date = null) {
     return api.get(`/etfs/${etfId}/allocations`, { params: { type, date } })
   },
-  getETFRiskMetrics(etfId, rfRate = 0.04) {
-    return api.get(`/etfs/${etfId}/risk-metrics`, { params: { rf_rate: rfRate } })
+  getRiskMetrics(tickers = [], rfRate = 0.04) {
+    return api.get('/etfs/risk-metrics', { params: { tickers: tickers.join(','), rf_rate: rfRate } })
+  },
+  getPerformance(etfId, fromDate = null, toDate = null) {
+    return api.get(`/etfs/${etfId}/performance`, { params: { from_date: fromDate, to_date: toDate } })
   },
   deleteETF(etfId) {
     return api.delete(`/etfs/${etfId}`)

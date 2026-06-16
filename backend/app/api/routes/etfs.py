@@ -30,6 +30,29 @@ async def list_etfs(
         query = query.filter(ETF.provider == provider)
     return query.offset(skip).limit(limit).all()
 
+@router.get("/risk-metrics")
+async def get_etf_risk_metrics(
+    tickers: Optional[str] = None,
+    rf_rate: float = 0.04,
+    db: Session = Depends(get_db),
+    api_key: APIKey = Depends(verify_api_key)
+):
+    """Return risk metrics for one or more ETFs. tickers = comma-separated tickers or UUIDs."""
+    from app.services.analytics_service import AnalyticsService
+    from uuid import UUID
+    etf_ids = None
+    if tickers:
+        ticker_list = [t.strip() for t in tickers.split(",") if t.strip()]
+        if _is_demo(api_key):
+            if any(t.upper() != "SWDA" for t in ticker_list):
+                raise HTTPException(status_code=403, detail="Demo key only allows access to SWDA ETF")
+        resolved = [resolve_etf(db, t) for t in ticker_list]
+        etf_ids = [etf.id for etf in resolved]
+    elif _is_demo(api_key):
+        swda = db.query(ETF).filter(ETF.ticker == "SWDA").first()
+        etf_ids = [swda.id] if swda else []
+    return AnalyticsService.calculate_risk_metrics(db, rf_rate, etf_ids=etf_ids)
+
 @router.get("/{etf_id}", response_model=ETFResponse)
 async def get_etf(
     etf_id: str,
@@ -99,18 +122,22 @@ async def get_allocations(
     allocations = query.all()
     return [a for a in allocations]
 
-@router.get("/{etf_id}/risk-metrics")
-async def get_etf_risk_metrics(
+@router.get("/{etf_id}/performance")
+async def get_etf_performance(
     etf_id: str,
-    rf_rate: float = 0.04,
+    from_date: Optional[date_type] = None,
+    to_date: Optional[date_type] = None,
     db: Session = Depends(get_db),
     api_key: APIKey = Depends(verify_api_key)
 ):
+    from app.schemas import Performance
     etf = resolve_etf(db, etf_id)
     if _is_demo(api_key) and etf.ticker != "SWDA":
         raise HTTPException(status_code=403, detail="Demo key only allows access to SWDA ETF")
-    from app.services.analytics_service import AnalyticsService
-    result = AnalyticsService.calculate_risk_metrics(db, rf_rate, etf.id)
-    if not result:
-        raise HTTPException(status_code=404, detail="ETF not found")
-    return result[0]
+    query = db.query(Performance).filter(Performance.etf_id == etf.id)
+    if from_date:
+        query = query.filter(Performance.date >= from_date)
+    if to_date:
+        query = query.filter(Performance.date <= to_date)
+    rows = query.order_by(Performance.date.desc()).limit(1000).all()
+    return [{"date": str(r.date), "close_price": r.close_price, "nav": r.nav, "currency": r.currency, "dividend": r.dividend} for r in rows]
