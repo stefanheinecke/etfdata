@@ -170,11 +170,19 @@ const groups = [
           {name:'date',in:'query',type:'date',required:false,desc:'Date in YYYY-MM-DD format'},
         ],
       },
-      { id: 'etf-risk-metrics', method: 'GET', short: '/etfs/{id}/risk-metrics', path: '/etfs/{etf_id}/risk-metrics',
-        title: 'ETF Risk Metrics', desc: 'Returns annualised risk statistics (volatility, Sharpe ratio, max drawdown, HHI) computed from 1-year price history for a single ETF.',
+      { id: 'etf-risk-metrics', method: 'GET', short: '/etfs/risk-metrics', path: '/etfs/risk-metrics',
+        title: 'ETF Risk Metrics', desc: 'Returns annualised risk statistics (return, volatility, Sharpe ratio, max drawdown, HHI) for one or more ETFs. Omit tickers to return all ETFs.',
+        params: [
+          {name:'tickers',in:'query',type:'string',required:false,desc:'Comma-separated tickers or UUIDs (e.g. SWDA,CSSPX). Omit to return all.'},
+          {name:'rf_rate',in:'query',type:'float',required:false,desc:'Annual risk-free rate as decimal (default 0.04 = 4%)'},
+        ],
+      },
+      { id: 'etf-performance', method: 'GET', short: '/etfs/{id}/performance', path: '/etfs/{etf_id}/performance',
+        title: 'ETF Performance Data', desc: 'Returns daily close price, NAV and dividend data for an ETF (newest first, up to 1 000 rows).',
         params: [
           {name:'etf_id',in:'path',type:'string',required:true,desc:'ETF UUID or ticker symbol (e.g. SWDA)'},
-          {name:'rf_rate',in:'query',type:'float',required:false,desc:'Annual risk-free rate as decimal (default 0.04 = 4%)'},
+          {name:'from_date',in:'query',type:'date',required:false,desc:'Start date YYYY-MM-DD'},
+          {name:'to_date',in:'query',type:'date',required:false,desc:'End date YYYY-MM-DD'},
         ],
       },
     ]
@@ -226,10 +234,8 @@ const tryoutConfigs = {
   'allocations':  { build: (id)  => ({ method: 'GET',  url: `${BASE}/etfs/${id}/allocations` }) },
   'exposure':          { build: (id, id2) => ({ method: 'POST', url: `${BASE}/analytics/exposure`,
                                         body: { portfolio: [{ etf_id: id, weight: 60 }, { etf_id: id2, weight: 40 }] } }) },
-  'etf-risk-metrics':  { build: (id) => ({ method: 'GET',  url: `${BASE}/etfs/${id}/risk-metrics` }) },
-  'risk-metrics-get':  { build: ()   => ({ method: 'GET',  url: `${BASE}/analytics/risk-metrics` }) },
-  'risk-metrics-post': { build: (id) => ({ method: 'POST', url: `${BASE}/analytics/risk-metrics`,
-                                            body: { etf_ids: [id] } }) },
+  'etf-risk-metrics':  { build: ()    => ({ method: 'GET',  url: `${BASE}/etfs/risk-metrics`, params: { tickers: 'SWDA' } }) },
+  'etf-performance':   { build: (id)  => ({ method: 'GET',  url: `${BASE}/etfs/${id}/performance` }) },
 }
 
 const activeTryoutConfig = computed(() => tryoutConfigs[activeId.value])

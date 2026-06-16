@@ -143,12 +143,12 @@
             <button class="btn btn-outline" style="font-size:.8rem" @click="riskSelectedEtfs=[]">
               Clear selection
             </button>
+            <button class="btn btn-outline" style="font-size:.8rem" @click="runRiskMetrics" :disabled="riskLoading">
+              {{ riskLoading ? 'Loading…' : '↻ Recalculate' }}
+            </button>
           </div>
         </div>
-        <button class="btn btn-primary" @click="runRiskMetrics" :disabled="riskLoading">
-          {{ riskLoading ? 'Loading…' : 'Load Risk Metrics' }}
-        </button>
-        <span v-if="!riskSelectedEtfs.length" style="font-size:.8rem;color:var(--text-muted);margin-left:.75rem">No ETFs selected — will fetch all</span>
+        <span v-if="!riskSelectedEtfs.length" style="font-size:.8rem;color:var(--text-muted)">No ETFs selected — showing all</span>
       </div>
       <div v-if="riskError" class="error-box" style="margin-bottom:1rem">{{ riskError }}</div>
       <div v-if="riskResult" class="card" style="padding:0;overflow:hidden">
@@ -307,6 +307,7 @@ const hhiClass  = v  => v === null ? '' : v < 500 ? 'cell-green' : v < 2000 ? 'c
 
 onMounted(() => {
   loadETFs()
+  runRiskMetrics()
   if (analyticsInitTab.value) { activeTab.value = analyticsInitTab.value; analyticsInitTab.value = null }
 })
 </script>
