@@ -220,20 +220,21 @@ const secondEtfId = ref(null)
 
 async function fetchEtfIds() {
   if (swdaId.value) return
-  // Prefer the user's own key so we can get ≥2 ETFs; fall back to demo (SWDA-only)
-  const userKey = localStorage.getItem('api_key')
-  const key = userKey || 'demo'
+  // Always use the demo key for swdaId — demo always returns SWDA, so all single-ETF
+  // demos work with the demo key used in runTryout.
   try {
-    const res = await axios.get(`${BASE}/etfs`, { headers: { 'x-api-key': key }, params: { limit: 2 } })
-    swdaId.value     = res.data[0]?.id ?? null
-    secondEtfId.value = res.data[1]?.id ?? swdaId.value
-  } catch {
+    const demoRes = await axios.get(`${BASE}/etfs`, { headers: { 'x-api-key': 'demo' } })
+    swdaId.value = demoRes.data[0]?.id ?? null
+  } catch {}
+  // For the exposure demo (2 ETFs), try to pick a second ETF via the user's own key.
+  const userKey = localStorage.getItem('api_key')
+  if (userKey && swdaId.value) {
     try {
-      const res = await axios.get(`${BASE}/etfs`, { headers: { 'x-api-key': 'demo' } })
-      swdaId.value     = res.data[0]?.id ?? null
-      secondEtfId.value = swdaId.value
+      const res = await axios.get(`${BASE}/etfs`, { headers: { 'x-api-key': userKey }, params: { limit: 10 } })
+      secondEtfId.value = res.data.find(e => e.id !== swdaId.value)?.id ?? swdaId.value
     } catch {}
   }
+  if (!secondEtfId.value) secondEtfId.value = swdaId.value
 }
 
 const tryoutConfigs = {
