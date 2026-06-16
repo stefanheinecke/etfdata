@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GoETF.ch</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+    <style>
+      *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+      :root {
+        --green-50:  #e1f3ff;
+        --green-100: #c3e5ff;
+        --green-200: #93ccff;
+        --green-400: #2d9ee0;
+        --green-500: #1585c8;
+        --green-600: #0b6aa5;
+        --green-700: #085590;
+        --green-800: #063e6a;
+        --bg:        #e1f3ff;
+        --bg-2:      #edf8ff;
+        --bg-3:      #d6eeff;
+        --surface:   #ffffff;
+        --surface-2: #f0f8ff;
+        --border:    #bce0ff;
+        --text:      #0b6aa5;
+        --text-2:    #085590;
+        --text-muted:#5a90bb;
+        --shadow:    0 1px 3px rgba(11,106,165,.1), 0 1px 2px rgba(11,106,165,.08);
+        --shadow-md: 0 4px 6px rgba(11,106,165,.1), 0 2px 4px rgba(11,106,165,.08);
+        --shadow-lg: 0 10px 15px rgba(11,106,165,.08), 0 4px 6px rgba(11,106,165,.06);
+        --radius: 12px;
+        --radius-sm: 8px;
+      }
+      [data-theme="dark"] {
+        --bg: #0a0f0a;
+        --bg-2: #0f1a0f;
+        --bg-3: #111f11;
+        --surface: #131f13;
+        --surface-2: #1a2e1a;
+        --border: #1e3a1e;
+        --text: #f0fdf4;
+        --text-2: #dcfce7;
+        --text-muted: #86efac;
+        --shadow: 0 1px 3px rgba(0,0,0,.4), 0 1px 2px rgba(0,0,0,.3);
+        --shadow-md: 0 4px 6px rgba(0,0,0,.4), 0 2px 4px rgba(0,0,0,.3);
+        --shadow-lg: 0 10px 15px rgba(0,0,0,.4), 0 4px 6px rgba(0,0,0,.3);
+      }
+      html { scroll-behavior: smooth; }
+      body {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        transition: background .3s, color .3s;
+        line-height: 1.6;
+      }
+      #app { min-height: 100vh; display: flex; flex-direction: column; }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
