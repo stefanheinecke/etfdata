@@ -13,12 +13,14 @@ token = '5be49902b71187.60586218'
 # data = requests.get(url).json()
 # print(data)
 
+url = "https://etfdata-production.up.railway.app/analytics/exposure"
 r = requests.post(
-    "https://api.goetf.ch/analytics/exposure",
-    headers={"x-api-key": "39a2R5CpXxjXVIDVlniFRii889BRempM90-f-ItAdy0R0dWew5n_a3a1QFyYWnq7"},
-    json={"portfolio": [{"etf_id": "ETF_ID", "weight": 100}]}
+    url,
+    headers={"x-api-key": "YOUR API KEY"},
+    json={"portfolio": [{"etf_id": "SWDA", "weight": 50}, {"etf_id": "CSSPX", "weight": 50}]}
 )
 exposure = r.json()
+print(exposure)
 
 # url = f'https://eodhd.com/api/exchange-symbol-list/SW?api_token=5be49902b71187.60586218&fmt=json'
 # data = requests.get(url).json()
