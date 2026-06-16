@@ -367,9 +367,7 @@ const riskStats = computed(() => {
     { label: 'Volatility',   value: fmt(r.volatility),   color: volClr(r.volatility),   sub: 'Ann. std. deviation' },
     { label: 'Sharpe Ratio', value: r.sharpe_ratio != null ? r.sharpe_ratio.toFixed(2) : '—', color: sharpeClr(r.sharpe_ratio), sub: 'Rf = 4% p.a.' },
     { label: 'Max Drawdown', value: fmt(r.max_drawdown), color: ddClr(r.max_drawdown),  sub: 'Peak to trough' },
-    { label: 'HHI',          value: r.hhi != null ? Number(r.hhi).toFixed(0) : '—', color: hhiClr(r.hhi), sub: 'Holdings concentration' },
-    { label: 'HHI Country',  value: r.hhi_country != null ? Number(r.hhi_country).toFixed(0) : '—', color: hhiClr(r.hhi_country), sub: 'Country concentration' },
-    { label: 'HHI Sector',   value: r.hhi_sector  != null ? Number(r.hhi_sector).toFixed(0)  : '—', color: hhiClr(r.hhi_sector),  sub: 'Sector concentration' },
+    { label: 'HHI',          value: r.hhi != null ? Number(r.hhi).toFixed(0) : '—', color: hhiClr(r.hhi), sub: 'Concentration index' },
     { label: '# Holdings',   value: r.num_holdings?.toLocaleString() || '—', color: 'var(--text)', sub: 'Latest snapshot' },
   ]
 })

@@ -2,7 +2,7 @@
   <div class="page">
     <div class="page-header">
       <h1 class="page-title">Analytics</h1>
-      <p class="page-subtitle">Portfolio overlap analysis, exposure breakdown and ETF similarity search.</p>
+      <p class="page-subtitle">Portfolio exposure breakdown and risk metrics comparison.</p>
     </div>
     <div v-if="!hasApiKey" class="cta-banner">
       <div class="cta-text">
@@ -15,54 +15,6 @@
       <button v-for="t in tabs" :key="t.id" :class="['ana-tab',{active:activeTab===t.id}]" @click="activeTab=t.id">
         <span>{{ t.icon }}</span> {{ t.label }}
       </button>
-    </div>
-
-    <!-- OVERLAP -->
-    <div v-if="activeTab==='overlap'">
-      <div class="card" style="margin-bottom:1.5rem">
-        <h2 class="card-title">ETF Overlap Analysis</h2>
-        <p style="font-size:.875rem;color:var(--text-muted);margin-bottom:1rem">Select two or more ETFs to calculate their holdings overlap.</p>
-        <div v-if="etfsLoading" class="loading"><div class="spinner"></div> Loading ETFs...</div>
-        <div v-else>
-          <label class="label">Select ETFs (hold Ctrl/Cmd for multiple)</label>
-          <select class="input" multiple v-model="selectedIds" style="height:160px">
-            <option v-for="e in allEtfs" :key="e.id" :value="e.id">{{ e.ticker }} — {{ e.name }}</option>
-          </select>
-          <div style="margin-top:1rem">
-            <button class="btn btn-primary" @click="runOverlap" :disabled="selectedIds.length < 2 || overlapLoading">
-              {{ overlapLoading ? 'Calculating...' : 'Calculate Overlap' }}
-            </button>
-            <span style="font-size:.8rem;color:var(--text-muted);margin-left:.75rem">{{ selectedIds.length }} selected</span>
-          </div>
-        </div>
-      </div>
-      <div v-if="overlapError" class="error-box" style="margin-bottom:1rem">{{ overlapError }}</div>
-      <div v-if="overlapResult" class="card">
-        <h3 class="card-title">Overlap Matrix</h3>
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>ETF A</th><th>ETF B</th><th>Common Holdings</th><th>Overlap %</th></tr></thead>
-            <tbody>
-              <tr v-for="row in overlapRows" :key="row.key">
-                <td>{{ row.a }}</td><td>{{ row.b }}</td><td>{{ row.common }}</td>
-                <td>
-                  <div style="display:flex;align-items:center;gap:.5rem">
-                    <div class="alloc-track" style="width:80px"><div class="alloc-fill" :style="{width:row.pct+'%'}"></div></div>
-                    <strong>{{ row.pct.toFixed(1) }}%</strong>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <div style="margin-top:1rem">
-          <h4 class="card-title" style="font-size:.9rem">Common Holdings</h4>
-          <div v-if="overlapResult.common_holdings?.length" style="display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.5rem">
-            <span v-for="h in overlapResult.common_holdings" :key="h.isin" class="badge">{{ h.isin }}</span>
-          </div>
-          <p v-else style="font-size:.875rem;color:var(--text-muted)">No common holdings found.</p>
-        </div>
-      </div>
     </div>
 
     <!-- EXPOSURE -->
@@ -100,31 +52,39 @@
       </div>
     </div>
 
-    <!-- SIMILAR -->
-    <div v-if="activeTab==='similar'">
-      <div class="card" style="margin-bottom:1.5rem">
-        <h2 class="card-title">Find Similar ETFs</h2>
-        <p style="font-size:.875rem;color:var(--text-muted);margin-bottom:1rem">Find ETFs most similar to a reference ETF based on holdings overlap.</p>
-        <label class="label">Reference ETF</label>
-        <select class="input" v-model="similarId" style="max-width:400px">
-          <option value="">Select ETF...</option>
-          <option v-for="e in allEtfs" :key="e.id" :value="e.id">{{ e.ticker }} — {{ e.name }}</option>
-        </select>
-        <div style="margin-top:1rem">
-          <button class="btn btn-primary" @click="runSimilar" :disabled="!similarId||similarLoading">
-            {{ similarLoading ? 'Searching...' : 'Find Similar' }}
-          </button>
+      <!-- Portfolio Risk Metrics -->
+      <div v-if="portfolioRiskResult" class="card" style="margin-top:1.5rem;padding:0;overflow:hidden">
+        <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--border)">
+          <h3 class="card-title" style="margin:0">Portfolio Risk Metrics</h3>
         </div>
-      </div>
-      <div v-if="similarError" class="error-box" style="margin-bottom:1rem">{{ similarError }}</div>
-      <div v-if="similarResult?.similar_etfs?.length" class="etf-grid">
-        <div v-for="s in similarResult.similar_etfs" :key="s.etf_id" class="etf-card">
-          <div class="etf-card-top">
-            <span class="etf-ticker">{{ s.ticker || s.etf_id?.slice(0,8) }}</span>
-            <span class="badge">{{ s.overlap_percentage?.toFixed(1) }}% overlap</span>
-          </div>
-          <p class="etf-name">{{ s.name || s.etf_id }}</p>
-          <div class="alloc-track" style="margin-top:.75rem"><div class="alloc-fill" :style="{width:(s.overlap_percentage||0)+'%'}"></div></div>
+        <div class="table-wrap">
+          <table class="risk-table">
+            <thead>
+              <tr>
+                <th>Ticker</th>
+                <th>1Y Return</th>
+                <th>Volatility</th>
+                <th>Sharpe</th>
+                <th>Max Drawdown</th>
+                <th>HHI</th>
+                <th># Holdings</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="row in portfolioRiskResult" :key="row.etf_id">
+                <td><strong style="color:var(--green-600)">{{ row.ticker }}</strong></td>
+                <td :class="signClass(row.ann_return)">{{ fmtPct(row.ann_return) }}</td>
+                <td :class="volClass(row.volatility)">{{ fmtPct(row.volatility) }}</td>
+                <td :class="sharpeClass(row.sharpe_ratio)">{{ row.sharpe_ratio !== null ? row.sharpe_ratio : '—' }}</td>
+                <td :class="ddClass(row.max_drawdown)">{{ fmtPct(row.max_drawdown) }}</td>
+                <td :class="hhiClass(row.hhi)">{{ row.hhi !== null ? row.hhi.toFixed(0) : '—' }}</td>
+                <td>{{ row.num_holdings?.toLocaleString() }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div style="padding:.6rem 1.25rem;font-size:.72rem;color:var(--text-muted);border-top:1px solid var(--border)">
+          Rf = {{ riskFreeRate }}% &nbsp;·&nbsp; HHI: Herfindahl–Hirschman Index (0–10 000; lower = more diversified)
         </div>
       </div>
     </div>
@@ -208,39 +168,20 @@ const analyticsInitTab = inject('analyticsInitTab', ref(null))
 const hasApiKey = ref(!!localStorage.getItem('api_key'))
 window.addEventListener('storage', (e) => { if (e.key === 'api_key') hasApiKey.value = !!e.newValue })
 
-const activeTab = ref('risk')
+const activeTab = ref('exposure')
 const tabs = [
   {id:'risk',label:'Risk Metrics',icon:'📉'},
-  {id:'overlap',label:'Overlap Analysis',icon:'🔗'},
   {id:'exposure',label:'Portfolio Exposure',icon:'🌍'},
-  {id:'similar',label:'Similar ETFs',icon:'🔍'},
 ]
 const allEtfs = ref([])
 const etfsLoading = ref(false)
-
-// Overlap
-const selectedIds = ref([])
-const overlapLoading = ref(false)
-const overlapResult = ref(null)
-const overlapError = ref('')
-const overlapRows = computed(() => {
-  if (!overlapResult.value?.matrix) return []
-  const rows = []
-  const m = overlapResult.value.matrix
-  const ids = Object.keys(m)
-  for (let i=0;i<ids.length;i++) for (let j=i+1;j<ids.length;j++) {
-    const a=ids[i],b=ids[j]
-    const ea=allEtfs.value.find(e=>e.id===a),eb=allEtfs.value.find(e=>e.id===b)
-    rows.push({key:a+b,a:ea?.ticker||a.slice(0,8),b:eb?.ticker||b.slice(0,8),common:m[a]?.[b]?.common_count||0,pct:m[a]?.[b]?.overlap_percentage||0})
-  }
-  return rows
-})
 
 // Exposure
 const portfolio = ref([{etf_id:'',weight:50},{etf_id:'',weight:50}])
 const exposureLoading = ref(false)
 const exposureResult = ref(null)
 const exposureError = ref('')
+const portfolioRiskResult = ref(null)
 const exposureGroups = computed(() => {
   if (!exposureResult.value) return []
   const r = exposureResult.value
@@ -251,26 +192,21 @@ const exposureGroups = computed(() => {
   ].filter(g=>g.entries.length)
 })
 
-// Similar
-const similarId = ref('')
-const similarLoading = ref(false)
-const similarResult = ref(null)
-const similarError = ref('')
-
 async function loadETFs() {
   etfsLoading.value=true
   try { const r=await etfService.getETFs(0,50); allEtfs.value=r.data } catch(e){console.error(e)} finally{etfsLoading.value=false}
 }
-async function runOverlap() {
-  overlapLoading.value=true; overlapError.value=''; overlapResult.value=null
-  try { const r=await analyticsService.calculateOverlap(selectedIds.value); overlapResult.value=r.data }
-  catch(e){overlapError.value=e.response?.data?.detail||e.message} finally{overlapLoading.value=false}
-}
 async function runExposure() {
-  exposureLoading.value=true; exposureError.value=''; exposureResult.value=null
+  exposureLoading.value=true; exposureError.value=''; exposureResult.value=null; portfolioRiskResult.value=null
   const p=portfolio.value.filter(x=>x.etf_id)
-  try { const r=await analyticsService.calculateExposure(p); exposureResult.value=r.data }
-  catch(e){exposureError.value=e.response?.data?.detail||e.message} finally{exposureLoading.value=false}
+  try {
+    const [exposureR, riskR] = await Promise.all([
+      analyticsService.calculateExposure(p),
+      analyticsService.getPortfolioRiskMetrics(p.map(x=>x.etf_id), riskFreeRate.value / 100)
+    ])
+    exposureResult.value=exposureR.data
+    portfolioRiskResult.value=riskR.data
+  } catch(e){exposureError.value=e.response?.data?.detail||e.message} finally{exposureLoading.value=false}
 }
 // Risk metrics
 const riskLoading    = ref(false)
@@ -327,6 +263,7 @@ async function loadRisk() {
     riskLoading.value = false
   }
 }
+async function runSimilar() {}
 onMounted(() => {
   loadETFs(); loadRisk()
   if (analyticsInitTab.value) { activeTab.value = analyticsInitTab.value; analyticsInitTab.value = null }

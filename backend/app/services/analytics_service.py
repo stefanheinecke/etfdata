@@ -139,14 +139,16 @@ class AnalyticsService:
         return {"similar_etfs": similar_etfs}
 
     @staticmethod
-    def calculate_risk_metrics(db: Session, rf_annual: float = 0.04, etf_id: Optional[UUID] = None) -> list:
+    def calculate_risk_metrics(db: Session, rf_annual: float = 0.04, etf_id: Optional[UUID] = None, etf_ids: Optional[List[UUID]] = None) -> list:
         """Compute annualized volatility, Sharpe ratio, max drawdown, and HHI for every ETF.
-        Pass etf_id to compute for a single ETF only.
+        Pass etf_id to compute for a single ETF, etf_ids for a specific subset, or neither for all.
         """
         import math
 
         query = db.query(ETF)
-        if etf_id:
+        if etf_ids:
+            query = query.filter(ETF.id.in_(etf_ids))
+        elif etf_id:
             query = query.filter(ETF.id == etf_id)
         else:
             query = query.order_by(ETF.ticker)
@@ -165,8 +167,6 @@ class AnalyticsService:
                 "data_points":  0,
                 "hhi":          None,
                 "num_holdings": 0,
-                "hhi_country":  None,
-                "hhi_sector":   None,
             }
 
             # ── Price-based metrics ──────────────────────────────────────────
@@ -228,25 +228,6 @@ class AnalyticsService:
                 if total_w > 0:
                     normalized = [w / total_w for w in weights]
                     row["hhi"] = round(sum(w * w for w in normalized) * 10_000, 1)
-
-            # ── HHI from latest country & sector allocations ──────────────────
-            alloc_date = (
-                db.query(func.max(Allocation.date))
-                .filter(Allocation.etf_id == etf.id)
-                .scalar()
-            )
-            if alloc_date:
-                allocs = (
-                    db.query(Allocation)
-                    .filter(Allocation.etf_id == etf.id, Allocation.date == alloc_date)
-                    .all()
-                )
-                for alloc_type, field in (("country", "hhi_country"), ("sector", "hhi_sector")):
-                    bucket_weights = [float(a.weight) for a in allocs if a.type == alloc_type and a.weight is not None]
-                    total = sum(bucket_weights)
-                    if total > 0:
-                        norm = [w / total for w in bucket_weights]
-                        row[field] = round(sum(w * w for w in norm) * 10_000, 1)
 
             results.append(row)
 

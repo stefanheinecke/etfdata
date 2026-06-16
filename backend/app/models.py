@@ -86,6 +86,9 @@ class OverlapRequest(BaseModel):
     etf_ids: List[str]
     date: Optional[date] = None
 
+class RiskMetricsRequest(BaseModel):
+    etf_ids: List[str]
+
 class OverlapResponse(BaseModel):
     matrix: dict
     common_holdings: List[dict]

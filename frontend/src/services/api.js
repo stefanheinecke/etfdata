@@ -57,6 +57,9 @@ export const analyticsService = {
   },
   getRiskMetrics(rfRate = 0.04) {
     return api.get('/analytics/risk-metrics', { params: { rf_rate: rfRate } })
+  },
+  getPortfolioRiskMetrics(etfIds, rfRate = 0.04) {
+    return api.post('/analytics/risk-metrics', { etf_ids: etfIds }, { params: { rf_rate: rfRate } })
   }
 }
 
