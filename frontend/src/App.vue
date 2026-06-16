@@ -4,7 +4,7 @@
     <nav class="navbar">
       <div class="nav-inner">
         <div class="nav-brand" @click="currentPage = 'home'">
-          <span class="brand-icon">◈</span>
+          <img src="/goetf_logo.png" class="brand-logo" alt="GoETF.ch" />
           <span class="brand-name">GoETF.ch</span>
         </div>
         <ul class="nav-links">
@@ -63,7 +63,7 @@
     <footer class="footer">
       <div class="footer-inner">
         <div class="footer-brand">
-          <span class="brand-icon">◈</span>
+          <img src="/goetf_logo.png" class="brand-logo" alt="GoETF.ch" />
           <strong>GoETF.ch</strong>
         </div>
         <div class="footer-links">
@@ -218,7 +218,7 @@ onMounted(async () => {
   cursor: pointer; text-decoration: none;
   flex-shrink: 0;
 }
-.brand-icon { font-size: 1.5rem; color: var(--green-500); }
+.brand-logo { height: 28px; width: auto; object-fit: contain; flex-shrink: 0; }
 .brand-name { font-size: 1.2rem; font-weight: 700; color: var(--text); letter-spacing: -.02em; }
 .nav-links {
   display: flex; list-style: none; gap: .25rem;
@@ -227,9 +227,9 @@ onMounted(async () => {
 .nav-actions { display: flex; align-items: center; gap: .75rem; flex-shrink: 0; }
 .btn-get-key {
   padding: .4rem 1rem; border-radius: 8px; font-size: .875rem; font-weight: 700;
-  background: linear-gradient(135deg, #667eea, #764ba2);
+  background: linear-gradient(135deg, #1585c8, #0b6aa5);
   color: #fff; border: none; cursor: pointer;
-  box-shadow: 0 2px 8px rgba(102,126,234,.4);
+  box-shadow: 0 2px 8px rgba(11,106,165,.4);
   transition: opacity .15s, transform .1s;
   white-space: nowrap;
 }

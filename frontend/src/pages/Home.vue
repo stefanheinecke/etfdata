@@ -327,7 +327,7 @@ function switchDemo(key) {
 }
 [data-theme="dark"] .hero-badge { background: #064e3b; color: #6ee7b7; }
 .hero-title { font-size: clamp(1.5rem, 3.5vw, 2.1rem); font-weight: 800; line-height: 1.1; letter-spacing: -.04em; color: var(--text); }
-.gradient-text { background: linear-gradient(135deg, #22c55e, #16a34a); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+.gradient-text { background: linear-gradient(135deg, #1585c8, #0b6aa5); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
 .hero-sub { font-size: .875rem; color: var(--text-muted); margin: .6rem 0 1rem; line-height: 1.55; }
 .hero-actions { display: flex; gap: .75rem; flex-wrap: wrap; }
 .btn-lg { padding: .5rem 1.1rem; font-size: .875rem; }
