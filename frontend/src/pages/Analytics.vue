@@ -126,29 +126,15 @@
 
     <!-- RISK METRICS -->
     <div v-if="activeTab==='risk'">
-      <div class="card" style="margin-bottom:1.5rem">
-        <h2 class="card-title">Risk Metrics</h2>
-        <p style="font-size:.875rem;color:var(--text-muted);margin-bottom:1rem">Select ETFs to compare risk and performance metrics. Leave empty to load all.</p>
-        <div style="display:flex;gap:.75rem;align-items:center;flex-wrap:wrap;margin-bottom:.75rem">
-          <select class="input" v-model="riskSelectedEtfs" multiple style="flex:2;min-width:220px;height:120px">
-            <option v-for="e in allEtfs" :key="e.id" :value="e.id">{{ e.ticker }} — {{ e.name }}</option>
-          </select>
-          <div style="display:flex;flex-direction:column;gap:.5rem;align-items:flex-start">
-            <label style="font-size:.8rem;color:var(--text-muted)">Risk-free rate</label>
-            <div style="display:flex;align-items:center;gap:.4rem">
-              <input class="input" type="number" v-model.number="riskRfRate" min="0" max="20" step="0.5"
-                style="width:72px;padding:.3rem .5rem;font-size:.875rem" />
-              <span style="font-size:.8rem;color:var(--text-muted)">% p.a.</span>
-            </div>
-            <button class="btn btn-outline" style="font-size:.8rem" @click="riskSelectedEtfs=[]">
-              Clear selection
-            </button>
-            <button class="btn btn-outline" style="font-size:.8rem" @click="runRiskMetrics" :disabled="riskLoading">
-              {{ riskLoading ? 'Loading…' : '↻ Recalculate' }}
-            </button>
-          </div>
-        </div>
-        <span v-if="!riskSelectedEtfs.length" style="font-size:.8rem;color:var(--text-muted)">No ETFs selected — showing all</span>
+      <div class="card" style="margin-bottom:1.5rem;display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+        <h2 class="card-title" style="margin:0">Risk Metrics</h2>
+        <label style="font-size:.8rem;color:var(--text-muted);margin-left:auto">Risk-free rate</label>
+        <input class="input" type="number" v-model.number="riskRfRate" min="0" max="20" step="0.5"
+          style="width:72px;padding:.3rem .5rem;font-size:.875rem" />
+        <span style="font-size:.8rem;color:var(--text-muted)">% p.a.</span>
+        <button class="btn btn-outline" style="font-size:.875rem" @click="runRiskMetrics" :disabled="riskLoading">
+          {{ riskLoading ? 'Loading…' : '↻ Recalculate' }}
+        </button>
       </div>
       <div v-if="riskError" class="error-box" style="margin-bottom:1rem">{{ riskError }}</div>
       <div v-if="riskResult" class="card" style="padding:0;overflow:hidden">
