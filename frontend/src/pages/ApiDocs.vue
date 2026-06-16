@@ -170,14 +170,6 @@ const groups = [
           {name:'date',in:'query',type:'date',required:false,desc:'Date in YYYY-MM-DD format'},
         ],
       },
-      { id: 'performance', method: 'GET', short: '/etfs/{id}/performance', path: '/etfs/{etf_id}/performance',
-        title: 'Get Performance History', desc: 'Returns daily NAV/price data for an ETF, optionally filtered to a date range.',
-        params: [
-          {name:'etf_id',in:'path',type:'string',required:true,desc:'ETF UUID or ticker symbol (e.g. SWDA)'},
-          {name:'from_date',in:'query',type:'date',required:false,desc:'Start date YYYY-MM-DD'},
-          {name:'to_date',in:'query',type:'date',required:false,desc:'End date YYYY-MM-DD'},
-        ],
-      },
       { id: 'etf-risk-metrics', method: 'GET', short: '/etfs/{id}/risk-metrics', path: '/etfs/{etf_id}/risk-metrics',
         title: 'ETF Risk Metrics', desc: 'Returns annualised risk statistics (volatility, Sharpe ratio, max drawdown, HHI) computed from 1-year price history for a single ETF.',
         params: [
@@ -191,20 +183,10 @@ const groups = [
     label: 'Analytics',
     endpoints: [
       { id: 'exposure', method: 'POST', short: '/analytics/exposure', path: '/analytics/exposure',
-        title: 'Portfolio Exposure', desc: 'Analyses the combined sector, country and currency exposure of a weighted portfolio of ETFs.',
+        title: 'Portfolio Exposure & Risk', desc: 'Analyses a weighted portfolio of ETFs. Returns sector, country and currency exposure breakdown plus per-ETF risk metrics (volatility, Sharpe, max drawdown, HHI) and a portfolio-level weighted summary.',
         body: `{\n  "portfolio": [\n    {"etf_id": "SWDA", "weight": 60},  // UUID or ticker\n    {"etf_id": "CSSPX", "weight": 40}\n  ]\n}`,
-      },
-      { id: 'risk-metrics-get', method: 'GET', short: '/analytics/risk-metrics', path: '/analytics/risk-metrics',
-        title: 'All ETFs Risk Metrics', desc: 'Returns annualised risk statistics (volatility, Sharpe, max drawdown, HHI) for every tracked ETF ordered by ticker. Ideal for building a screening table.',
         params: [
-          {name:'rf_rate',in:'query',type:'float',required:false,desc:'Annual risk-free rate as decimal (default 0.04 = 4%)'},
-        ],
-      },
-      { id: 'risk-metrics-post', method: 'POST', short: '/analytics/risk-metrics', path: '/analytics/risk-metrics',
-        title: 'Portfolio Risk Metrics', desc: 'Returns risk metrics for a specific subset of ETFs (by ticker or UUID). Use this to compare the ETFs that make up a portfolio side by side.',
-        body: `{\n  "etf_ids": ["SWDA", "CSSPX"]  // UUID or ticker\n}`,
-        params: [
-          {name:'rf_rate',in:'query',type:'float',required:false,desc:'Annual risk-free rate as decimal (default 0.04 = 4%)'},
+          {name:'rf_rate',in:'query',type:'float',required:false,desc:'Annual risk-free rate as decimal for Sharpe (default 0.04 = 4%)'},
         ],
       },
     ]
@@ -244,7 +226,6 @@ const tryoutConfigs = {
   'allocations':  { build: (id)  => ({ method: 'GET',  url: `${BASE}/etfs/${id}/allocations` }) },
   'exposure':          { build: (id, id2) => ({ method: 'POST', url: `${BASE}/analytics/exposure`,
                                         body: { portfolio: [{ etf_id: id, weight: 60 }, { etf_id: id2, weight: 40 }] } }) },
-  'performance':       { build: (id) => ({ method: 'GET',  url: `${BASE}/etfs/${id}/performance` }) },
   'etf-risk-metrics':  { build: (id) => ({ method: 'GET',  url: `${BASE}/etfs/${id}/risk-metrics` }) },
   'risk-metrics-get':  { build: ()   => ({ method: 'GET',  url: `${BASE}/analytics/risk-metrics` }) },
   'risk-metrics-post': { build: (id) => ({ method: 'POST', url: `${BASE}/analytics/risk-metrics`,
@@ -376,6 +357,22 @@ history = r.json()`,
   { headers: { "x-api-key": "YOUR_API_KEY" } }
 ).then(r => r.json());`,
   },
+  'performance': {
+    cURL: `curl "https://api.goetf.ch/etfs/SWDA/performance" \\
+  -H "x-api-key: YOUR_API_KEY"`,
+    Python: `import requests
+
+r = requests.get(
+    "https://api.goetf.ch/etfs/SWDA/performance",
+    params={"from_date": "2025-01-01"},
+    headers={"x-api-key": "YOUR_API_KEY"}
+)
+history = r.json()`,
+    JavaScript: `const history = await fetch(
+  "https://api.goetf.ch/etfs/SWDA/performance",
+  { headers: { "x-api-key": "YOUR_API_KEY" } }
+).then(r => r.json());`,
+  },
   'etf-risk-metrics': {
     cURL: `curl "https://api.goetf.ch/etfs/SWDA/risk-metrics" \\
   -H "x-api-key: YOUR_API_KEY"`,
@@ -393,7 +390,7 @@ metrics = r.json()`,
 ).then(r => r.json());`,
   },
   'exposure': {
-    cURL: `curl -X POST https://api.goetf.ch/analytics/exposure \\
+    cURL: `curl -X POST "https://api.goetf.ch/analytics/exposure?rf_rate=0.04" \\
   -H "x-api-key: YOUR_API_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{"portfolio": [{"etf_id": "SWDA", "weight": 60}, {"etf_id": "CSSPX", "weight": 40}]}'`,
@@ -401,21 +398,32 @@ metrics = r.json()`,
 
 r = requests.post(
     "https://api.goetf.ch/analytics/exposure",
+    params={"rf_rate": 0.04},
     headers={"x-api-key": "YOUR_API_KEY"},
-    json={"portfolio": [{"etf_id": "SWDA", "weight": 60}, {"etf_id": "CSSPX", "weight": 40}]}
+    json={"portfolio": [
+        {"etf_id": "SWDA", "weight": 60},
+        {"etf_id": "CSSPX", "weight": 40}
+    ]}
 )
-exposure = r.json()`,
-    JavaScript: `const exposure = await fetch(
-  "https://api.goetf.ch/analytics/exposure",
+# Response includes sectors, countries, currencies + risk_metrics per ETF
+result = r.json()`,
+    JavaScript: `const result = await fetch(
+  "https://api.goetf.ch/analytics/exposure?rf_rate=0.04",
   {
     method: "POST",
     headers: {
       "x-api-key": "YOUR_API_KEY",
       "Content-Type": "application/json"
     },
-    body: JSON.stringify({ portfolio: [{ etf_id: "SWDA", weight: 60 }, { etf_id: "CSSPX", weight: 40 }] })
+    body: JSON.stringify({
+      portfolio: [
+        { etf_id: "SWDA", weight: 60 },
+        { etf_id: "CSSPX", weight: 40 }
+      ]
+    })
   }
-).then(r => r.json());`,
+).then(r => r.json());
+// result.sectors / result.countries / result.currencies / result.risk_metrics`,
   },
   'risk-metrics-get': {
     cURL: `curl "https://api.goetf.ch/analytics/risk-metrics" \\

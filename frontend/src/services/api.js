@@ -28,9 +28,6 @@ export const etfService = {
   getAllocations(etfId, type = null, date = null) {
     return api.get(`/etfs/${etfId}/allocations`, { params: { type, date } })
   },
-  getPerformance(etfId, fromDate = null, toDate = null) {
-    return api.get(`/etfs/${etfId}/performance`, { params: { from_date: fromDate, to_date: toDate } })
-  },
   getETFRiskMetrics(etfId, rfRate = 0.04) {
     return api.get(`/etfs/${etfId}/risk-metrics`, { params: { rf_rate: rfRate } })
   },
@@ -43,15 +40,9 @@ export const etfService = {
 }
 
 export const analyticsService = {
-  calculateExposure(portfolio, date = null) {
-    return api.post('/analytics/exposure', { portfolio }, { params: { date } })
+  calculateExposure(portfolio, date = null, rfRate = 0.04) {
+    return api.post('/analytics/exposure', { portfolio }, { params: { date, rf_rate: rfRate } })
   },
-  getRiskMetrics(rfRate = 0.04) {
-    return api.get('/analytics/risk-metrics', { params: { rf_rate: rfRate } })
-  },
-  getPortfolioRiskMetrics(etfIds, rfRate = 0.04) {
-    return api.post('/analytics/risk-metrics', { etf_ids: etfIds }, { params: { rf_rate: rfRate } })
-  }
 }
 
 export const healthService = {

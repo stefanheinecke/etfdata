@@ -99,30 +99,6 @@ async def get_allocations(
     allocations = query.all()
     return [a for a in allocations]
 
-@router.get("/{etf_id}/performance")
-async def get_performance(
-    etf_id: str,
-    from_date: Optional[date_type] = None,
-    to_date: Optional[date_type] = None,
-    db: Session = Depends(get_db),
-    api_key: APIKey = Depends(verify_api_key)
-):
-    from app.schemas import Performance
-
-    etf = resolve_etf(db, etf_id)
-    if _is_demo(api_key) and etf.ticker != "SWDA":
-        raise HTTPException(status_code=403, detail="Demo key only allows access to SWDA ETF")
-
-    query = db.query(Performance).filter(Performance.etf_id == etf.id)
-
-    if from_date:
-        query = query.filter(Performance.date >= from_date)
-    if to_date:
-        query = query.filter(Performance.date <= to_date)
-
-    performance = query.order_by(Performance.date).all()
-    return [p for p in performance]
-
 @router.get("/{etf_id}/risk-metrics")
 async def get_etf_risk_metrics(
     etf_id: str,

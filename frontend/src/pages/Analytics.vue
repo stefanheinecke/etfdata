@@ -2,7 +2,7 @@
   <div class="page">
     <div class="page-header">
       <h1 class="page-title">Analytics</h1>
-      <p class="page-subtitle">Portfolio exposure breakdown and risk metrics comparison.</p>
+      <p class="page-subtitle">Portfolio exposure breakdown and per-ETF risk metrics in one call.</p>
     </div>
     <div v-if="!hasApiKey" class="cta-banner">
       <div class="cta-text">
@@ -30,11 +30,15 @@
           <input class="input" type="number" v-model.number="item.weight" placeholder="Weight %" style="flex:1;max-width:120px" min="0" max="100" />
           <button class="btn btn-outline" @click="portfolio.splice(i,1)" style="flex-shrink:0">✕</button>
         </div>
-        <div style="display:flex;gap:.75rem;margin-top:.75rem">
+        <div style="display:flex;gap:.75rem;margin-top:.75rem;align-items:center;flex-wrap:wrap">
           <button class="btn btn-outline" @click="portfolio.push({etf_id:'',weight:0})">+ Add ETF</button>
           <button class="btn btn-primary" @click="runExposure" :disabled="exposureLoading || !portfolio.some(p=>p.etf_id)">
             {{ exposureLoading ? 'Calculating...' : 'Analyse Exposure' }}
           </button>
+          <label style="font-size:.8rem;color:var(--text-muted);margin-left:auto">Risk-free rate</label>
+          <input class="input" type="number" v-model.number="riskFreeRate" min="0" max="20" step="0.5"
+            style="width:72px;padding:.3rem .5rem;font-size:.875rem" />
+          <span style="font-size:.8rem;color:var(--text-muted)">% p.a.</span>
         </div>
       </div>
       <div v-if="exposureError" class="error-box" style="margin-bottom:1rem">{{ exposureError }}</div>
@@ -119,74 +123,6 @@
           Rf = {{ riskFreeRate }}% &nbsp;·&nbsp; HHI: Herfindahl–Hirschman Index (0–10 000; lower = more diversified)
         </div>
       </div>      </div>    </div>
-
-    <!-- RISK METRICS -->
-    <div v-if="activeTab==='risk'">
-      <div class="card" style="margin-bottom:1rem">
-        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.75rem">
-          <div>
-            <h2 class="card-title">Risk Metrics Overview</h2>
-            <p style="font-size:.875rem;color:var(--text-muted)">Annualised statistics computed from 1-year daily price history and current holdings.</p>
-          </div>
-          <div style="display:flex;align-items:center;gap:.5rem">
-            <label style="font-size:.8rem;color:var(--text-muted)">Risk-free rate</label>
-            <input class="input" type="number" v-model.number="riskFreeRate" min="0" max="20" step="0.5"
-              style="width:80px;padding:.3rem .5rem;font-size:.875rem" />
-            <span style="font-size:.8rem;color:var(--text-muted)">%</span>
-            <button class="btn btn-primary" @click="loadRisk" :disabled="riskLoading" style="padding:.35rem .9rem">
-              {{ riskLoading ? 'Loading…' : riskResult ? 'Refresh' : 'Load' }}
-            </button>
-          </div>
-        </div>
-      </div>
-      <div v-if="riskError" class="error-box" style="margin-bottom:1rem">{{ riskError }}</div>
-      <div v-if="riskResult" class="card" style="padding:0;overflow:hidden">
-        <div class="table-wrap">
-          <table class="risk-table">
-            <thead>
-              <tr>
-                <th v-for="col in riskCols" :key="col.key" @click="setRiskSort(col.key)" class="sortable-th">
-                  {{ col.label }}
-                  <span class="sort-arrow" v-if="riskSortKey===col.key">{{ riskSortDir==='asc' ? '▲' : '▼' }}</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="row in riskRows" :key="row.etf_id">
-                <td><strong style="color:var(--green-600)">{{ row.ticker }}</strong></td>
-                <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ row.name }}</td>
-                <td :class="signClass(row.ann_return)">{{ fmtPct(row.ann_return) }}</td>
-                <td :class="volClass(row.volatility)">{{ fmtPct(row.volatility) }}</td>
-                <td :class="sharpeClass(row.sharpe_ratio)">{{ row.sharpe_ratio !== null ? row.sharpe_ratio : '—' }}</td>
-                <td :class="ddClass(row.max_drawdown)">{{ fmtPct(row.max_drawdown) }}</td>
-                <td :class="hhiClass(row.hhi)">
-                  <span v-if="row.hhi !== null">{{ row.hhi.toFixed(0) }}</span>
-                  <span v-else>—</span>
-                </td>
-                <td style="text-align:right">{{ row.num_holdings.toLocaleString() }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <div style="padding:.75rem 1.25rem;font-size:.75rem;color:var(--text-muted);border-top:1px solid var(--border)">
-          Volatility &amp; Sharpe: annualised from daily log-returns &nbsp;·&nbsp;
-          Max Drawdown: peak-to-trough over 1 year &nbsp;·&nbsp;
-          HHI: Herfindahl–Hirschman Index (0–10 000; lower = more diversified) &nbsp;·&nbsp;
-          Risk-free rate used: {{ riskFreeRate }}%
-        </div>
-        <div style="padding:.5rem 1.25rem .75rem;font-size:.72rem;color:var(--text-muted);opacity:.7;display:flex;flex-wrap:wrap;gap:.25rem 1.5rem">
-          <span><span style="color:#16a34a">■</span> / <span style="color:#ca8a04">■</span> / <span style="color:#ef4444">■</span> &nbsp;colour thresholds:</span>
-          <span><strong>1Y Return</strong> ≥ 0% / &lt; 0%</span>
-          <span><strong>Volatility</strong> &lt; 12% / 12–22% / &gt; 22%</span>
-          <span><strong>Sharpe</strong> ≥ 1 / 0–1 / &lt; 0</span>
-          <span><strong>Max Drawdown</strong> &gt; −10% / −10 to −20% / &lt; −20%</span>
-          <span><strong>HHI</strong> &lt; 500 / 500–2 000 / &gt; 2 000</span>
-        </div>
-      </div>
-      <div v-else-if="!riskLoading" class="card" style="text-align:center;padding:2rem;color:var(--text-muted)">
-        Click <strong>Load</strong> to compute risk metrics for all ETFs.
-      </div>
-    </div>
   </div>
 </template>
 
@@ -202,7 +138,6 @@ window.addEventListener('storage', (e) => { if (e.key === 'api_key') hasApiKey.v
 const activeTab = ref('exposure')
 const tabs = [
   {id:'exposure',label:'Portfolio Exposure',icon:'🌍'},
-  {id:'risk',label:'Risk Metrics',icon:'📉'},
 ]
 const allEtfs = ref([])
 const etfsLoading = ref(false)
@@ -251,49 +186,13 @@ async function runExposure() {
   exposureLoading.value=true; exposureError.value=''; exposureResult.value=null; portfolioRiskResult.value=null
   const p=portfolio.value.filter(x=>x.etf_id)
   try {
-    const [exposureR, riskR] = await Promise.all([
-      analyticsService.calculateExposure(p),
-      analyticsService.getPortfolioRiskMetrics(p.map(x=>x.etf_id), riskFreeRate.value / 100)
-    ])
-    exposureResult.value=exposureR.data
-    portfolioRiskResult.value=riskR.data
+    const r = await analyticsService.calculateExposure(p, null, riskFreeRate.value / 100)
+    exposureResult.value = r.data
+    portfolioRiskResult.value = r.data.risk_metrics ?? null
   } catch(e){exposureError.value=e.response?.data?.detail||e.message} finally{exposureLoading.value=false}
 }
-// Risk metrics
-const riskLoading    = ref(false)
-const riskError      = ref('')
-const riskResult     = ref(null)
-const riskFreeRate   = ref(4.0)     // % per year
-const riskSortKey    = ref('ticker')
-const riskSortDir    = ref('asc')
-
-const riskCols = [
-  { key: 'ticker',       label: 'Ticker' },
-  { key: 'name',         label: 'Name' },
-  { key: 'ann_return',   label: '1Y Return' },
-  { key: 'volatility',   label: 'Volatility (ann.)' },
-  { key: 'sharpe_ratio', label: 'Sharpe Ratio' },
-  { key: 'max_drawdown', label: 'Max Drawdown' },
-  { key: 'hhi',          label: 'HHI' },
-  { key: 'num_holdings', label: '# Holdings' },
-]
-
-function setRiskSort(key) {
-  if (riskSortKey.value === key) riskSortDir.value = riskSortDir.value === 'asc' ? 'desc' : 'asc'
-  else { riskSortKey.value = key; riskSortDir.value = 'asc' }
-}
-
-const riskRows = computed(() => {
-  if (!riskResult.value) return []
-  const dir = riskSortDir.value === 'asc' ? 1 : -1
-  return [...riskResult.value].sort((a, b) => {
-    const av = a[riskSortKey.value], bv = b[riskSortKey.value]
-    if (av === null && bv === null) return 0
-    if (av === null) return 1
-    if (bv === null) return -1
-    return typeof av === 'string' ? av.localeCompare(bv) * dir : (av - bv) * dir
-  })
-})
+// Risk-free rate (used for portfolio Sharpe in summary)
+const riskFreeRate = ref(4.0)     // % per year
 
 // Formatting & colour helpers
 const fmtPct = v => v !== null && v !== undefined ? `${v >= 0 ? '+' : ''}${v.toFixed(2)}%` : '—'
@@ -303,20 +202,10 @@ const sharpeClass = v => v === null ? '' : v >= 1 ? 'cell-green' : v >= 0 ? 'cel
 const ddClass   = v  => v === null ? '' : v > -10 ? 'cell-green' : v > -20 ? 'cell-yellow' : 'cell-red'
 const hhiClass  = v  => v === null ? '' : v < 500 ? 'cell-green' : v < 2000 ? 'cell-yellow' : 'cell-red'
 
-async function loadRisk() {
-  riskLoading.value = true; riskError.value = ''; riskResult.value = null
-  try {
-    const r = await analyticsService.getRiskMetrics(riskFreeRate.value / 100)
-    riskResult.value = r.data
-  } catch (e) {
-    riskError.value = e.response?.data?.detail || e.message
-  } finally {
-    riskLoading.value = false
-  }
-}
+async function loadRisk() {}
 async function runSimilar() {}
 onMounted(() => {
-  loadETFs(); loadRisk()
+  loadETFs()
   if (analyticsInitTab.value) { activeTab.value = analyticsInitTab.value; analyticsInitTab.value = null }
 })
 </script>
