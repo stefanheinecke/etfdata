@@ -50,7 +50,6 @@
           </div>
         </div>
       </div>
-    </div>
 
       <!-- Portfolio Risk Metrics -->
       <div v-if="portfolioRiskResult" class="card" style="margin-top:1.5rem;padding:0;overflow:hidden">
