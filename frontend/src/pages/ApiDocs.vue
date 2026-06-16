@@ -211,14 +211,24 @@ const active = computed(() => allEndpoints.value.find(e => e.id === activeId.val
 
 // ── Try it out ─────────────────────────────────────────────────────────────
 const swdaId = ref(null)
+const secondEtfId = ref(null)
 
-async function fetchSwdaId() {
-  if (swdaId.value) return swdaId.value
+async function fetchEtfIds() {
+  if (swdaId.value) return
+  // Prefer the user's own key so we can get ≥2 ETFs; fall back to demo (SWDA-only)
+  const userKey = localStorage.getItem('api_key')
+  const key = userKey || 'demo'
   try {
-    const res = await axios.get(`${BASE}/etfs`, { headers: { 'x-api-key': 'demo' } })
-    swdaId.value = res.data[0]?.id ?? null
-  } catch {}
-  return swdaId.value
+    const res = await axios.get(`${BASE}/etfs`, { headers: { 'x-api-key': key }, params: { limit: 2 } })
+    swdaId.value     = res.data[0]?.id ?? null
+    secondEtfId.value = res.data[1]?.id ?? swdaId.value
+  } catch {
+    try {
+      const res = await axios.get(`${BASE}/etfs`, { headers: { 'x-api-key': 'demo' } })
+      swdaId.value     = res.data[0]?.id ?? null
+      secondEtfId.value = swdaId.value
+    } catch {}
+  }
 }
 
 const tryoutConfigs = {
@@ -229,8 +239,8 @@ const tryoutConfigs = {
   'overlap-post': { build: (id)  => ({ method: 'POST', url: `${BASE}/analytics/overlap`,
                                         body: { etf_ids: [id, id] } }) },
   'overlap-get':  { build: (id)  => ({ method: 'GET',  url: `${BASE}/analytics/overlap/${id}/${id}` }) },
-  'exposure':     { build: (id)  => ({ method: 'POST', url: `${BASE}/analytics/exposure`,
-                                        body: { portfolio: [{ etf_id: id, weight: 100 }] } }) },
+  'exposure':     { build: (id, id2)  => ({ method: 'POST', url: `${BASE}/analytics/exposure`,
+                                        body: { portfolio: [{ etf_id: id, weight: 60 }, { etf_id: id2, weight: 40 }] } }) },
   'similar':      { build: (id)  => ({ method: 'GET',  url: `${BASE}/analytics/similar/${id}` }) },
 }
 
@@ -255,8 +265,10 @@ async function runTryout() {
   state.error  = null
   state.status = null
   try {
-    const id  = await fetchSwdaId()
-    const req = cfg.build(id)
+    await fetchEtfIds()
+    const id  = swdaId.value
+    const id2 = secondEtfId.value ?? id
+    const req = cfg.build(id, id2)
     const axiosCfg = { method: req.method, url: req.url, headers: { 'x-api-key': 'demo' } }
     if (req.body) { axiosCfg.data = req.body; axiosCfg.headers['Content-Type'] = 'application/json' }
     if (req.params) axiosCfg.params = req.params
