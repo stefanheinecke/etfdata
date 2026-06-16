@@ -170,7 +170,7 @@ function close() {
   margin: 0 0 1.25rem;
 }
 
-.success-sub { color: #15803d; font-weight: 500; }
+.success-sub { color: #0b6aa5; font-weight: 500; }
 
 .form-field { margin-bottom: 1rem; }
 

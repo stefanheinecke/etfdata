@@ -444,7 +444,7 @@ pre {
 }
 .mobile-menu-item:hover { background: var(--bg-3); color: var(--text); }
 .mobile-menu-item.active { background: var(--green-100); color: var(--green-700); font-weight: 600; }
-[data-theme="dark"] .mobile-menu-item.active { background: #052e16; color: #6ee7b7; }
+[data-theme="dark"] .mobile-menu-item.active { background: #041a33; color: #7ec8e3; }
 .mobile-menu-getkey { color: #667eea; font-weight: 700; }
 .slide-down-enter-active, .slide-down-leave-active { transition: all .2s ease; }
 .slide-down-enter-from, .slide-down-leave-to { opacity: 0; transform: translateY(-10px); }

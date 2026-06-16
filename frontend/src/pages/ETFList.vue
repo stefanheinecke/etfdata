@@ -207,7 +207,7 @@ onMounted(loadETFs)
 .etf-isin{font-size:.75rem;color:var(--text-muted);font-family:monospace;margin-bottom:.75rem}
 .etf-meta{display:flex;gap:.75rem;font-size:.8rem;color:var(--text-muted);flex-wrap:wrap}
 .etf-replication{margin-top:.5rem;font-size:.75rem;color:var(--text-muted)}
-.badge-acc{background:#d1fae5;color:#065f46;border-radius:4px;padding:1px 6px;font-size:.7rem;font-weight:600}
+.badge-acc{background:#c3e5ff;color:#0b6aa5;border-radius:4px;padding:1px 6px;font-size:.7rem;font-weight:600}
 .badge-dist{background:#dbeafe;color:#1e40af;border-radius:4px;padding:1px 6px;font-size:.7rem;font-weight:600}
 .cta-banner{display:flex;align-items:center;justify-content:space-between;gap:1rem;background:linear-gradient(135deg,#667eea15,#764ba215);border:1.5px solid #667eea55;border-radius:12px;padding:1rem 1.25rem;margin-bottom:1.5rem;flex-wrap:wrap}
 .cta-text{display:flex;flex-direction:column;gap:.2rem;font-size:.9rem}

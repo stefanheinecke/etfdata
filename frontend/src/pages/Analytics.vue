@@ -226,7 +226,7 @@ onMounted(() => {
 .stat-box .stat-value{font-size:1.25rem}
 .sortable-th:hover{color:var(--green-600)}
 .sort-arrow{margin-left:.25rem;font-size:.7rem}
-.cell-green{color:#16a34a;font-weight:600}
+.cell-green{color:#0b6aa5;font-weight:600}
 .cell-yellow{color:#ca8a04;font-weight:600}
 .cell-red{color:#ef4444;font-weight:600}
 .table-wrap{overflow-x:auto}
