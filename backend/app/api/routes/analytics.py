@@ -6,34 +6,11 @@ from sqlalchemy.orm import Session
 from app.db.database import get_db
 from app.core.auth import verify_api_key
 from app.schemas import APIKey
-from app.models import OverlapRequest, ExposureRequest, RiskMetricsRequest
+from app.models import ExposureRequest, RiskMetricsRequest
 from app.services.analytics_service import AnalyticsService
 from app.api.utils import resolve_etf
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])
-
-@router.post("/overlap")
-async def calculate_overlap(
-    request: OverlapRequest,
-    db: Session = Depends(get_db),
-    api_key: APIKey = Depends(verify_api_key)
-):
-    resolved_ids = [resolve_etf(db, ref).id for ref in request.etf_ids]
-    result = AnalyticsService.calculate_overlap(db, resolved_ids, request.date)
-    return result
-
-@router.get("/overlap/{etf_a}/{etf_b}")
-async def pairwise_overlap(
-    etf_a: str,
-    etf_b: str,
-    date: Optional[date_type] = None,
-    db: Session = Depends(get_db),
-    api_key: APIKey = Depends(verify_api_key)
-):
-    id_a = resolve_etf(db, etf_a).id
-    id_b = resolve_etf(db, etf_b).id
-    result = AnalyticsService.calculate_overlap(db, [id_a, id_b], date)
-    return result
 
 @router.post("/exposure")
 async def calculate_exposure(
@@ -47,17 +24,6 @@ async def calculate_exposure(
         for item in request.portfolio
     ]
     result = AnalyticsService.calculate_portfolio_exposure(db, resolved_portfolio, date)
-    return result
-
-@router.get("/similar/{etf_id}")
-async def find_similar(
-    etf_id: str,
-    top_n: int = 5,
-    db: Session = Depends(get_db),
-    api_key: APIKey = Depends(verify_api_key)
-):
-    resolved_id = resolve_etf(db, etf_id).id
-    result = AnalyticsService.find_similar_etfs(db, resolved_id, top_n)
     return result
 
 @router.get("/risk-metrics")

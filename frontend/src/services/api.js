@@ -43,17 +43,8 @@ export const etfService = {
 }
 
 export const analyticsService = {
-  calculateOverlap(etfIds, date = null) {
-    return api.post('/analytics/overlap', { etf_ids: etfIds, date })
-  },
-  pairwiseOverlap(etfA, etfB, date = null) {
-    return api.get(`/analytics/overlap/${etfA}/${etfB}`, { params: { date } })
-  },
   calculateExposure(portfolio, date = null) {
     return api.post('/analytics/exposure', { portfolio }, { params: { date } })
-  },
-  findSimilar(etfId, topN = 5) {
-    return api.get(`/analytics/similar/${etfId}`, { params: { top_n: topN } })
   },
   getRiskMetrics(rfRate = 0.04) {
     return api.get('/analytics/risk-metrics', { params: { rf_rate: rfRate } })

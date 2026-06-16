@@ -190,28 +190,9 @@ const groups = [
   {
     label: 'Analytics',
     endpoints: [
-      { id: 'overlap-post', method: 'POST', short: '/analytics/overlap', path: '/analytics/overlap',
-        title: 'Multi-ETF Overlap', desc: 'Calculates the holdings overlap matrix between multiple ETFs.',
-        body: `{\n  "etf_ids": ["SWDA", "CSSPX", "CSNDX"],  // UUID or ticker\n  "date": "2026-05-24"  // optional\n}`,
-      },
-      { id: 'overlap-get', method: 'GET', short: '/analytics/overlap/{a}/{b}', path: '/analytics/overlap/{etf_a}/{etf_b}',
-        title: 'Pairwise Overlap', desc: 'Quick overlap calculation between exactly two ETFs.',
-        params: [
-          {name:'etf_a',in:'path',type:'string',required:true,desc:'First ETF UUID or ticker'},
-          {name:'etf_b',in:'path',type:'string',required:true,desc:'Second ETF UUID or ticker'},
-          {name:'date',in:'query',type:'date',required:false,desc:'Date in YYYY-MM-DD format'},
-        ],
-      },
       { id: 'exposure', method: 'POST', short: '/analytics/exposure', path: '/analytics/exposure',
         title: 'Portfolio Exposure', desc: 'Analyses the combined sector, country and currency exposure of a weighted portfolio of ETFs.',
         body: `{\n  "portfolio": [\n    {"etf_id": "SWDA", "weight": 60},  // UUID or ticker\n    {"etf_id": "CSSPX", "weight": 40}\n  ]\n}`,
-      },
-      { id: 'similar', method: 'GET', short: '/analytics/similar/{id}', path: '/analytics/similar/{etf_id}',
-        title: 'Find Similar ETFs', desc: 'Returns the top N most similar ETFs to a reference ETF based on holdings overlap.',
-        params: [
-          {name:'etf_id',in:'path',type:'string',required:true,desc:'ETF UUID or ticker symbol'},
-          {name:'top_n',in:'query',type:'integer',required:false,desc:'Number of results (default 5)'},
-        ],
       },
       { id: 'risk-metrics-get', method: 'GET', short: '/analytics/risk-metrics', path: '/analytics/risk-metrics',
         title: 'All ETFs Risk Metrics', desc: 'Returns annualised risk statistics (volatility, Sharpe, max drawdown, HHI) for every tracked ETF ordered by ticker. Ideal for building a screening table.',
@@ -260,13 +241,9 @@ const tryoutConfigs = {
   'get-etf':      { build: (id)  => ({ method: 'GET',  url: `${BASE}/etfs/${id}` }) },
   'holdings':     { build: (id)  => ({ method: 'GET',  url: `${BASE}/etfs/${id}/holdings` }) },
   'allocations':  { build: (id)  => ({ method: 'GET',  url: `${BASE}/etfs/${id}/allocations` }) },
-  'overlap-post': { build: (id)  => ({ method: 'POST', url: `${BASE}/analytics/overlap`,
-                                        body: { etf_ids: [id, id] } }) },
-  'overlap-get':  { build: (id)  => ({ method: 'GET',  url: `${BASE}/analytics/overlap/${id}/${id}` }) },
-  'exposure':     { build: (id, id2)  => ({ method: 'POST', url: `${BASE}/analytics/exposure`,
+  'exposure':          { build: (id, id2) => ({ method: 'POST', url: `${BASE}/analytics/exposure`,
                                         body: { portfolio: [{ etf_id: id, weight: 60 }, { etf_id: id2, weight: 40 }] } }) },
-  'similar':           { build: (id) => ({ method: 'GET',  url: `${BASE}/analytics/similar/${id}` }) },
-  'performance':       { build: (id) => ({ method: 'GET',  url: `${BASE}/etfs/${id}/performance`, params: { limit: 30 } }) },
+  'performance':       { build: (id) => ({ method: 'GET',  url: `${BASE}/etfs/${id}/performance` }) },
   'etf-risk-metrics':  { build: (id) => ({ method: 'GET',  url: `${BASE}/etfs/${id}/risk-metrics` }) },
   'risk-metrics-get':  { build: ()   => ({ method: 'GET',  url: `${BASE}/analytics/risk-metrics` }) },
   'risk-metrics-post': { build: (id) => ({ method: 'POST', url: `${BASE}/analytics/risk-metrics`,
@@ -382,87 +359,6 @@ allocs = r.json()`,
   { headers: { "x-api-key": "YOUR_API_KEY" } }
 ).then(r => r.json());`,
   },
-  'overlap-post': {
-    cURL: `curl -X POST https://api.goetf.ch/analytics/overlap \\
-  -H "x-api-key: YOUR_API_KEY" \\
-  -H "Content-Type: application/json" \\
-  -d '{"etf_ids": ["ETF_ID_A", "ETF_ID_B"]}'`,
-    Python: `import requests
-
-r = requests.post(
-    "https://api.goetf.ch/analytics/overlap",
-    headers={"x-api-key": "YOUR_API_KEY"},
-    json={"etf_ids": ["ETF_ID_A", "ETF_ID_B"]}
-)
-result = r.json()`,
-    JavaScript: `const result = await fetch(
-  "https://api.goetf.ch/analytics/overlap",
-  {
-    method: "POST",
-    headers: {
-      "x-api-key": "YOUR_API_KEY",
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({ etf_ids: ["ETF_ID_A", "ETF_ID_B"] })
-  }
-).then(r => r.json());`,
-  },
-  'overlap-get': {
-    cURL: `curl "https://api.goetf.ch/analytics/overlap/ETF_ID_A/ETF_ID_B" \\
-  -H "x-api-key: YOUR_API_KEY"`,
-    Python: `import requests
-
-r = requests.get(
-    "https://api.goetf.ch/analytics/overlap/ETF_ID_A/ETF_ID_B",
-    headers={"x-api-key": "YOUR_API_KEY"}
-)
-overlap = r.json()`,
-    JavaScript: `const overlap = await fetch(
-  "https://api.goetf.ch/analytics/overlap/ETF_ID_A/ETF_ID_B",
-  { headers: { "x-api-key": "YOUR_API_KEY" } }
-).then(r => r.json());`,
-  },
-  'exposure': {
-    cURL: `curl -X POST https://api.goetf.ch/analytics/exposure \\
-  -H "x-api-key: YOUR_API_KEY" \\
-  -H "Content-Type: application/json" \\
-  -d '{"portfolio": [{"etf_id": "ETF_ID", "weight": 100}]}'`,
-    Python: `import requests
-
-r = requests.post(
-    "https://api.goetf.ch/analytics/exposure",
-    headers={"x-api-key": "YOUR_API_KEY"},
-    json={"portfolio": [{"etf_id": "ETF_ID", "weight": 100}]}
-)
-exposure = r.json()`,
-    JavaScript: `const exposure = await fetch(
-  "https://api.goetf.ch/analytics/exposure",
-  {
-    method: "POST",
-    headers: {
-      "x-api-key": "YOUR_API_KEY",
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({ portfolio: [{ etf_id: "ETF_ID", weight: 100 }] })
-  }
-).then(r => r.json());`,
-  },
-  'similar': {
-    cURL: `curl "https://api.goetf.ch/analytics/similar/SWDA?top_n=5" \\
-  -H "x-api-key: YOUR_API_KEY"`,
-    Python: `import requests
-
-r = requests.get(
-    "https://api.goetf.ch/analytics/similar/SWDA",
-    params={"top_n": 5},
-    headers={"x-api-key": "YOUR_API_KEY"}
-)
-similar = r.json()`,
-    JavaScript: `const similar = await fetch(
-  "https://api.goetf.ch/analytics/similar/SWDA?top_n=5",
-  { headers: { "x-api-key": "YOUR_API_KEY" } }
-).then(r => r.json());`,
-  },
   'performance': {
     cURL: `curl "https://api.goetf.ch/etfs/SWDA/performance" \\
   -H "x-api-key: YOUR_API_KEY"`,
@@ -493,6 +389,31 @@ metrics = r.json()`,
     JavaScript: `const metrics = await fetch(
   "https://api.goetf.ch/etfs/SWDA/risk-metrics?rf_rate=0.04",
   { headers: { "x-api-key": "YOUR_API_KEY" } }
+).then(r => r.json());`,
+  },
+  'exposure': {
+    cURL: `curl -X POST https://api.goetf.ch/analytics/exposure \\
+  -H "x-api-key: YOUR_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{"portfolio": [{"etf_id": "SWDA", "weight": 60}, {"etf_id": "CSSPX", "weight": 40}]}'`,
+    Python: `import requests
+
+r = requests.post(
+    "https://api.goetf.ch/analytics/exposure",
+    headers={"x-api-key": "YOUR_API_KEY"},
+    json={"portfolio": [{"etf_id": "SWDA", "weight": 60}, {"etf_id": "CSSPX", "weight": 40}]}
+)
+exposure = r.json()`,
+    JavaScript: `const exposure = await fetch(
+  "https://api.goetf.ch/analytics/exposure",
+  {
+    method: "POST",
+    headers: {
+      "x-api-key": "YOUR_API_KEY",
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ portfolio: [{ etf_id: "SWDA", weight: 60 }, { etf_id: "CSSPX", weight: 40 }] })
+  }
 ).then(r => r.json());`,
   },
   'risk-metrics-get': {
