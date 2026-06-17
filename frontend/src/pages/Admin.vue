@@ -34,7 +34,7 @@
       <h2 class="card-title">Admin Credentials</h2>
       <p style="font-size:.875rem;color:var(--text-muted);margin-bottom:1rem">
         Enter your <code>ADMIN_SECRET</code> from Railway to unlock admin operations.
-        Stored in <strong>sessionStorage</strong> — cleared automatically when you close the browser tab.
+        Stored in <strong>sessionStorage</strong>, cleared automatically when you close the browser tab.
       </p>
       <label class="label">Admin Secret</label>
       <div class="key-row">
@@ -46,7 +46,7 @@
       </div>
       <div v-if="verifyError" class="error-box" style="margin-top:.5rem">{{ verifyError }}</div>
       <div v-if="adminVerified" class="success-msg" style="margin-top:.5rem;display:flex;align-items:center;justify-content:space-between;gap:1rem">
-        <span>✓ Admin secret verified — operations unlocked.</span>
+        <span>✓ Admin secret verified, operations unlocked.</span>
         <button class="btn btn-outline" style="font-size:.8rem;padding:.35rem .75rem" @click="logout">Log out</button>
       </div>
     </div>
@@ -55,7 +55,7 @@
     <div class="grid-2" style="margin-bottom:1.5rem">
       <div class="card">
         <h3 class="card-title">Create New API Key</h3>
-        <p style="font-size:.875rem;color:var(--text-muted);margin-bottom:1rem">Generate a new API key. Copy it — it won't be shown again.</p>
+        <p style="font-size:.875rem;color:var(--text-muted);margin-bottom:1rem">Generate a new API key. Copy it - it won't be shown again.</p>
         <label class="label">Key Name</label>
         <input class="input" v-model="newKeyName" placeholder="e.g. my-app" style="margin-bottom:.75rem" />
         <label class="label">Rate Limit (req/min)</label>
@@ -106,7 +106,7 @@
       <h2 class="card-title">Import ETF</h2>
       <p style="font-size:.875rem;color:var(--text-muted);margin-bottom:1rem">
         Provide an EODHD symbol (e.g. <code>EIMI.SW</code>, <code>SWDA.LSE</code>) to import or refresh an ETF.
-        All metadata — name, ISIN, TER, benchmark, holdings — is fetched automatically from EODHD.
+        All metadata (name, ISIN, TER, benchmark, holdings) is fetched automatically from EODHD.
         Use a USD-denominated listing (e.g. <code>.SW</code>) to store prices in USD.
       </p>
       <div style="margin-bottom:.75rem">
@@ -114,7 +114,7 @@
         <input class="input" v-model="importSymbol" placeholder="e.g. EIMI.SW or SWDA.LSE" style="text-transform:uppercase" />
       </div>
       <div style="margin-bottom:.75rem">
-        <label class="label">ISIN <span style="font-weight:400;color:var(--text-muted)">(optional — fetched from EODHD automatically; enter manually if EODHD doesn't return it)</span></label>
+        <label class="label">ISIN <span style="font-weight:400;color:var(--text-muted)">(optional, fetched from EODHD automatically; enter manually if EODHD doesn't return it)</span></label>
         <input class="input" v-model="importIsin" placeholder="e.g. IE00BKM4GZ66" style="text-transform:uppercase" />
       </div>
       <div class="grid-2" style="margin-bottom:.75rem">
@@ -127,14 +127,14 @@
           <input class="input" type="number" step="0.01" v-model.number="importTer" placeholder="e.g. 0.07" />
         </div>
       </div>
-      <label class="label">Holdings CSV <span style="font-weight:400;color:var(--text-muted)">(optional — EODHD holdings used if not provided)</span></label>
+      <label class="label">Holdings CSV <span style="font-weight:400;color:var(--text-muted)">(optional, EODHD holdings used if not provided)</span></label>
       <input type="file" accept=".csv" class="input" style="margin-bottom:.75rem" @change="e => importCsvFile = e.target.files[0]" />
       <button class="btn btn-primary" @click="importETF" :disabled="!adminVerified || !importSymbol || importLoading" style="width:100%">
         {{ importLoading ? 'Importing…' : 'Import ETF' }}
       </button>
       <div v-if="importError" class="error-box" style="margin-top:.75rem">{{ importError }}</div>
       <div v-if="importResult" class="success-msg" style="margin-top:.75rem">
-        ✓ {{ importResult.name }} ({{ importResult.ticker }}) imported — {{ importResult.holdings }} holdings, {{ importResult.allocations }} allocations.
+        ✓ {{ importResult.name }} ({{ importResult.ticker }}) imported: {{ importResult.holdings }} holdings, {{ importResult.allocations }} allocations.
       </div>
       <div v-if="importLogs.length" style="margin-top:.75rem;background:#f8f9fa;border-radius:6px;padding:.75rem;font-family:monospace;font-size:.8rem;white-space:pre-wrap;max-height:200px;overflow-y:auto;">{{ importLogs.join('\n') }}</div>
     </div>
@@ -210,7 +210,7 @@
       </div>
       <div v-if="logsError" class="error-msg" style="margin-top:.5rem">{{ logsError }}</div>
       <div v-if="logsData" style="margin-top:.75rem">
-        <div class="log-meta">{{ logsData.total }} total &nbsp;|&nbsp; showing {{ logsData.offset + 1 }}–{{ Math.min(logsData.offset + logsData.limit, logsData.total) }}</div>
+        <div class="log-meta">{{ logsData.total }} total &nbsp;|&nbsp; showing {{ logsData.offset + 1 }}-{{ Math.min(logsData.offset + logsData.limit, logsData.total) }}</div>
         <div class="log-table-wrap">
           <table class="log-table">
             <thead>
@@ -259,7 +259,7 @@
       <h3>📋 Admin Disclaimer</h3>
       <p>
         Admin operations directly modify the production database. The Reset operation permanently deletes all ETF data.
-        GoETF.ch is for <strong>informational purposes only</strong> — none of the data constitutes investment advice.
+        GoETF.ch is for <strong>informational purposes only</strong>; none of the data constitutes investment advice.
         Do not use real financial data without appropriate licensing and compliance review.
       </p>
     </div>
@@ -280,7 +280,7 @@
             <div style="display:flex;gap:.5rem">
               <select class="input" v-model="valuesEtfId" style="flex:1">
                 <option value="">— select ETF —</option>
-                <option v-for="e in valuesEtfList" :key="e.id" :value="e.id">{{ e.ticker }} — {{ e.name }}</option>
+                <option v-for="e in valuesEtfList" :key="e.id" :value="e.id">{{ e.ticker }} - {{ e.name }}</option>
               </select>
               <button class="btn btn-outline" @click="loadValuesEtfList" :disabled="valuesEtfListLoading" title="Refresh ETF list">
                 {{ valuesEtfListLoading ? '…' : '↻' }}
@@ -349,7 +349,7 @@
         <div style="display:flex;gap:.5rem;align-items:center">
           <select class="input" v-model="editorEtfId" style="flex:1">
             <option value="">— select ETF —</option>
-            <option v-for="e in editorEtfList" :key="e.id" :value="e.id">{{ e.ticker }} — {{ e.name }}</option>
+            <option v-for="e in editorEtfList" :key="e.id" :value="e.id">{{ e.ticker }} - {{ e.name }}</option>
           </select>
           <button class="btn btn-outline" @click="loadEditorEtfList" title="Refresh list">↻</button>
           <button class="btn btn-primary" @click="loadEditorData" :disabled="!editorEtfId || editorLoading">
@@ -362,7 +362,7 @@
       <!-- Metadata editor -->
       <div v-if="editorEtf" class="card" style="margin-bottom:1.5rem">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
-          <h2 class="card-title" style="margin:0">Metadata — {{ editorEtf.ticker }}</h2>
+          <h2 class="card-title" style="margin:0">Metadata: {{ editorEtf.ticker }}</h2>
           <button class="btn btn-primary" @click="saveMetadata" :disabled="metaSaving">
             {{ metaSaving ? 'Saving…' : 'Save Metadata' }}
           </button>

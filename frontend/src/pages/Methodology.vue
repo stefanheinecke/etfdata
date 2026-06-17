@@ -8,9 +8,9 @@
     <!-- ETF Score -->
     <div class="meth-section">
       <div class="meth-section-head">
-        <span class="meth-badge">1–10</span>
+        <span class="meth-badge">1-10</span>
         <div>
-          <h2 class="meth-title">GoETF Score — Individual ETF</h2>
+          <h2 class="meth-title">GoETF Score: Individual ETF</h2>
           <p class="meth-sub">A composite rating that measures an ETF's risk-adjusted return quality and portfolio diversification, relative to all other ETFs in the GoETF universe.</p>
         </div>
       </div>
@@ -19,9 +19,9 @@
       <div class="card meth-card">
         <h3 class="card-title">How it works</h3>
         <ol class="meth-steps">
-          <li><strong>Compute raw metrics</strong> — 8 metrics are calculated for each ETF from its price history, holdings, and country allocations.</li>
-          <li><strong>Percentile rank</strong> — Each metric is ranked percentile-wise across all ETFs in the universe (0 = worst, 1 = best). The direction (higher/lower is better) is taken into account.</li>
-          <li><strong>Weighted score</strong> — Percentile ranks are combined using fixed weights. The resulting 0–1 value is scaled to 1–10.</li>
+          <li><strong>Compute raw metrics</strong>: 8 metrics are calculated for each ETF from its price history, holdings, and country allocations.</li>
+          <li><strong>Percentile rank</strong>: each metric is ranked percentile-wise across all ETFs in the universe (0 = worst, 1 = best). The direction (higher/lower is better) is taken into account.</li>
+          <li><strong>Weighted score</strong>: percentile ranks are combined using fixed weights. The resulting 0-1 value is scaled to 1-10.</li>
         </ol>
         <div class="meth-formula-box">
           <code>raw = Σ (weight<sub>i</sub> × percentile_rank<sub>i</sub>)</code>
@@ -65,14 +65,14 @@
                 <td class="meth-weight">15%</td>
                 <td class="meth-dir meth-up">↑ Less negative</td>
                 <td class="meth-src">Price history</td>
-                <td>Conditional Value at Risk — the average of the worst 5% of daily log-returns (annualised). Measures tail-risk severity.</td>
+                <td>Conditional Value at Risk: the average of the worst 5% of daily log-returns (annualised). Measures tail-risk severity.</td>
               </tr>
               <tr>
                 <td><strong>HHI</strong></td>
                 <td class="meth-weight">10%</td>
                 <td class="meth-dir meth-down">↓ Lower</td>
                 <td class="meth-src">Holdings</td>
-                <td>Herfindahl–Hirschman Index of holdings concentration: Σw² × 10,000. Ranges from ~0 (highly diversified) to 10,000 (single holding).</td>
+                <td>Herfindahl-Hirschman Index of holdings concentration: Σw² × 10,000. Ranges from ~0 (highly diversified) to 10,000 (single holding).</td>
               </tr>
               <tr>
                 <td><strong>Effective N</strong></td>
@@ -114,7 +114,7 @@
     <!-- Portfolio Score -->
     <div class="meth-section">
       <div class="meth-section-head">
-        <span class="meth-badge meth-badge-port">1–10</span>
+        <span class="meth-badge meth-badge-port">1-10</span>
         <div>
           <h2 class="meth-title">Portfolio GoETF Score</h2>
           <p class="meth-sub">A portfolio-level score that rewards low overlap between ETFs and broad geographic diversification, while penalising redundant positions.</p>
@@ -127,7 +127,7 @@
           <div class="meth-comp-top">
             <span class="meth-comp-icon">⚖️</span>
             <h3 class="meth-comp-title">Base Score</h3>
-            <span class="meth-comp-range">1–10</span>
+            <span class="meth-comp-range">1-10</span>
           </div>
           <p class="meth-comp-desc">Weighted average of the individual GoETF Scores of all ETFs in the portfolio, using their portfolio weights.</p>
           <div class="meth-formula-box meth-formula-sm">
@@ -141,7 +141,7 @@
             <h3 class="meth-comp-title">Overlap Penalty</h3>
             <span class="meth-comp-range meth-range-neg">0 to −2</span>
           </div>
-          <p class="meth-comp-desc">For every pair of ETFs, the weight overlap is computed as Σ min(w<sub>a</sub>, w<sub>b</sub>) across shared holdings (0–100%). The weighted average pairwise overlap drives the penalty: 100% identical overlap costs 2 score points.</p>
+          <p class="meth-comp-desc">For every pair of ETFs, the weight overlap is computed as Σ min(w<sub>a</sub>, w<sub>b</sub>) across shared holdings (0-100%). The weighted average pairwise overlap drives the penalty: 100% identical overlap costs 2 score points.</p>
           <div class="meth-formula-box meth-formula-sm">
             <code>penalty = (avg_weight_overlap_% ÷ 100) × 2</code>
           </div>
@@ -166,7 +166,7 @@
         <div class="meth-formula-box meth-formula-lg">
           <code>Portfolio Score = clamp(base − penalty + bonus, 1, 10)</code>
         </div>
-        <p style="font-size:.85rem;color:var(--text-muted);margin-top:.75rem;margin-bottom:0">The score is clamped to the range 1–10. A perfectly diversified, non-overlapping portfolio of high-scoring ETFs can reach a score close to 10.</p>
+        <p style="font-size:.85rem;color:var(--text-muted);margin-top:.75rem;margin-bottom:0">The score is clamped to the range 1-10. A perfectly diversified, non-overlapping portfolio of high-scoring ETFs can reach a score close to 10.</p>
       </div>
 
       <!-- Swap Tip -->

@@ -25,7 +25,7 @@
         <div v-for="(item,i) in portfolio" :key="i" style="display:flex;gap:.5rem;margin-bottom:.5rem;align-items:center">
           <select class="input" v-model="item.etf_id" style="flex:2">
             <option value="">Select ETF...</option>
-            <option v-for="e in allEtfs" :key="e.id" :value="e.id">{{ e.ticker }} — {{ e.name }}</option>
+            <option v-for="e in allEtfs" :key="e.id" :value="e.id">{{ e.ticker }} - {{ e.name }}</option>
           </select>
           <input class="input" type="number" v-model.number="item.weight" placeholder="Weight %" style="flex:1;max-width:120px" min="0" max="100" />
           <button class="btn btn-outline" @click="portfolio.splice(i,1)" style="flex-shrink:0">✕</button>
@@ -41,7 +41,7 @@
           <span style="font-size:.8rem;color:var(--text-muted)">% p.a.</span>
         </div>
       </div>
-      <!-- GoETF Portfolio Score – quick feedback below builder -->
+      <!-- GoETF Portfolio Score - quick feedback below builder -->
       <div v-if="portfolioScoreLoading" style="margin-bottom:1.5rem;padding:1rem 1.25rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);font-size:.875rem;color:var(--text-muted)">Computing GoETF Portfolio Score…</div>
       <div v-if="portfolioScoreResult" class="card" style="margin-bottom:1.5rem">
         <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;margin-bottom:1rem">
@@ -175,7 +175,7 @@
           </table>
         </div>
         <div style="padding:.6rem 1.25rem;font-size:.72rem;color:var(--text-muted);border-top:1px solid var(--border)">
-          Rf = {{ riskFreeRate }}% &nbsp;·&nbsp; HHI: Herfindahl–Hirschman Index (0–10 000; lower = more diversified)
+          Rf = {{ riskFreeRate }}% &nbsp;·&nbsp; HHI: Herfindahl-Hirschman Index (0-10,000; lower = more diversified)
         </div>
       </div>
       </div>    </div>
@@ -225,7 +225,7 @@
           </table>
         </div>
         <div style="padding:.6rem 1.25rem;font-size:.72rem;color:var(--text-muted);border-top:1px solid var(--border)">
-          HHI: Herfindahl–Hirschman Index (0–10 000; lower = more diversified)
+          HHI: Herfindahl-Hirschman Index (0-10,000; lower = more diversified)
         </div>
       </div>
     </div>
@@ -235,7 +235,7 @@
       <div class="card" style="margin-bottom:1.5rem;display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
         <div>
           <h2 class="card-title" style="margin:0">GoETF Score</h2>
-          <p style="font-size:.8rem;color:var(--text-muted);margin:.2rem 0 0">Composite 1–10 score based on 8 risk &amp; diversification metrics, percentile-ranked across all ETFs</p>
+          <p style="font-size:.8rem;color:var(--text-muted);margin:.2rem 0 0">Composite 1-10 score based on 8 risk &amp; diversification metrics, percentile-ranked across all ETFs</p>
           <button class="meth-link" @click="navigateTo('methodology')">ℹ How is this calculated?</button>
         </div>
         <label style="font-size:.8rem;color:var(--text-muted);margin-left:auto">Risk-free rate</label>
@@ -290,7 +290,7 @@
           </table>
         </div>
         <div style="padding:.6rem 1.25rem;font-size:.72rem;color:var(--text-muted);border-top:1px solid var(--border)">
-          Score = weighted percentile rank (1–10) across 8 metrics &nbsp;·&nbsp; Sortino &amp; Calmar: higher = better &nbsp;·&nbsp; CVaR: less negative = better &nbsp;·&nbsp; HHI: lower = more diversified &nbsp;·&nbsp; Eff. N: effective number of holdings &nbsp;·&nbsp; Geo Div: geographic diversity (0–100%) &nbsp;·&nbsp; Max UW: max consecutive days under previous peak
+          Score = weighted percentile rank (1-10) across 8 metrics &nbsp;·&nbsp; Sortino &amp; Calmar: higher = better &nbsp;·&nbsp; CVaR: less negative = better &nbsp;·&nbsp; HHI: lower = more diversified &nbsp;·&nbsp; Eff. N: effective number of holdings &nbsp;·&nbsp; Geo Div: geographic diversity (0-100%) &nbsp;·&nbsp; Max UW: max consecutive days under previous peak
         </div>
       </div>
     </div>
