@@ -441,7 +441,7 @@ function switchDemo(key) {
 [data-theme="dark"] .hd-status { background: #061829; border-color: #0e3060; color: #2d9ee0; }
 .hd-count { font-size: .66rem; color: var(--text-muted); }
 /* Carousel body, dots, transitions */
-.hc-body { min-height: 152px; }
+.hc-body { height: 152px; overflow: hidden; }
 .hc-dots {
   display: flex; align-items: center; justify-content: center; gap: .4rem;
   padding: .3rem; border-top: 1px solid var(--border); background: var(--bg-2);
