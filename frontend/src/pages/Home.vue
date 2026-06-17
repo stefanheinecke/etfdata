@@ -256,14 +256,18 @@ const overlap = await fetch(
 const swdaId = ref(null)
 const activeDemo = ref('etfs')
 const demoEndpoints = [
-  { key: 'etfs',        short: '/etfs' },
-  { key: 'holdings',    short: '/etfs/{id}/holdings' },
-  { key: 'allocations', short: '/etfs/{id}/allocations' },
+  { key: 'etfs',         short: '/etfs' },
+  { key: 'holdings',     short: '/etfs/{id}/holdings' },
+  { key: 'allocations',  short: '/etfs/{id}/allocations' },
+  { key: 'risk-metrics', short: '/etfs/risk-metrics' },
+  { key: 'scores-etfs',  short: '/scores/etfs' },
 ]
 const demoStates = ref({
-  etfs:        { loading: false, result: null, error: null },
-  holdings:    { loading: false, result: null, error: null },
-  allocations: { loading: false, result: null, error: null },
+  etfs:          { loading: false, result: null, error: null },
+  holdings:      { loading: false, result: null, error: null },
+  allocations:   { loading: false, result: null, error: null },
+  'risk-metrics':{ loading: false, result: null, error: null },
+  'scores-etfs': { loading: false, result: null, error: null },
 })
 const currentDemo = computed(() => demoStates.value[activeDemo.value])
 
@@ -272,9 +276,15 @@ async function fetchDemo(key) {
   if (state.result !== null || state.loading) return
   state.loading = true; state.error = null
   try {
-    let url
+    let url, params
     if (key === 'etfs') {
       url = `${API_BASE}/etfs`
+    } else if (key === 'risk-metrics') {
+      url = `${API_BASE}/etfs/risk-metrics`
+      params = { tickers: 'SWDA' }
+    } else if (key === 'scores-etfs') {
+      url = `${API_BASE}/scores/etfs`
+      params = { tickers: 'SWDA' }
     } else {
       if (!swdaId.value) {
         const r = await axios.get(`${API_BASE}/etfs`, { headers: { 'x-api-key': 'demo' } })
@@ -285,7 +295,7 @@ async function fetchDemo(key) {
       }
       url = `${API_BASE}/etfs/${swdaId.value}/${key}`
     }
-    const res = await axios.get(url, { headers: { 'x-api-key': 'demo' } })
+    const res = await axios.get(url, { headers: { 'x-api-key': 'demo' }, params })
     const data = res.data
     if (key === 'etfs') {
       state.result = data[0] ? JSON.stringify(data[0], null, 2) : '[]'

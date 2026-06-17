@@ -41,6 +41,60 @@
           <span style="font-size:.8rem;color:var(--text-muted)">% p.a.</span>
         </div>
       </div>
+      <!-- GoETF Portfolio Score – quick feedback below builder -->
+      <div v-if="portfolioScoreLoading" style="margin-bottom:1.5rem;padding:1rem 1.25rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);font-size:.875rem;color:var(--text-muted)">Computing GoETF Portfolio Score…</div>
+      <div v-if="portfolioScoreResult" class="card" style="margin-bottom:1.5rem">
+        <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;margin-bottom:1rem">
+          <h3 class="card-title" style="margin:0">GoETF Portfolio Score</h3>
+          <span class="score-badge score-lg" :class="scoreBadgeClass(portfolioScoreResult.portfolio_score)">
+            {{ portfolioScoreResult.portfolio_score?.toFixed(1) }}
+          </span>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:.75rem;margin-bottom:1rem">
+          <div class="stat-box">
+            <div class="stat-label">Base Score</div>
+            <div class="stat-value">{{ portfolioScoreResult.base_score?.toFixed(1) }}</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-label">Overlap Penalty</div>
+            <div class="stat-value" style="color:#ef4444">−{{ portfolioScoreResult.overlap_penalty?.toFixed(2) }}</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-label">Diversification Bonus</div>
+            <div class="stat-value" style="color:#0b6aa5">+{{ portfolioScoreResult.allocation_bonus?.toFixed(2) }}</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-label">Avg Holdings Overlap</div>
+            <div class="stat-value" :class="portfolioScoreResult.avg_overlap_pct > 50 ? 'cell-red' : portfolioScoreResult.avg_overlap_pct > 20 ? 'cell-yellow' : 'cell-green'">
+              {{ portfolioScoreResult.avg_overlap_pct?.toFixed(1) }}%
+            </div>
+          </div>
+        </div>
+        <div v-if="portfolioScoreResult.pairwise_overlaps?.length" style="margin-bottom:1rem">
+          <div style="font-size:.8rem;font-weight:600;color:var(--text-muted);margin-bottom:.5rem">Holdings Overlap by Pair</div>
+          <div v-for="ov in portfolioScoreResult.pairwise_overlaps" :key="ov.etf_a_id+ov.etf_b_id" style="display:flex;align-items:center;gap:.75rem;margin-bottom:.4rem">
+            <span style="font-size:.85rem;font-weight:600;color:var(--green-600)">{{ ov.etf_a_ticker }}</span>
+            <span style="font-size:.75rem;color:var(--text-muted)">↔</span>
+            <span style="font-size:.85rem;font-weight:600;color:var(--green-600)">{{ ov.etf_b_ticker }}</span>
+            <div class="alloc-track" style="flex:1;max-width:180px"><div class="alloc-fill" :style="{width:Math.min(ov.weight_overlap_pct,100)+'%',background:ov.weight_overlap_pct>50?'#ef4444':ov.weight_overlap_pct>20?'#ca8a04':'#0b6aa5'}"></div></div>
+            <span style="font-size:.85rem;font-weight:600">{{ ov.weight_overlap_pct?.toFixed(1) }}%</span>
+          </div>
+        </div>
+        <div v-if="portfolioScoreResult.tip" class="tip-box">
+          <span class="tip-icon">💡</span>
+          <div>
+            <strong>Swap Tip:</strong> Replace <strong style="color:var(--green-600)">{{ portfolioScoreResult.tip.replace_ticker }}</strong>
+            with <strong style="color:var(--green-600)">{{ portfolioScoreResult.tip.with_ticker }}</strong>
+            → new portfolio score <strong>{{ portfolioScoreResult.tip.new_score }}</strong>
+            (<span style="color:#0b6aa5">+{{ portfolioScoreResult.tip.improvement }}</span> pts)
+            <div style="font-size:.8rem;color:var(--text-muted);margin-top:.2rem">{{ portfolioScoreResult.tip.reason }}</div>
+          </div>
+        </div>
+        <div v-else-if="portfolioScoreResult.tip === null" style="font-size:.8rem;color:var(--text-muted)">No single-ETF swap improves the portfolio score by more than 0.1 pts.</div>
+        <p style="font-size:.7rem;color:var(--text-muted);margin-top:.75rem;margin-bottom:0">
+          Base = weighted avg of individual GoETF Scores &nbsp;·&nbsp; Overlap Penalty: max −2 pts for 100% overlap &nbsp;·&nbsp; Bonus: portfolio country diversification vs individual weighted avg
+        </p>
+      </div>
       <div v-if="exposureError" class="error-box" style="margin-bottom:1rem">{{ exposureError }}</div>
       <div v-if="exposureResult" class="grid-3">
         <div class="card" v-for="group in exposureGroups" :key="group.label">
@@ -123,63 +177,6 @@
           Rf = {{ riskFreeRate }}% &nbsp;·&nbsp; HHI: Herfindahl–Hirschman Index (0–10 000; lower = more diversified)
         </div>
       </div>
-
-      <!-- GoETF Portfolio Score -->
-      <div v-if="portfolioScoreResult" class="card" style="margin-top:1rem">
-        <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;margin-bottom:1rem">
-          <h3 class="card-title" style="margin:0">GoETF Portfolio Score</h3>
-          <span class="score-badge score-lg" :class="scoreBadgeClass(portfolioScoreResult.portfolio_score)">
-            {{ portfolioScoreResult.portfolio_score?.toFixed(1) }}
-          </span>
-        </div>
-        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:.75rem;margin-bottom:1rem">
-          <div class="stat-box">
-            <div class="stat-label">Base Score</div>
-            <div class="stat-value">{{ portfolioScoreResult.base_score?.toFixed(1) }}</div>
-          </div>
-          <div class="stat-box">
-            <div class="stat-label">Overlap Penalty</div>
-            <div class="stat-value" style="color:#ef4444">−{{ portfolioScoreResult.overlap_penalty?.toFixed(2) }}</div>
-          </div>
-          <div class="stat-box">
-            <div class="stat-label">Diversification Bonus</div>
-            <div class="stat-value" style="color:#0b6aa5">+{{ portfolioScoreResult.allocation_bonus?.toFixed(2) }}</div>
-          </div>
-          <div class="stat-box">
-            <div class="stat-label">Avg Holdings Overlap</div>
-            <div class="stat-value" :class="portfolioScoreResult.avg_overlap_pct > 50 ? 'cell-red' : portfolioScoreResult.avg_overlap_pct > 20 ? 'cell-yellow' : 'cell-green'">
-              {{ portfolioScoreResult.avg_overlap_pct?.toFixed(1) }}%
-            </div>
-          </div>
-        </div>
-        <!-- Pairwise overlaps -->
-        <div v-if="portfolioScoreResult.pairwise_overlaps?.length" style="margin-bottom:1rem">
-          <div style="font-size:.8rem;font-weight:600;color:var(--text-muted);margin-bottom:.5rem">Holdings Overlap by Pair</div>
-          <div v-for="ov in portfolioScoreResult.pairwise_overlaps" :key="ov.etf_a_id+ov.etf_b_id" style="display:flex;align-items:center;gap:.75rem;margin-bottom:.4rem">
-            <span style="font-size:.85rem;font-weight:600;color:var(--green-600)">{{ ov.etf_a_ticker }}</span>
-            <span style="font-size:.75rem;color:var(--text-muted)">↔</span>
-            <span style="font-size:.85rem;font-weight:600;color:var(--green-600)">{{ ov.etf_b_ticker }}</span>
-            <div class="alloc-track" style="flex:1;max-width:180px"><div class="alloc-fill" :style="{width:Math.min(ov.weight_overlap_pct,100)+'%',background:ov.weight_overlap_pct>50?'#ef4444':ov.weight_overlap_pct>20?'#ca8a04':'#0b6aa5'}"></div></div>
-            <span style="font-size:.85rem;font-weight:600">{{ ov.weight_overlap_pct?.toFixed(1) }}%</span>
-          </div>
-        </div>
-        <!-- Swap tip -->
-        <div v-if="portfolioScoreResult.tip" class="tip-box">
-          <span class="tip-icon">💡</span>
-          <div>
-            <strong>Swap Tip:</strong> Replace <strong style="color:var(--green-600)">{{ portfolioScoreResult.tip.replace_ticker }}</strong>
-            with <strong style="color:var(--green-600)">{{ portfolioScoreResult.tip.with_ticker }}</strong>
-            → new portfolio score <strong>{{ portfolioScoreResult.tip.new_score }}</strong>
-            (<span style="color:#0b6aa5">+{{ portfolioScoreResult.tip.improvement }}</span> pts)
-            <div style="font-size:.8rem;color:var(--text-muted);margin-top:.2rem">{{ portfolioScoreResult.tip.reason }}</div>
-          </div>
-        </div>
-        <div v-else-if="portfolioScoreResult.tip === null" style="font-size:.8rem;color:var(--text-muted)">No single-ETF swap improves the portfolio score by more than 0.1 pts.</div>
-        <p style="font-size:.7rem;color:var(--text-muted);margin-top:.75rem;margin-bottom:0">
-          Base = weighted avg of individual GoETF Scores &nbsp;·&nbsp; Overlap Penalty: max −2 pts for 100% overlap &nbsp;·&nbsp; Bonus: portfolio country diversification vs individual weighted avg
-        </p>
-      </div>
-      <div v-if="portfolioScoreLoading" style="margin-top:1rem;font-size:.875rem;color:var(--text-muted)">Computing GoETF Portfolio Score…</div>
       </div>    </div>
 
     <!-- RISK METRICS -->
