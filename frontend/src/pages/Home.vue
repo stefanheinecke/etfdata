@@ -5,7 +5,7 @@
       <div class="hero-inner">
         <div class="hero-badge">GoETF</div>
         <h1 class="hero-title">ETF Portfolio<br/><span class="gradient-text">Analytics API</span></h1>
-        <p class="hero-sub">Real ETF data via REST API. Query holdings, allocations and portfolio exposure analysis. Free demo key.</p>
+        <p class="hero-sub">Real ETF data via REST API. Query holdings, allocations and portfolio exposure analysis. FREE API key.</p>
         <div class="hero-actions">
           <button class="btn btn-primary btn-lg" @click="$emit('navigate','etfs')">Browse ETFs</button>
           <button class="btn btn-outline btn-lg" @click="$emit('navigate','docs')">View Docs</button>
@@ -441,7 +441,7 @@ function switchDemo(key) {
 [data-theme="dark"] .hd-status { background: #061829; border-color: #0e3060; color: #2d9ee0; }
 .hd-count { font-size: .66rem; color: var(--text-muted); }
 /* Carousel body, dots, transitions */
-.hc-body { min-height: 124px; }
+.hc-body { min-height: 152px; }
 .hc-dots {
   display: flex; align-items: center; justify-content: center; gap: .4rem;
   padding: .3rem; border-top: 1px solid var(--border); background: var(--bg-2);

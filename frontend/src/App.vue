@@ -21,7 +21,7 @@
           <button class="theme-toggle" @click="toggleTheme" :title="theme === 'dark' ? 'Light mode' : 'Dark mode'">
             {{ theme === 'dark' ? '☀️' : '🌙' }}
           </button>
-          <button class="btn-get-key" @click="showApiKeyModal = true">Get API Key</button>
+          <button class="btn-get-key" @click="showApiKeyModal = true">Get Free API Key</button>
           <button v-if="adminActive" class="nav-btn admin-btn" @click="currentPage = 'admin'">⚙ Admin</button>
         </div>
         <button class="hamburger" :class="{open: mobileMenuOpen}" @click="mobileMenuOpen = !mobileMenuOpen" aria-label="Menu">
@@ -36,7 +36,7 @@
         <button v-for="item in navItems" :key="item.id"
           :class="['mobile-menu-item', { active: currentPage === item.id || (item.id === 'etfs' && currentPage === 'etf-detail') }]"
           @click="currentPage = item.id; mobileMenuOpen = false">{{ item.label }}</button>
-        <button class="mobile-menu-item mobile-menu-getkey" @click="showApiKeyModal = true; mobileMenuOpen = false">🔑 Get API Key</button>
+        <button class="mobile-menu-item mobile-menu-getkey" @click="showApiKeyModal = true; mobileMenuOpen = false">🔑 Get Free API Key</button>
         <button v-if="adminActive" class="mobile-menu-item" @click="currentPage = 'admin'; mobileMenuOpen = false">⚙ Admin</button>
         <button v-else class="mobile-menu-item" @click="showAdminLogin = true; mobileMenuOpen = false">🔒 Admin Login</button>
       </div>

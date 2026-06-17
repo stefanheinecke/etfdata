@@ -7,7 +7,7 @@
           <p class="page-subtitle">Complete documentation for all GoETF.ch API endpoints.</p>
         </div>
         <button class="btn btn-primary" style="flex-shrink:0;margin-top:.25rem" @click="showApiKeyModal = true">
-          Get API Key
+          Get Free API Key
         </button>
       </div>
     </div>

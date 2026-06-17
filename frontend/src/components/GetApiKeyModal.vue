@@ -50,7 +50,7 @@
             :disabled="!email || loading"
             @click="submit"
           >
-            {{ loading ? 'Sending…' : 'Get API Key' }}
+            {{ loading ? 'Sending…' : 'Get Free API Key' }}
           </button>
 
           <p class="modal-note">
