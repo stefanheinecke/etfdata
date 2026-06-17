@@ -48,6 +48,7 @@
       <ETFList v-else-if="currentPage === 'etfs'" />
       <ETFDetail v-else-if="currentPage === 'etf-detail'" />
       <Analytics v-else-if="currentPage === 'analytics'" />
+      <Methodology v-else-if="currentPage === 'methodology'" />
       <ApiDocs v-else-if="currentPage === 'docs'" />
       <Admin v-else-if="currentPage === 'admin' && adminActive" />
       <Home v-else-if="currentPage === 'admin' && !adminActive" @navigate="currentPage = $event" />
@@ -70,6 +71,7 @@
           <button @click="currentPage = 'home'">Home</button>
           <button @click="currentPage = 'etfs'">ETFs</button>
           <button @click="currentPage = 'analytics'">Analytics</button>
+          <button @click="currentPage = 'methodology'">Methodology</button>
           <button @click="currentPage = 'docs'">API Docs</button>
           <button v-if="adminActive" @click="currentPage = 'admin'">Admin</button>
           <button v-else @click="showAdminLogin = true" class="admin-lock-btn" title="Admin login">🔒</button>
@@ -147,6 +149,7 @@ import ETFList from './pages/ETFList.vue'
 import ETFDetail from './pages/ETFDetail.vue'
 import Analytics from './pages/Analytics.vue'
 import ApiDocs from './pages/ApiDocs.vue'
+import Methodology from './pages/Methodology.vue'
 import Admin from './pages/Admin.vue'
 import GetApiKeyModal from './components/GetApiKeyModal.vue'
 
@@ -176,6 +179,7 @@ const navItems = [
   { id: 'home', label: 'Home' },
   { id: 'etfs', label: 'ETFs' },
   { id: 'analytics', label: 'Analytics' },
+  { id: 'methodology', label: 'Methodology' },
   { id: 'docs', label: 'API Docs' },
 ]
 

@@ -93,6 +93,7 @@
         <div v-else-if="portfolioScoreResult.tip === null" style="font-size:.8rem;color:var(--text-muted)">No single-ETF swap improves the portfolio score by more than 0.1 pts.</div>
         <p style="font-size:.7rem;color:var(--text-muted);margin-top:.75rem;margin-bottom:0">
           Base = weighted avg of individual GoETF Scores &nbsp;·&nbsp; Overlap Penalty: max −2 pts for 100% overlap &nbsp;·&nbsp; Bonus: portfolio country diversification vs individual weighted avg
+          &nbsp;<button class="meth-link" @click="navigateTo('methodology')">→ Methodology</button>
         </p>
       </div>
       <div v-if="exposureError" class="error-box" style="margin-bottom:1rem">{{ exposureError }}</div>
@@ -235,6 +236,7 @@
         <div>
           <h2 class="card-title" style="margin:0">GoETF Score</h2>
           <p style="font-size:.8rem;color:var(--text-muted);margin:.2rem 0 0">Composite 1–10 score based on 8 risk &amp; diversification metrics, percentile-ranked across all ETFs</p>
+          <button class="meth-link" @click="navigateTo('methodology')">ℹ How is this calculated?</button>
         </div>
         <label style="font-size:.8rem;color:var(--text-muted);margin-left:auto">Risk-free rate</label>
         <input class="input" type="number" v-model.number="goetfRfRate" min="0" max="20" step="0.5"
@@ -301,6 +303,7 @@ import { etfService, analyticsService, scoreService } from '../services/api.js'
 
 const showApiKeyModal = inject('showApiKeyModal')
 const analyticsInitTab = inject('analyticsInitTab', ref(null))
+const navigateTo = inject('navigateTo')
 const hasApiKey = ref(!!localStorage.getItem('api_key'))
 window.addEventListener('storage', (e) => { if (e.key === 'api_key') hasApiKey.value = !!e.newValue })
 
@@ -505,6 +508,8 @@ onMounted(() => {
 .alloc-track{flex:1;height:8px;background:var(--border);border-radius:4px;overflow:hidden}
 .alloc-fill{height:100%;background:var(--green-500);border-radius:4px;transition:width .4s}
 .alloc-pct{width:45px;text-align:right;font-size:.8rem;font-weight:600;color:var(--text)}
+.meth-link{background:none;border:none;padding:0;cursor:pointer;font-size:.76rem;color:var(--green-700);text-decoration:underline;margin-top:.2rem;display:inline-block}
+.meth-link:hover{color:var(--green-800)}
 .score-badge{display:inline-block;padding:.2rem .55rem;border-radius:6px;font-size:.85rem;font-weight:700;min-width:2.4rem;text-align:center}
 .score-badge.score-lg{font-size:1.5rem;padding:.35rem .9rem;border-radius:10px}
 .score-high{background:#dbeafe;color:#0b6aa5}
