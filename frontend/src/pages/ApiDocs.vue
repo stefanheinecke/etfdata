@@ -256,8 +256,8 @@ const tryoutConfigs = {
   'etf-risk-metrics':  { build: ()    => ({ method: 'GET',  url: `${BASE}/etfs/risk-metrics`, params: { tickers: 'SWDA' } }) },
   'etf-performance':   { build: (id)  => ({ method: 'GET',  url: `${BASE}/etfs/${id}/performance` }) },
   'score-etfs':        { build: ()    => ({ method: 'GET',  url: `${BASE}/scores/etfs`, params: { tickers: 'SWDA' } }) },
-  'score-portfolio':   { build: (id, id2) => ({ method: 'POST', url: `${BASE}/scores/portfolio`,
-                                        body: { portfolio: [{ etf_id: id, weight: 60 }, { etf_id: id2, weight: 40 }] } }) },
+  'score-portfolio':   { build: (id) => ({ method: 'POST', url: `${BASE}/scores/portfolio`,
+                                        body: { portfolio: [{ etf_id: id, weight: 60 }, { etf_id: 'CSSPX', weight: 40 }] } }) },
 }
 
 const activeTryoutConfig = computed(() => tryoutConfigs[activeId.value])
@@ -285,7 +285,7 @@ async function runTryout() {
     const id  = swdaId.value
     const id2 = secondEtfId.value ?? id
     const req = cfg.build(id, id2)
-    const axiosCfg = { method: req.method, url: req.url, headers: { 'x-api-key': 'demo' } }
+    const axiosCfg = { method: req.method, url: req.url, headers: { 'x-api-key': localStorage.getItem('api_key') || 'demo' } }
     if (req.body) { axiosCfg.data = req.body; axiosCfg.headers['Content-Type'] = 'application/json' }
     if (req.params) axiosCfg.params = req.params
     const res  = await axios(axiosCfg)

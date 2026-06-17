@@ -65,14 +65,9 @@ async def get_portfolio_score(
 
     Request body: {"portfolio": [{"etf_id": "SWDA", "weight": 60}, ...]}
     """
-    resolved_portfolio = []
-    for item in request.portfolio:
-        etf = resolve_etf(db, item["etf_id"])
-        if _is_demo(api_key) and etf.ticker != "SWDA":
-            raise HTTPException(
-                status_code=403,
-                detail="Demo key only allows access to the SWDA ETF.",
-            )
-        resolved_portfolio.append({"etf_id": str(etf.id), "weight": item["weight"]})
+    resolved_portfolio = [
+        {"etf_id": str(resolve_etf(db, item["etf_id"]).id), "weight": item["weight"]}
+        for item in request.portfolio
+    ]
 
     return compute_portfolio_score(db, resolved_portfolio, rf_annual=rf_rate)

@@ -3,7 +3,7 @@
     <!-- Hero -->
     <section class="hero">
       <div class="hero-inner">
-        <div class="hero-badge">GoETF.ch API</div>
+        <div class="hero-badge">GoETF</div>
         <h1 class="hero-title">ETF Portfolio<br/><span class="gradient-text">Analytics API</span></h1>
         <p class="hero-sub">Real ETF data via REST API. Query holdings, allocations and portfolio exposure analysis. Free demo key.</p>
         <div class="hero-actions">
@@ -15,6 +15,47 @@
         </button>
         <p class="hero-disclaimer">For informational purposes only. Not investment advice.</p>
       </div>
+      <!-- Score Carousel -->
+      <div class="hero-carousel">
+        <div class="hd-chrome">
+          <span class="hd-dot hd-r"></span>
+          <span class="hd-dot hd-y"></span>
+          <span class="hd-dot hd-g"></span>
+          <code class="hd-url">{{ scoreCarouselSlides[scoreCarouselIdx].label }}</code>
+        </div>
+        <transition name="cs" mode="out-in">
+          <div :key="scoreCarouselIdx" class="hc-body">
+            <!-- Slide 0: ETF GoETF Scores -->
+            <template v-if="scoreCarouselIdx === 0">
+              <div class="hd-score-row"><span class="hd-ticker">SWDA</span><div class="hd-score-track"><div class="hd-score-fill" style="width:78%"></div></div><span class="hds-num hds-high">7.8</span></div>
+              <div class="hd-score-row"><span class="hd-ticker">CSSPX</span><div class="hd-score-track"><div class="hd-score-fill" style="width:72%"></div></div><span class="hds-num hds-high">7.2</span></div>
+              <div class="hd-score-row"><span class="hd-ticker">ISF</span><div class="hd-score-track"><div class="hd-score-fill hd-score-fill-mid" style="width:65%"></div></div><span class="hds-num hds-mid">6.5</span></div>
+              <div class="hd-score-row"><span class="hd-ticker">SEDY</span><div class="hd-score-track"><div class="hd-score-fill hd-score-fill-mid" style="width:59%"></div></div><span class="hds-num hds-mid">5.9</span></div>
+              <div class="hd-footer"><span class="hd-status">200 OK</span><span class="hd-count">GoETF Score / 10</span></div>
+            </template>
+            <!-- Slide 1: Portfolio Score + Tip -->
+            <template v-else>
+              <div class="hd-ps-header">
+                <div><div class="hd-ps-port">SWDA 60% + CSSPX 40%</div><div class="hd-ps-label">Portfolio GoETF Score</div></div>
+                <span class="hd-ps-badge">7.1</span>
+              </div>
+              <div class="hd-ps-rows">
+                <div class="hd-ps-row"><span>Base score</span><span>7.5</span></div>
+                <div class="hd-ps-row"><span>Overlap penalty</span><span class="hd-neg">−0.8</span></div>
+                <div class="hd-ps-row"><span>Div. bonus</span><span class="hd-pos">+0.4</span></div>
+              </div>
+              <div class="hd-tip-row">💡 Swap <b>CSSPX</b> → <b>ISF</b> &nbsp;·&nbsp; score +0.6 pts</div>
+              <div class="hd-footer"><span class="hd-status">200 OK</span><span class="hd-count">portfolio score</span></div>
+            </template>
+          </div>
+        </transition>
+        <div class="hc-dots">
+          <button v-for="(_, i) in scoreCarouselSlides" :key="i"
+            :class="['hc-dot-btn', { active: scoreCarouselIdx === i }]"
+            @click="scoreCarouselIdx = i"></button>
+        </div>
+      </div>
+      <!-- API Data Carousel -->
       <div class="hero-carousel">
         <div class="hd-chrome">
           <span class="hd-dot hd-r"></span>
@@ -196,6 +237,13 @@ const carouselSlides = [
 ]
 let _carouselTimer = null
 
+const scoreCarouselIdx = ref(0)
+const scoreCarouselSlides = [
+  { label: 'GET /scores/etfs' },
+  { label: 'POST /scores/portfolio' },
+]
+let _scoreCarouselTimer = null
+
 function scrollToTryout() {
   document.getElementById('live-explorer')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
@@ -205,8 +253,11 @@ onMounted(() => {
   _carouselTimer = setInterval(() => {
     carouselIdx.value = (carouselIdx.value + 1) % carouselSlides.length
   }, 3600)
+  _scoreCarouselTimer = setInterval(() => {
+    scoreCarouselIdx.value = (scoreCarouselIdx.value + 1) % scoreCarouselSlides.length
+  }, 4200)
 })
-onUnmounted(() => clearInterval(_carouselTimer))
+onUnmounted(() => { clearInterval(_carouselTimer); clearInterval(_scoreCarouselTimer) })
 
 const codeTabs = [
   {
@@ -424,6 +475,29 @@ function switchDemo(key) {
 .hd-expo-port { font-family: monospace; font-size: .72rem; font-weight: 700; color: var(--text); }
 .hd-expo-lbl { font-size: .65rem; color: var(--text-muted); }
 .hd-bar-sec { background: #6366f1; }
+/* Score carousel elements */
+.hd-score-row { display:flex; align-items:center; gap:.5rem; padding:.35rem .7rem; border-bottom:1px solid var(--border); }
+.hd-score-track { flex:1; height:5px; background:var(--border); border-radius:3px; overflow:hidden; }
+.hd-score-fill { height:100%; background:var(--green-500); border-radius:3px; }
+.hd-score-fill-mid { background:#2d9ee0; }
+.hds-num { font-size:.82rem; font-weight:700; min-width:2.1rem; text-align:right; }
+.hds-high { color:var(--green-700); }
+.hds-mid { color:#2d9ee0; }
+[data-theme="dark"] .hds-high { color:#93d5f0; }
+/* Portfolio score carousel */
+.hd-ps-header { display:flex; align-items:center; justify-content:space-between; padding:.4rem .7rem; border-bottom:1px solid var(--border); gap:.5rem; }
+.hd-ps-port { font-size:.68rem; color:var(--text-muted); font-family:monospace; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.hd-ps-label { font-size:.62rem; color:var(--text-muted); margin-top:.1rem; }
+.hd-ps-badge { font-size:1.4rem; font-weight:800; color:var(--green-700); line-height:1; flex-shrink:0; }
+[data-theme="dark"] .hd-ps-badge { color:#93d5f0; }
+.hd-ps-rows { display:flex; flex-direction:column; }
+.hd-ps-row { display:flex; justify-content:space-between; font-size:.73rem; padding:.26rem .7rem; border-bottom:1px solid var(--border); }
+.hd-ps-row span:first-child { color:var(--text-muted); }
+.hd-ps-row span:last-child { font-weight:600; }
+.hd-neg { color:#ef4444; }
+.hd-pos { color:var(--green-600); }
+[data-theme="dark"] .hd-pos { color:#2d9ee0; }
+.hd-tip-row { font-size:.71rem; padding:.32rem .7rem; background:var(--bg-3); border-bottom:1px solid var(--border); color:var(--text); }
 /* Live API Explorer button */
 .hero-live-btn {
   display: inline-flex; align-items: center; gap: .45rem;

@@ -4,8 +4,8 @@
     <nav class="navbar">
       <div class="nav-inner">
         <div class="nav-brand" @click="currentPage = 'home'">
-          <img src="/goetf_logo.png" class="brand-logo" alt="GoETF.ch" />
-          <span class="brand-name">GoETF.ch</span>
+          <img src="/goetf_logo.png" class="brand-logo" alt="GoETF" />
+          <span class="brand-name">GoETF</span>
         </div>
         <ul class="nav-links">
           <li v-for="item in navItems" :key="item.id">
@@ -55,7 +55,7 @@
 
     <!-- Disclaimer -->
     <div class="disclaimer-bar">
-      ⚠ Disclaimer: GoETF.ch is for informational purposes only. Nothing on this platform constitutes financial or investment advice.
+      ⚠ Disclaimer: GoETF is for informational purposes only. Nothing on this platform constitutes financial or investment advice.
       Past performance is not indicative of future results. Always consult a qualified financial adviser before making investment decisions.
     </div>
 
@@ -63,8 +63,8 @@
     <footer class="footer">
       <div class="footer-inner">
         <div class="footer-brand">
-          <img src="/goetf_logo.png" class="brand-logo" alt="GoETF.ch" />
-          <strong>GoETF.ch</strong>
+          <img src="/goetf_logo.png" class="brand-logo" alt="GoETF" />
+          <strong>GoETF</strong>
         </div>
         <div class="footer-links">
           <button @click="currentPage = 'home'">Home</button>
