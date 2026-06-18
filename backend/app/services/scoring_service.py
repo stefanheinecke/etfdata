@@ -41,6 +41,23 @@ HIGHER_IS_BETTER = {
     "max_underwater": False,
 }
 
+# Absolute reference ranges (worst, best) for each metric.
+# Score = clamp((value − worst) / (best − worst), 0, 1)
+# For "lower is better" metrics worst > best, so the formula naturally inverts.
+SCORE_RANGES = {
+    # metric: (worst, best) — score = clamp((value − worst) / (best − worst), 0, 1)
+    # For "lower is better" metrics worst > best, so the formula naturally inverts.
+    # "best" values represent genuinely excellent but achievable equity ETF performance.
+    "sortino":        (-0.5,   1.5),   # ratio; worst = −0.5, best = 1.5
+    "calmar":         (-0.2,   0.7),   # ratio; worst = −0.2, best = 0.7
+    "cvar":           (-80.0, -15.0),  # %; worst = −80%, best = −15%
+    "hit_ratio":      ( 0.40,  0.60),  # fraction; worst = 40%, best = 60%
+    "hhi":            (5000,   50),    # lower is better; worst = 5000, best = 50
+    "effective_n":    (   1,  200),    # higher is better; worst = 1, best = 200
+    "geo_div":        ( 0.0,   0.80),  # fraction; worst = 0, best = 0.80
+    "max_underwater": (2500,   50),    # days; lower is better; worst = 2500, best = 50
+}
+
 
 # ---------------------------------------------------------------------------
 # Raw metric computation for a single ETF
@@ -178,16 +195,19 @@ def _compute_raw_metrics(db: Session, etf: ETF, rf_annual: float) -> Optional[Di
 
 
 # ---------------------------------------------------------------------------
-# Percentile ranking helper
+# Absolute metric scorer
 # ---------------------------------------------------------------------------
-def _percentile_rank(values: List[float], val: float, higher_is_better: bool) -> float:
-    """Return 0..1 percentile rank. 1.0 = best in universe."""
-    if len(values) <= 1:
+def _absolute_score(metric: str, value: float) -> float:
+    """
+    Map a raw metric value to a 0–1 quality score using fixed reference ranges.
+    0 = worst realistic value, 1 = best realistic value.
+    Works for both higher-is-better and lower-is-better metrics because
+    SCORE_RANGES encodes direction via (worst, best) ordering.
+    """
+    worst, best = SCORE_RANGES[metric]
+    if best == worst:
         return 0.5
-    sorted_v = sorted(values)
-    count_below = sum(1 for v in sorted_v if v < val)
-    rank = count_below / (len(sorted_v) - 1)
-    return rank if higher_is_better else (1.0 - rank)
+    return max(0.0, min(1.0, (value - worst) / (best - worst)))
 
 
 # ---------------------------------------------------------------------------
@@ -213,14 +233,7 @@ def compute_goetf_scores(
         raw = _compute_raw_metrics(db, etf, rf_annual)
         rows.append({"etf_id": str(etf.id), "ticker": etf.ticker, "name": etf.name, "metrics": raw})
 
-    # Step 2: collect metric series for percentile ranking (valid ETFs only)
-    valid_rows = [r for r in rows if r["metrics"] is not None]
-    metric_values: Dict[str, List[float]] = {m: [] for m in SCORE_WEIGHTS}
-    for row in valid_rows:
-        for m in SCORE_WEIGHTS:
-            metric_values[m].append(row["metrics"][m])
-
-    # Step 3: score each ETF
+    # Step 2: score each ETF against fixed absolute reference ranges
     results = []
     for row in rows:
         if row["metrics"] is None:
@@ -235,11 +248,11 @@ def compute_goetf_scores(
             )
             continue
 
-        pct_ranks = {
-            m: _percentile_rank(metric_values[m], row["metrics"][m], HIGHER_IS_BETTER[m])
+        metric_scores = {
+            m: _absolute_score(m, row["metrics"][m])
             for m in SCORE_WEIGHTS
         }
-        raw_score = sum(SCORE_WEIGHTS[m] * pct_ranks[m] for m in SCORE_WEIGHTS)
+        raw_score = sum(SCORE_WEIGHTS[m] * metric_scores[m] for m in SCORE_WEIGHTS)
         goetf_score = round(1.0 + raw_score * 9.0, 1)
 
         results.append(
@@ -249,7 +262,7 @@ def compute_goetf_scores(
                 "name": row["name"],
                 "goetf_score": goetf_score,
                 **row["metrics"],
-                "percentile_ranks": {m: round(pct_ranks[m], 3) for m in pct_ranks},
+                "metric_scores": {m: round(metric_scores[m], 3) for m in metric_scores},
             }
         )
 

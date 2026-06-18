@@ -257,7 +257,7 @@
             <thead>
               <tr>
                 <th class="sortable-th" @click="toggleGoetfSort('goetf_score')">
-                  <span class="col-label" :data-tip="`Overall GoETF Score (1–10). Combines all 8 metrics into one number — higher means a better ETF overall.\n\n✅ Great: ≥ 7\n🟡 Average: 5–7\n🔴 Weak: ≤ 4`">Score <span class="col-i">i</span></span>
+                  <span class="col-label" :data-tip="`Absolute quality score (1–10) based on fixed reference ranges for each metric — not a ranking against other ETFs. A score of 7+ means genuinely good by general standards; it does not change when new ETFs are added to the universe.\n\n✅ Good quality: ≥ 7\n🟡 Average: 5–7\n🔴 Below standard: ≤ 4`">Score <span class="col-i">i</span></span>
                   <span class="sort-arrow">{{ goetfSortKey==='goetf_score' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span>
                 </th>
                 <th class="sortable-th" @click="toggleGoetfSort('ticker')">Ticker <span class="sort-arrow">{{ goetfSortKey==='ticker' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span></th>
@@ -317,7 +317,7 @@
           </table>
         </div>
         <div style="padding:.5rem 1.25rem;border-top:1px solid var(--border);font-size:.7rem;color:var(--text-muted)">
-          Hover any ⓘ column header for metric details &nbsp;·&nbsp; Score = weighted percentile rank (1–10) &nbsp;·&nbsp; Rankings are relative within the tracked universe. Not investment advice.
+          Hover any <strong>ⓘ</strong> column header for metric details &nbsp;·&nbsp; Score = absolute quality score against fixed benchmarks — independent of how many ETFs are tracked &nbsp;·&nbsp; Not investment advice.
         </div>
       </div>
     </div>
