@@ -21,8 +21,7 @@
           <button class="theme-toggle" @click="toggleTheme" :title="theme === 'dark' ? 'Light mode' : 'Dark mode'">
             {{ theme === 'dark' ? '☀️' : '🌙' }}
           </button>
-          <button class="btn-get-key" @click="openApiKeyModal('request')">Get Free API Key</button>
-          <button class="btn-enter-key" @click="openApiKeyModal('enter')" title="Enter your API key">🔑 Enter Key</button>
+          <button v-if="!hasApiKey" class="btn-get-key" @click="openApiKeyModal('request')">🔑 Request &amp; Enter Key</button>
           <button v-if="adminActive" class="nav-btn admin-btn" @click="currentPage = 'admin'">⚙ Admin</button>
         </div>
         <button class="hamburger" :class="{open: mobileMenuOpen}" @click="mobileMenuOpen = !mobileMenuOpen" aria-label="Menu">
@@ -37,8 +36,7 @@
         <button v-for="item in navItems" :key="item.id"
           :class="['mobile-menu-item', { active: currentPage === item.id || (item.id === 'etfs' && currentPage === 'etf-detail') }]"
           @click="currentPage = item.id; mobileMenuOpen = false">{{ item.label }}</button>
-        <button class="mobile-menu-item mobile-menu-getkey" @click="openApiKeyModal('request'); mobileMenuOpen = false">🔑 Get Free API Key</button>
-        <button class="mobile-menu-item" @click="openApiKeyModal('enter'); mobileMenuOpen = false">🔑 Enter API Key</button>
+        <button v-if="!hasApiKey" class="mobile-menu-item mobile-menu-getkey" @click="openApiKeyModal('request'); mobileMenuOpen = false">🔑 Request &amp; Enter Key</button>
         <button v-if="adminActive" class="mobile-menu-item" @click="currentPage = 'admin'; mobileMenuOpen = false">⚙ Admin</button>
         <button v-else class="mobile-menu-item" @click="showAdminLogin = true; mobileMenuOpen = false">🔒 Admin Login</button>
       </div>
@@ -246,14 +244,6 @@ onMounted(async () => {
   white-space: nowrap;
 }
 .btn-get-key:hover { opacity: .9; transform: translateY(-1px); }
-.btn-enter-key {
-  padding: .4rem .85rem; border-radius: 8px; font-size: .875rem; font-weight: 600;
-  background: var(--bg-3, #f0f0f0);
-  color: var(--text, #222); border: 1px solid var(--border, #ddd); cursor: pointer;
-  transition: opacity .15s, transform .1s;
-  white-space: nowrap;
-}
-.btn-enter-key:hover { opacity: .85; transform: translateY(-1px); }
 .nav-btn {
   background: none; border: none; cursor: pointer;
   padding: .4rem .85rem; border-radius: 8px;
