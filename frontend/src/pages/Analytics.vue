@@ -304,12 +304,12 @@
                 </td>
                 <td><strong style="color:var(--green-600)">{{ row.ticker }}</strong></td>
                 <td style="font-size:.8rem;color:var(--text-muted);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ row.name }}</td>
-                <td :class="ratioClass(row.sortino)">{{ row.sortino != null ? row.sortino.toFixed(2) : '—' }}</td>
-                <td :class="ratioClass(row.calmar)">{{ row.calmar != null ? row.calmar.toFixed(2) : '—' }}</td>
+                <td :class="sortinoClass(row.sortino)">{{ row.sortino != null ? row.sortino.toFixed(2) : '—' }}</td>
+                <td :class="calmarClass(row.calmar)">{{ row.calmar != null ? row.calmar.toFixed(2) : '—' }}</td>
                 <td :class="cvarClass(row.cvar)">{{ row.cvar != null ? row.cvar.toFixed(1) + '%' : '—' }}</td>
                 <td :class="hitClass(row.hit_ratio)">{{ row.hit_ratio != null ? (row.hit_ratio * 100).toFixed(1) + '%' : '—' }}</td>
                 <td :class="hhiClass(row.hhi)">{{ row.hhi != null ? row.hhi.toFixed(0) : '—' }}</td>
-                <td>{{ row.effective_n != null ? row.effective_n.toFixed(0) : '—' }}</td>
+                <td :class="effNClass(row.effective_n)">{{ row.effective_n != null ? row.effective_n.toFixed(0) : '—' }}</td>
                 <td :class="geodivClass(row.geo_div)">{{ row.geo_div != null ? (row.geo_div * 100).toFixed(1) + '%' : '—' }}</td>
                 <td :class="uwClass(row.max_underwater)">{{ row.max_underwater != null ? row.max_underwater + 'd' : '—' }}</td>
               </tr>
@@ -439,12 +439,15 @@ async function runGoetfScores() {
   } finally { goetfLoading.value = false }
 }
 
-const scoreBadgeClass = (s) => s >= 8 ? 'score-high' : s >= 6 ? 'score-mid' : s >= 4 ? 'score-low' : 'score-poor'
-const ratioClass = (v) => v === null || v === undefined ? '' : v >= 1 ? 'cell-green' : v >= 0 ? 'cell-yellow' : 'cell-red'
-const cvarClass = (v) => v === null || v === undefined ? '' : v > -10 ? 'cell-green' : v > -20 ? 'cell-yellow' : 'cell-red'
-const hitClass = (v) => v === null || v === undefined ? '' : v >= 0.55 ? 'cell-green' : v >= 0.5 ? 'cell-yellow' : 'cell-red'
-const geodivClass = (v) => v === null || v === undefined ? '' : v >= 0.7 ? 'cell-green' : v >= 0.5 ? 'cell-yellow' : 'cell-red'
-const uwClass = (v) => v === null || v === undefined ? '' : v < 90 ? 'cell-green' : v < 180 ? 'cell-yellow' : 'cell-red'
+const scoreBadgeClass = (s) => s >= 7 ? 'score-high' : s >= 5 ? 'score-mid' : s >= 3.5 ? 'score-low' : 'score-poor'
+const sortinoClass = (v) => v == null ? '' : v >= 1.0 ? 'cell-green' : v >= 0.5 ? 'cell-yellow' : 'cell-red'
+const calmarClass  = (v) => v == null ? '' : v >= 0.5 ? 'cell-green' : v >= 0.2 ? 'cell-yellow' : 'cell-red'
+const cvarClass    = (v) => v == null ? '' : v > -20  ? 'cell-green' : v > -40  ? 'cell-yellow' : 'cell-red'
+const hitClass     = (v) => v == null ? '' : v >= 0.55 ? 'cell-green' : v >= 0.48 ? 'cell-yellow' : 'cell-red'
+const hhiClass     = (v) => v == null ? '' : v < 200  ? 'cell-green' : v < 1000 ? 'cell-yellow' : 'cell-red'
+const effNClass    = (v) => v == null ? '' : v >= 100 ? 'cell-green' : v >= 20  ? 'cell-yellow' : 'cell-red'
+const geodivClass  = (v) => v == null ? '' : v >= 0.6 ? 'cell-green' : v >= 0.2 ? 'cell-yellow' : 'cell-red'
+const uwClass      = (v) => v == null ? '' : v < 250  ? 'cell-green' : v < 500  ? 'cell-yellow' : 'cell-red'
 
 // Risk Metrics tab
 const riskSelectedEtfs = ref([])
@@ -490,7 +493,7 @@ const signClass = v  => v === null ? '' : v >= 0 ? 'cell-green' : 'cell-red'
 const volClass  = v  => v === null ? '' : v < 12 ? 'cell-green' : v < 22 ? 'cell-yellow' : 'cell-red'
 const sharpeClass = v => v === null ? '' : v >= 1 ? 'cell-green' : v >= 0 ? 'cell-yellow' : 'cell-red'
 const ddClass   = v  => v === null ? '' : v > -10 ? 'cell-green' : v > -20 ? 'cell-yellow' : 'cell-red'
-const hhiClass  = v  => v === null ? '' : v < 500 ? 'cell-green' : v < 2000 ? 'cell-yellow' : 'cell-red'
+const hhiClass  = v  => v === null ? '' : v < 200  ? 'cell-green' : v < 1000 ? 'cell-yellow' : 'cell-red'
 
 onMounted(() => {
   loadETFs()
@@ -516,7 +519,7 @@ onMounted(() => {
 .stat-box .stat-value{font-size:1.25rem}
 .sortable-th:hover{color:var(--green-600)}
 .sort-arrow{margin-left:.25rem;font-size:.7rem}
-.cell-green{color:#0b6aa5;font-weight:600}
+.cell-green{color:#16a34a;font-weight:600}
 .cell-yellow{color:#ca8a04;font-weight:600}
 .cell-red{color:#ef4444;font-weight:600}
 .table-wrap{overflow-x:auto}
@@ -539,14 +542,14 @@ onMounted(() => {
 .meth-link:hover{color:var(--green-800)}
 .score-badge{display:inline-block;padding:.2rem .55rem;border-radius:6px;font-size:.85rem;font-weight:700;min-width:2.4rem;text-align:center}
 .score-badge.score-lg{font-size:1.5rem;padding:.35rem .9rem;border-radius:10px}
-.score-high{background:#dbeafe;color:#0b6aa5}
-.score-mid{background:#e0f2fe;color:#2d9ee0}
-.score-low{background:#fef3c7;color:#92400e}
+.score-high{background:#dcfce7;color:#166534}
+.score-mid{background:#fef9c3;color:#854d0e}
+.score-low{background:#ffedd5;color:#9a3412}
 .score-poor{background:#fee2e2;color:#b91c1c}
 .score-na{background:var(--bg-3);color:var(--text-muted)}
-[data-theme="dark"] .score-high{background:#0b3a5e;color:#93d5f0}
-[data-theme="dark"] .score-mid{background:#0a2d4a;color:#7ec8e3}
-[data-theme="dark"] .score-low{background:#3d2900;color:#fcd34d}
+[data-theme="dark"] .score-high{background:#052e16;color:#86efac}
+[data-theme="dark"] .score-mid{background:#2d1b00;color:#fde68a}
+[data-theme="dark"] .score-low{background:#3d1a00;color:#fdba74}
 [data-theme="dark"] .score-poor{background:#3d0000;color:#fca5a5}
 .tip-box{display:flex;gap:.75rem;align-items:flex-start;background:var(--bg-3);border:1px solid var(--border);border-radius:10px;padding:.85rem 1rem;margin-top:.5rem}
 .tip-icon{font-size:1.2rem;flex-shrink:0}
