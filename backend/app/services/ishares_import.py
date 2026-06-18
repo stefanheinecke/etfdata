@@ -397,7 +397,7 @@ def _upsert_price_row(db, etf_id, row_date, close: float, currency: str) -> None
     db.execute(stmt)
 
 
-def refresh_daily_prices(db: Session) -> dict:
+def refresh_daily_prices(db: Session, progress_cb=None) -> dict:
     """
     Fetch the latest 7 calendar days of closing prices for every ETF in the
     database and upsert into the performance table.  Existing rows are updated
@@ -405,6 +405,8 @@ def refresh_daily_prices(db: Session) -> dict:
 
     Uses EODHD when EODHD_TOKEN is set (preferred — no rate-limit issues).
     Falls back to yfinance for any ETF where no EODHD token is available.
+
+    progress_cb: optional callable(done, total, ticker) called before each ETF.
     """
     import os
     from datetime import datetime, timedelta
@@ -414,11 +416,15 @@ def refresh_daily_prices(db: Session) -> dict:
     from_date = (datetime.utcnow() - timedelta(days=7)).strftime("%Y-%m-%d")
 
     etfs = db.query(ETF).order_by(ETF.ticker).all()
+    total = len(etfs)
     total_rows = 0
     etf_results = []
     errors = []
 
-    for etf in etfs:
+    for i, etf in enumerate(etfs):
+        if progress_cb:
+            progress_cb(i, total, etf.ticker)
+
         eodhd_sym = _eodhd_symbol_for_etf(etf)
         source = "eodhd" if (token and eodhd_sym) else "yfinance"
 
@@ -471,8 +477,12 @@ def refresh_daily_prices(db: Session) -> dict:
             errors.append(f"{etf.ticker}: {exc}")
             logger.error("refresh_daily_prices failed for %s: %s", etf.ticker, exc)
 
+    if progress_cb:
+        progress_cb(total, total, "")
+
     return {
         "total_rows_upserted": total_rows,
+        "total_etfs": total,
         "etfs": etf_results,
         "errors": errors,
     }

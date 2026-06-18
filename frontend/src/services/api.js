@@ -108,6 +108,9 @@ export const adminService = {
   refreshPrices(adminSecret) {
     return api.post('/admin/refresh-prices', null, { headers: { 'x-admin-secret': adminSecret } })
   },
+  refreshPricesStatus(adminSecret, jobId) {
+    return api.get(`/admin/refresh-prices/status/${jobId}`, { headers: { 'x-admin-secret': adminSecret } })
+  },
   backfillEodhdSymbols(adminSecret) {
     return api.post('/admin/backfill-eodhd-symbols', null, { headers: { 'x-admin-secret': adminSecret } })
   },

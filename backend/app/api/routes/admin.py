@@ -1,16 +1,22 @@
 import os
+import threading
 from datetime import date as date_type
+from uuid import UUID, uuid4
 from fastapi import APIRouter, Depends, HTTPException, Header, UploadFile, File
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
-from uuid import UUID
 
 from typing import List, Optional
-from app.db.database import get_db
+from app.db.database import get_db, SessionLocal
 from app.core.auth import create_api_key
 from app.services.ishares_import import import_ishares, ISHARES_ETFS
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+
+# ---------------------------------------------------------------------------
+# In-memory job store for async price refresh progress tracking
+# ---------------------------------------------------------------------------
+_refresh_jobs: dict[str, dict] = {}
 
 
 class ImportRequest(BaseModel):
@@ -61,14 +67,56 @@ def verify_endpoint(_: None = Depends(verify_admin_secret)):
 
 
 @router.post("/refresh-prices")
-def refresh_prices_endpoint(
-    db: Session = Depends(get_db),
-    _: None = Depends(verify_admin_secret),
-):
-    """Fetch the latest closing prices for all tracked ETFs from EODHD (or yfinance fallback)
-    and upsert into the performance table. Safe to call daily — no data is deleted."""
+def refresh_prices_endpoint(_: None = Depends(verify_admin_secret)):
+    """
+    Start an async price refresh job. Returns a job_id immediately.
+    Poll GET /admin/refresh-prices/status/{job_id} for live progress.
+    """
     from app.services.ishares_import import refresh_daily_prices
-    return refresh_daily_prices(db)
+
+    job_id = str(uuid4())
+    _refresh_jobs[job_id] = {
+        "status": "running",
+        "done": 0,
+        "total": 0,
+        "current_ticker": "",
+        "total_rows_upserted": 0,
+        "etfs": [],
+        "errors": [],
+    }
+
+    def _run():
+        db = SessionLocal()
+        try:
+            def _progress(done: int, total: int, ticker: str):
+                _refresh_jobs[job_id].update({"done": done, "total": total, "current_ticker": ticker})
+
+            result = refresh_daily_prices(db, progress_cb=_progress)
+            _refresh_jobs[job_id].update({
+                "status": "done",
+                "done": result.get("total_etfs", 0),
+                "total": result.get("total_etfs", 0),
+                "current_ticker": "",
+                "total_rows_upserted": result["total_rows_upserted"],
+                "etfs": result["etfs"],
+                "errors": result["errors"],
+            })
+        except Exception as exc:
+            _refresh_jobs[job_id].update({"status": "error", "errors": [str(exc)]})
+        finally:
+            db.close()
+
+    threading.Thread(target=_run, daemon=True).start()
+    return {"job_id": job_id}
+
+
+@router.get("/refresh-prices/status/{job_id}")
+def refresh_prices_status(job_id: str, _: None = Depends(verify_admin_secret)):
+    """Poll for progress of a running or completed refresh job."""
+    job = _refresh_jobs.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found or expired.")
+    return job
 
 
 @router.post("/backfill-eodhd-symbols")

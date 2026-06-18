@@ -100,6 +100,10 @@
               {{ refreshPricesLoading ? 'Refreshing…' : '🔄 Refresh Prices (latest close)' }}
             </button>
             <p style="font-size:.75rem;color:var(--text-muted);margin-top:.3rem">Fetches the latest closing prices for all ETFs from EODHD (upserts last 7 days).</p>
+            <div v-if="refreshPricesLoading && refreshPricesProgress" style="margin-top:.4rem;font-size:.8rem;color:var(--text-muted);display:flex;align-items:center;gap:.4rem">
+              <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--primary);animation:pulse 1s infinite"></span>
+              {{ refreshPricesProgress }}
+            </div>
           </div>
           <div>
             <button class="btn btn-outline" style="width:100%" @click="triggerBackfillSymbols" :disabled="!adminVerified || backfillLoading">
@@ -572,6 +576,7 @@ const resetLoading = ref(false)
 const dbResult = ref('')
 const dbError = ref('')
 const refreshPricesLoading = ref(false)
+const refreshPricesProgress = ref('')   // "5 of 12 — SWDA"
 const refreshPricesResult = ref('')
 const refreshPricesError = ref('')
 const backfillLoading = ref(false)
@@ -679,17 +684,44 @@ async function confirmReset() {
 }
 
 async function triggerRefreshPrices() {
-  refreshPricesLoading.value = true; refreshPricesResult.value = ''; refreshPricesError.value = ''
+  refreshPricesLoading.value = true
+  refreshPricesProgress.value = ''
+  refreshPricesResult.value = ''
+  refreshPricesError.value = ''
   try {
-    const r = await adminService.refreshPrices(adminSecret.value)
-    const d = r.data
-    const etfCount = d.etfs?.length ?? 0
-    const errors = d.errors?.length ? ` (${d.errors.length} error(s): ${d.errors.join(', ')})` : ''
-    refreshPricesResult.value = `✓ ${d.total_rows_upserted} price rows upserted across ${etfCount} ETF(s).${errors}`
+    const { data } = await adminService.refreshPrices(adminSecret.value)
+    const jobId = data.job_id
+
+    // Poll for progress every 900 ms
+    await new Promise((resolve, reject) => {
+      const interval = setInterval(async () => {
+        try {
+          const { data: job } = await adminService.refreshPricesStatus(adminSecret.value, jobId)
+          if (job.total > 0) {
+            const ticker = job.current_ticker ? ` — ${job.current_ticker}` : ''
+            refreshPricesProgress.value = `${job.done} of ${job.total}${ticker}`
+          }
+          if (job.status === 'done') {
+            clearInterval(interval)
+            const errors = job.errors?.length ? ` (${job.errors.length} error(s))` : ''
+            refreshPricesResult.value = `✓ ${job.total_rows_upserted} rows upserted across ${job.etfs?.length ?? 0} ETF(s).${errors}`
+            if (job.errors?.length) refreshPricesError.value = job.errors.join(', ')
+            resolve()
+          } else if (job.status === 'error') {
+            clearInterval(interval)
+            reject(new Error(job.errors?.[0] || 'Unknown error'))
+          }
+        } catch (e) {
+          clearInterval(interval)
+          reject(e)
+        }
+      }, 900)
+    })
   } catch(e) {
     refreshPricesError.value = e.response?.data?.detail || e.message
   } finally {
     refreshPricesLoading.value = false
+    refreshPricesProgress.value = ''
   }
 }
 
@@ -986,6 +1018,7 @@ async function loadLogs(offset = 0) {
 </script>
 
 <style scoped>
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }
 .tab-bar { display: flex; gap: 0; margin-bottom: 1.5rem; border-bottom: 2px solid var(--border); }
 .tab-btn { background: none; border: none; border-bottom: 2px solid transparent; margin-bottom: -2px; padding: .6rem 1.25rem; font-size: .9rem; font-weight: 500; color: var(--text-muted); cursor: pointer; transition: color .15s, border-color .15s; border-radius: var(--radius-sm) var(--radius-sm) 0 0; }
 .tab-btn:hover { color: var(--text); background: var(--bg-2); }
