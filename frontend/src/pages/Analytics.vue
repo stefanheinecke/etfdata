@@ -256,17 +256,44 @@
           <table class="risk-table">
             <thead>
               <tr>
-                <th class="sortable-th" @click="toggleGoetfSort('goetf_score')">Score <span class="sort-arrow">{{ goetfSortKey==='goetf_score' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span><span class="col-tip" data-tip="Weighted percentile rank 1–10 across all 8 metrics. Higher = better overall.">ⓘ</span></th>
+                <th class="sortable-th" @click="toggleGoetfSort('goetf_score')">
+                  <span class="col-label" :data-tip="`Overall GoETF Score (1–10). Combines all 8 metrics into one number — higher means a better ETF overall.\n\n✅ Great: ≥ 7\n🟡 Average: 5–7\n🔴 Weak: ≤ 4`">Score <span class="col-i">i</span></span>
+                  <span class="sort-arrow">{{ goetfSortKey==='goetf_score' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span>
+                </th>
                 <th class="sortable-th" @click="toggleGoetfSort('ticker')">Ticker <span class="sort-arrow">{{ goetfSortKey==='ticker' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span></th>
                 <th>Name</th>
-                <th class="sortable-th" @click="toggleGoetfSort('sortino')">Sortino <span class="sort-arrow">{{ goetfSortKey==='sortino' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span><span class="col-tip" data-tip="Return ÷ downside deviation (20% weight). Higher = better. ✅ >1.0  🟡 0.5–1.0  🔴 <0.3">ⓘ</span></th>
-                <th class="sortable-th" @click="toggleGoetfSort('calmar')">Calmar <span class="sort-arrow">{{ goetfSortKey==='calmar' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span><span class="col-tip" data-tip="Return ÷ max drawdown (15% weight). Higher = better. ✅ >0.5  🟡 0.2–0.5  🔴 <0.1">ⓘ</span></th>
-                <th class="sortable-th" @click="toggleGoetfSort('cvar')">CVaR 95% <span class="sort-arrow">{{ goetfSortKey==='cvar' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span><span class="col-tip" data-tip="Avg loss on worst 5% of days, annualised via √252 (15% weight). Less negative = better. ✅ >−20%  🟡 −20% to −40%  🔴 <−40%">ⓘ</span></th>
-                <th class="sortable-th" @click="toggleGoetfSort('hit_ratio')">Hit Ratio <span class="sort-arrow">{{ goetfSortKey==='hit_ratio' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span><span class="col-tip" data-tip="% of trading days that closed positive (10% weight). Higher = better. ✅ >55%  🟡 50–55%  🔴 <48%">ⓘ</span></th>
-                <th class="sortable-th" @click="toggleGoetfSort('hhi')">HHI <span class="sort-arrow">{{ goetfSortKey==='hhi' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span><span class="col-tip" data-tip="Herfindahl-Hirschman Index of holding weights ×10,000 (10% weight). Lower = more diversified. ✅ <200  🟡 200–800  🔴 >1000">ⓘ</span></th>
-                <th class="sortable-th" @click="toggleGoetfSort('effective_n')">Eff. N <span class="sort-arrow">{{ goetfSortKey==='effective_n' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span><span class="col-tip" data-tip="Effective number of holdings = 1 ÷ Σw² (10% weight). Higher = more diversified. ✅ >100  🟡 20–100  🔴 <10">ⓘ</span></th>
-                <th class="sortable-th" @click="toggleGoetfSort('geo_div')">Geo Div <span class="sort-arrow">{{ goetfSortKey==='geo_div' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span><span class="col-tip" data-tip="Country spread 0–100% (10% weight). 100% = perfectly even across countries. ✅ >60%  🟡 20–60%  🔴 <20%">ⓘ</span></th>
-                <th class="sortable-th" @click="toggleGoetfSort('max_underwater')">Max UW <span class="sort-arrow">{{ goetfSortKey==='max_underwater' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span><span class="col-tip" data-tip="Max consecutive days below previous all-time high (10% weight). Lower = faster recovery. ✅ <250d  🟡 250–500d  🔴 >500d">ⓘ</span></th>
+                <th class="sortable-th" @click="toggleGoetfSort('sortino')">
+                  <span class="col-label" :data-tip="`How much return you get relative to losses. Only bad days count against you — good days are not penalised. Higher is better.\n\n✅ Good: > 1.0\n🟡 OK: 0.5–1.0\n🔴 Poor: < 0.3`">Sortino <span class="col-i">i</span></span>
+                  <span class="sort-arrow">{{ goetfSortKey==='sortino' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span>
+                </th>
+                <th class="sortable-th" @click="toggleGoetfSort('calmar')">
+                  <span class="col-label" :data-tip="`How much annual return you earned vs. the worst crash the ETF ever had. High value = steady gains with shallow losses. Higher is better.\n\n✅ Good: > 0.5\n🟡 OK: 0.2–0.5\n🔴 Poor: < 0.1`">Calmar <span class="col-i">i</span></span>
+                  <span class="sort-arrow">{{ goetfSortKey==='calmar' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span>
+                </th>
+                <th class="sortable-th" @click="toggleGoetfSort('cvar')">
+                  <span class="col-label" :data-tip="`How bad things get on the worst 5% of days, scaled to a yearly number. Think: expected loss in a really bad year. Less negative = better.\n\n✅ Low risk: > −20%\n🟡 Moderate: −20% to −40%\n🔴 High risk: < −40%`">CVaR 95% <span class="col-i">i</span></span>
+                  <span class="sort-arrow">{{ goetfSortKey==='cvar' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span>
+                </th>
+                <th class="sortable-th" @click="toggleGoetfSort('hit_ratio')">
+                  <span class="col-label" :data-tip="`How often the ETF ends a day in positive territory. More green days = more consistent growth. Higher is better.\n\n✅ Consistent: > 55%\n🟡 Average: 50–55%\n🔴 Erratic: < 48%`">Hit Ratio <span class="col-i">i</span></span>
+                  <span class="sort-arrow">{{ goetfSortKey==='hit_ratio' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span>
+                </th>
+                <th class="sortable-th" @click="toggleGoetfSort('hhi')">
+                  <span class="col-label" :data-tip="`Measures how concentrated the ETF is in its top holdings. 10,000 = everything in one stock. Lower = more spread out.\n\n✅ Diversified: < 200\n🟡 Moderate: 200–800\n🔴 Concentrated: > 1,000`">HHI <span class="col-i">i</span></span>
+                  <span class="sort-arrow">{{ goetfSortKey==='hhi' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span>
+                </th>
+                <th class="sortable-th" @click="toggleGoetfSort('effective_n')">
+                  <span class="col-label" :data-tip="`The 'real' number of meaningful holdings. Even 500 stocks can act like 20 if a few giants dominate. Higher = more balanced.\n\n✅ Diversified: > 100\n🟡 Moderate: 20–100\n🔴 Concentrated: < 10`">Eff. N <span class="col-i">i</span></span>
+                  <span class="sort-arrow">{{ goetfSortKey==='effective_n' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span>
+                </th>
+                <th class="sortable-th" @click="toggleGoetfSort('geo_div')">
+                  <span class="col-label" :data-tip="`How evenly the ETF is spread across countries. 100% = perfectly global, 0% = single country. Higher = less geographic risk.\n\n✅ Global: > 60%\n🟡 Regional: 20–60%\n🔴 Single-country: < 20%`">Geo Div <span class="col-i">i</span></span>
+                  <span class="sort-arrow">{{ goetfSortKey==='geo_div' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span>
+                </th>
+                <th class="sortable-th" @click="toggleGoetfSort('max_underwater')">
+                  <span class="col-label" :data-tip="`How long investors had to wait to break even after the ETF's worst crash. Shorter = more resilient. Lower is better.\n\n✅ Fast recovery: < 250 days\n🟡 Moderate: 250–500 days\n🔴 Slow: > 500 days`">Max UW <span class="col-i">i</span></span>
+                  <span class="sort-arrow">{{ goetfSortKey==='max_underwater' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span>
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -480,9 +507,9 @@ onMounted(() => {
 .cta-text span{color:var(--text-muted)}
 .cta-btn{padding:.55rem 1.2rem;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;border:none;border-radius:8px;font-weight:700;font-size:.875rem;cursor:pointer;white-space:nowrap;flex-shrink:0}
 .cta-btn:hover{opacity:.9}
-.risk-table{width:100%;border-collapse:collapse;font-size:.875rem}
+.risk-table{width:100%;border-collapse:collapse;font-size:.8rem}
 .risk-table thead tr{background:var(--bg-3)}
-.risk-table th,.risk-table td{padding:.6rem 1rem;text-align:left;border-bottom:1px solid var(--border)}
+.risk-table th,.risk-table td{padding:.5rem .65rem;text-align:left;border-bottom:1px solid var(--border)}
 .risk-table tbody tr:hover{background:var(--bg-3)}
 .sortable-th{cursor:pointer;user-select:none;white-space:nowrap}
 .stat-box{background:var(--bg-3);border-radius:10px;padding:.75rem 1rem;display:flex;flex-direction:column}
@@ -525,27 +552,39 @@ onMounted(() => {
 .tip-icon{font-size:1.2rem;flex-shrink:0}
 
 /* ── Column header tooltips ───────────────────────────────────── */
-.col-tip{
+.col-label{
+  display:inline-flex;align-items:center;gap:.2rem;
+  cursor:help;
+  text-decoration:underline;
+  text-decoration-style:dotted;
+  text-underline-offset:3px;
+  text-decoration-color:var(--text-muted,#aaa);
+  position:relative;
+  font-weight:600;
+}
+.col-label:hover{color:var(--primary,#1585c8)}
+.col-i{
   display:inline-flex;align-items:center;justify-content:center;
-  width:14px;height:14px;border-radius:50%;
-  font-size:.65rem;font-weight:700;font-style:normal;
+  width:13px;height:13px;border-radius:50%;
+  font-size:.6rem;font-weight:700;font-style:italic;
   background:var(--bg-3,#e8edf2);color:var(--text-muted,#888);
-  cursor:default;margin-left:.3rem;position:relative;vertical-align:middle;
-  flex-shrink:0;
+  flex-shrink:0;line-height:1;
 }
-.col-tip::after{
-  content: attr(data-tip);
-  position:absolute;top:calc(100% + 6px);left:50%;transform:translateX(-50%);
-  min-width:220px;max-width:280px;
+.col-label::after{
+  content:attr(data-tip);
+  position:absolute;top:calc(100% + 8px);left:0;
+  min-width:210px;max-width:250px;
   background:#1e293b;color:#f1f5f9;
-  font-size:.72rem;font-weight:400;line-height:1.5;
-  padding:.55rem .75rem;border-radius:8px;
-  white-space:normal;text-align:left;
-  box-shadow:0 4px 16px rgba(0,0,0,.35);
+  font-size:.73rem;font-weight:400;line-height:1.6;
+  padding:.65rem .85rem;border-radius:8px;
+  white-space:pre-line;
+  text-align:left;
+  box-shadow:0 4px 20px rgba(0,0,0,.4);
   pointer-events:none;opacity:0;transition:opacity .15s;
-  z-index:200;
+  z-index:300;
+  text-decoration:none;
+  font-style:normal;
 }
-.col-tip:hover::after{opacity:1}
-/* keep tooltip inside card on last columns */
-thead th:nth-last-child(-n+3) .col-tip::after{left:auto;right:0;transform:none}
+.col-label:hover::after{opacity:1}
+thead th:nth-last-child(-n+3) .col-label::after{left:auto;right:0}
 </style>
