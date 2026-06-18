@@ -256,17 +256,17 @@
           <table class="risk-table">
             <thead>
               <tr>
-                <th class="sortable-th" @click="toggleGoetfSort('goetf_score')">Score <span class="sort-arrow">{{ goetfSortKey==='goetf_score' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span></th>
+                <th class="sortable-th" @click="toggleGoetfSort('goetf_score')">Score <span class="sort-arrow">{{ goetfSortKey==='goetf_score' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span><span class="col-tip" data-tip="Weighted percentile rank 1–10 across all 8 metrics. Higher = better overall.">ⓘ</span></th>
                 <th class="sortable-th" @click="toggleGoetfSort('ticker')">Ticker <span class="sort-arrow">{{ goetfSortKey==='ticker' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span></th>
                 <th>Name</th>
-                <th class="sortable-th" @click="toggleGoetfSort('sortino')">Sortino <span class="sort-arrow">{{ goetfSortKey==='sortino' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span></th>
-                <th class="sortable-th" @click="toggleGoetfSort('calmar')">Calmar <span class="sort-arrow">{{ goetfSortKey==='calmar' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span></th>
-                <th class="sortable-th" @click="toggleGoetfSort('cvar')">CVaR 95% <span class="sort-arrow">{{ goetfSortKey==='cvar' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span></th>
-                <th class="sortable-th" @click="toggleGoetfSort('hit_ratio')">Hit Ratio <span class="sort-arrow">{{ goetfSortKey==='hit_ratio' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span></th>
-                <th class="sortable-th" @click="toggleGoetfSort('hhi')">HHI <span class="sort-arrow">{{ goetfSortKey==='hhi' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span></th>
-                <th class="sortable-th" @click="toggleGoetfSort('effective_n')">Eff. N <span class="sort-arrow">{{ goetfSortKey==='effective_n' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span></th>
-                <th class="sortable-th" @click="toggleGoetfSort('geo_div')">Geo Div <span class="sort-arrow">{{ goetfSortKey==='geo_div' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span></th>
-                <th class="sortable-th" @click="toggleGoetfSort('max_underwater')">Max UW <span class="sort-arrow">{{ goetfSortKey==='max_underwater' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span></th>
+                <th class="sortable-th" @click="toggleGoetfSort('sortino')">Sortino <span class="sort-arrow">{{ goetfSortKey==='sortino' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span><span class="col-tip" data-tip="Return ÷ downside deviation (20% weight). Higher = better. ✅ >1.0  🟡 0.5–1.0  🔴 <0.3">ⓘ</span></th>
+                <th class="sortable-th" @click="toggleGoetfSort('calmar')">Calmar <span class="sort-arrow">{{ goetfSortKey==='calmar' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span><span class="col-tip" data-tip="Return ÷ max drawdown (15% weight). Higher = better. ✅ >0.5  🟡 0.2–0.5  🔴 <0.1">ⓘ</span></th>
+                <th class="sortable-th" @click="toggleGoetfSort('cvar')">CVaR 95% <span class="sort-arrow">{{ goetfSortKey==='cvar' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span><span class="col-tip" data-tip="Avg loss on worst 5% of days, annualised via √252 (15% weight). Less negative = better. ✅ >−20%  🟡 −20% to −40%  🔴 <−40%">ⓘ</span></th>
+                <th class="sortable-th" @click="toggleGoetfSort('hit_ratio')">Hit Ratio <span class="sort-arrow">{{ goetfSortKey==='hit_ratio' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span><span class="col-tip" data-tip="% of trading days that closed positive (10% weight). Higher = better. ✅ >55%  🟡 50–55%  🔴 <48%">ⓘ</span></th>
+                <th class="sortable-th" @click="toggleGoetfSort('hhi')">HHI <span class="sort-arrow">{{ goetfSortKey==='hhi' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span><span class="col-tip" data-tip="Herfindahl-Hirschman Index of holding weights ×10,000 (10% weight). Lower = more diversified. ✅ <200  🟡 200–800  🔴 >1000">ⓘ</span></th>
+                <th class="sortable-th" @click="toggleGoetfSort('effective_n')">Eff. N <span class="sort-arrow">{{ goetfSortKey==='effective_n' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span><span class="col-tip" data-tip="Effective number of holdings = 1 ÷ Σw² (10% weight). Higher = more diversified. ✅ >100  🟡 20–100  🔴 <10">ⓘ</span></th>
+                <th class="sortable-th" @click="toggleGoetfSort('geo_div')">Geo Div <span class="sort-arrow">{{ goetfSortKey==='geo_div' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span><span class="col-tip" data-tip="Country spread 0–100% (10% weight). 100% = perfectly even across countries. ✅ >60%  🟡 20–60%  🔴 <20%">ⓘ</span></th>
+                <th class="sortable-th" @click="toggleGoetfSort('max_underwater')">Max UW <span class="sort-arrow">{{ goetfSortKey==='max_underwater' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span><span class="col-tip" data-tip="Max consecutive days below previous all-time high (10% weight). Lower = faster recovery. ✅ <250d  🟡 250–500d  🔴 >500d">ⓘ</span></th>
               </tr>
             </thead>
             <tbody>
@@ -289,8 +289,8 @@
             </tbody>
           </table>
         </div>
-        <div style="padding:.6rem 1.25rem;font-size:.72rem;color:var(--text-muted);border-top:1px solid var(--border)">
-          Score = weighted percentile rank (1-10) across 8 metrics &nbsp;·&nbsp; Sortino &amp; Calmar: higher = better &nbsp;·&nbsp; CVaR: less negative = better &nbsp;·&nbsp; HHI: lower = more diversified &nbsp;·&nbsp; Eff. N: effective number of holdings &nbsp;·&nbsp; Geo Div: geographic diversity (0-100%) &nbsp;·&nbsp; Max UW: max consecutive days under previous peak
+        <div style="padding:.5rem 1.25rem;border-top:1px solid var(--border);font-size:.7rem;color:var(--text-muted)">
+          Hover any ⓘ column header for metric details &nbsp;·&nbsp; Score = weighted percentile rank (1–10) &nbsp;·&nbsp; Rankings are relative within the tracked universe. Not investment advice.
         </div>
       </div>
     </div>
@@ -523,4 +523,29 @@ onMounted(() => {
 [data-theme="dark"] .score-poor{background:#3d0000;color:#fca5a5}
 .tip-box{display:flex;gap:.75rem;align-items:flex-start;background:var(--bg-3);border:1px solid var(--border);border-radius:10px;padding:.85rem 1rem;margin-top:.5rem}
 .tip-icon{font-size:1.2rem;flex-shrink:0}
+
+/* ── Column header tooltips ───────────────────────────────────── */
+.col-tip{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:14px;height:14px;border-radius:50%;
+  font-size:.65rem;font-weight:700;font-style:normal;
+  background:var(--bg-3,#e8edf2);color:var(--text-muted,#888);
+  cursor:default;margin-left:.3rem;position:relative;vertical-align:middle;
+  flex-shrink:0;
+}
+.col-tip::after{
+  content: attr(data-tip);
+  position:absolute;top:calc(100% + 6px);left:50%;transform:translateX(-50%);
+  min-width:220px;max-width:280px;
+  background:#1e293b;color:#f1f5f9;
+  font-size:.72rem;font-weight:400;line-height:1.5;
+  padding:.55rem .75rem;border-radius:8px;
+  white-space:normal;text-align:left;
+  box-shadow:0 4px 16px rgba(0,0,0,.35);
+  pointer-events:none;opacity:0;transition:opacity .15s;
+  z-index:200;
+}
+.col-tip:hover::after{opacity:1}
+/* keep tooltip inside card on last columns */
+thead th:nth-last-child(-n+3) .col-tip::after{left:auto;right:0;transform:none}
 </style>
