@@ -91,11 +91,11 @@ def _compute_raw_metrics(db: Session, etf: ETF, rf_annual: float) -> Optional[Di
             max_dd = dd
     calmar = ann_return / abs(max_dd) if max_dd != 0 else 0.0
 
-    # 3. CVaR 95% — mean of worst 5 % of daily log-returns, annualised as return equivalent
+    # 3. CVaR 95% — mean of worst 5 % of daily log-returns, annualised via sqrt-of-time rule
     sorted_r = sorted(daily_returns)
     n_tail = max(1, int(n * 0.05))
-    cvar_daily = sum(sorted_r[:n_tail]) / n_tail  # average worst-day return
-    cvar_ann = cvar_daily * 252  # annualised (simple scaling)
+    cvar_daily = sum(sorted_r[:n_tail]) / n_tail  # average worst-day log-return (e.g. -0.026)
+    cvar_ann = cvar_daily * math.sqrt(252)        # scale by √252 (same as volatility)
 
     # 4. Hit Ratio — fraction of days with positive return
     hit_ratio = sum(1 for r in daily_returns if r > 0) / n
