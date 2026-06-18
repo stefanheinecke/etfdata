@@ -60,6 +60,17 @@ def verify_endpoint(_: None = Depends(verify_admin_secret)):
     return {"status": "ok"}
 
 
+@router.post("/refresh-prices")
+def refresh_prices_endpoint(
+    db: Session = Depends(get_db),
+    _: None = Depends(verify_admin_secret),
+):
+    """Fetch the latest closing prices for all tracked ETFs from Yahoo Finance
+    and upsert into the performance table. Safe to call daily — no data is deleted."""
+    from app.services.ishares_import import refresh_daily_prices
+    return refresh_daily_prices(db)
+
+
 @router.post("/import-etf")
 def import_etf_endpoint(
     symbol: str,

@@ -10,9 +10,11 @@ import logging
 import time
 from datetime import date
 from typing import Optional
+from uuid import uuid4
 
 import yfinance as yf
 from sqlalchemy.orm import Session
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.schemas import ETF, Holding, Allocation, Performance
 
@@ -344,4 +346,87 @@ def import_ishares(db: Session, tickers: Optional[list[str]] = None) -> dict:
         "total": len(targets),
         "total_holdings": total_holdings,
         "details": results,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Daily price refresh (incremental — does NOT delete existing rows)
+# ---------------------------------------------------------------------------
+
+# Lookup table: our internal ticker → the yfinance symbol used for price history
+_YF_PERF_SYMBOL: dict[str, str] = {
+    m["ticker"]: m.get("perf_yf_symbol") or m["yf_symbol"]
+    for m in ISHARES_ETFS
+}
+
+
+def refresh_daily_prices(db: Session) -> dict:
+    """
+    Fetch the latest 7 calendar days of closing prices for every ETF in the
+    database and upsert into the performance table.  Existing rows are updated
+    in-place; no data is deleted.  Designed to be called once per trading day.
+    """
+    etfs = db.query(ETF).order_by(ETF.ticker).all()
+    total_rows = 0
+    etf_results = []
+    errors = []
+
+    for etf in etfs:
+        yf_sym = _YF_PERF_SYMBOL.get(etf.ticker, etf.ticker)
+        try:
+            ticker_obj = yf.Ticker(yf_sym)
+            hist = ticker_obj.history(period="7d")
+            if hist is None or hist.empty:
+                errors.append(f"{etf.ticker}: no price data from Yahoo Finance ({yf_sym})")
+                continue
+
+            # Detect currency (handles GBX pence conversion)
+            actual_currency = etf.currency or "USD"
+            gbx_factor = 1.0
+            try:
+                reported = ticker_obj.fast_info.currency or ""
+                if reported:
+                    actual_currency = reported
+            except Exception:
+                pass
+            if actual_currency in ("GBp", "GBX", "GBx"):
+                gbx_factor = 0.01
+                actual_currency = "GBP"
+
+            count = 0
+            for idx, row in hist.iterrows():
+                close = float(row["Close"]) * gbx_factor
+                if close <= 0:
+                    continue
+                stmt = pg_insert(Performance).values(
+                    id=uuid4(),
+                    etf_id=etf.id,
+                    date=idx.date(),
+                    close_price=round(close, 4),
+                    currency=actual_currency,
+                ).on_conflict_do_update(
+                    index_elements=["etf_id", "date"],
+                    set_={
+                        "close_price": round(close, 4),
+                        "currency": actual_currency,
+                    },
+                )
+                db.execute(stmt)
+                count += 1
+
+            db.commit()
+            total_rows += count
+            etf_results.append({"ticker": etf.ticker, "rows_upserted": count})
+            logger.info("refresh_daily_prices: %s — %d rows upserted", etf.ticker, count)
+
+        except Exception as exc:
+            db.rollback()
+            msg = f"{etf.ticker}: {exc}"
+            errors.append(msg)
+            logger.error("refresh_daily_prices failed for %s: %s", etf.ticker, exc)
+
+    return {
+        "total_rows_upserted": total_rows,
+        "etfs": etf_results,
+        "errors": errors,
     }

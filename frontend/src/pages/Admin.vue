@@ -95,7 +95,15 @@
             </button>
             <p style="font-size:.75rem;color:var(--text-muted);margin-top:.3rem">Deletes all ETF data and reseeds fresh sample data.</p>
           </div>
+          <div>
+            <button class="btn btn-outline" style="width:100%" @click="triggerRefreshPrices" :disabled="!adminVerified || refreshPricesLoading">
+              {{ refreshPricesLoading ? 'Refreshing…' : '🔄 Refresh Prices (latest close)' }}
+            </button>
+            <p style="font-size:.75rem;color:var(--text-muted);margin-top:.3rem">Fetches the latest closing prices for all ETFs from Yahoo Finance (upserts last 7 days).</p>
+          </div>
         </div>
+        <div v-if="refreshPricesResult" class="success-msg" style="margin-top:.75rem">{{ refreshPricesResult }}</div>
+        <div v-if="refreshPricesError" class="error-box" style="margin-top:.75rem">{{ refreshPricesError }}</div>
         <div v-if="dbResult" class="success-msg" style="margin-top:.75rem">{{ dbResult }}</div>
         <div v-if="dbError" class="error-box" style="margin-top:.75rem">{{ dbError }}</div>
       </div>
@@ -555,6 +563,9 @@ const seedLoading = ref(false)
 const resetLoading = ref(false)
 const dbResult = ref('')
 const dbError = ref('')
+const refreshPricesLoading = ref(false)
+const refreshPricesResult = ref('')
+const refreshPricesError = ref('')
 
 const importSymbol = ref('')
 const importName = ref('')
@@ -654,6 +665,21 @@ async function confirmReset() {
   try { const r = await adminService.reset(adminSecret.value); dbResult.value = `Reset complete. Seeded: ${JSON.stringify(r.data.seeded)}` }
   catch(e) { dbError.value = e.response?.data?.detail || e.message }
   finally { resetLoading.value = false }
+}
+
+async function triggerRefreshPrices() {
+  refreshPricesLoading.value = true; refreshPricesResult.value = ''; refreshPricesError.value = ''
+  try {
+    const r = await adminService.refreshPrices(adminSecret.value)
+    const d = r.data
+    const etfCount = d.etfs?.length ?? 0
+    const errors = d.errors?.length ? ` (${d.errors.length} error(s): ${d.errors.join(', ')})` : ''
+    refreshPricesResult.value = `✓ ${d.total_rows_upserted} price rows upserted across ${etfCount} ETF(s).${errors}`
+  } catch(e) {
+    refreshPricesError.value = e.response?.data?.detail || e.message
+  } finally {
+    refreshPricesLoading.value = false
+  }
 }
 
 async function checkHealth() {

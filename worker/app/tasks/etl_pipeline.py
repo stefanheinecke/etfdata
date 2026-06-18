@@ -1,9 +1,14 @@
 import logging
+import os
+import requests
 from datetime import datetime
 from sqlalchemy.orm import Session
 from app.schemas import ETLJob
 
 logger = logging.getLogger(__name__)
+
+BACKEND_URL = os.getenv("BACKEND_URL", "http://backend:8000")
+ADMIN_SECRET = os.getenv("ADMIN_SECRET", "")
 
 class ETLPipeline:
     def __init__(self, db: Session):
@@ -46,10 +51,26 @@ class ETLPipeline:
         return job
 
     def _import_etf_data(self) -> int:
-        return 0
+        """Call backend /admin/refresh-prices to upsert latest closing prices."""
+        resp = requests.post(
+            f"{BACKEND_URL}/admin/refresh-prices",
+            headers={"x-admin-secret": ADMIN_SECRET},
+            timeout=180,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        rows = data.get("total_rows_upserted", 0)
+        errors = data.get("errors", [])
+        if errors:
+            logger.warning("refresh-prices reported errors: %s", errors)
+        logger.info("refresh-prices: %d rows upserted across %d ETFs",
+                    rows, len(data.get("etfs", [])))
+        return rows
 
     def _import_holdings_data(self) -> int:
+        # Holdings change monthly — not implemented for daily refresh
         return 0
 
     def _import_allocations_data(self) -> int:
+        # Allocations change monthly — not implemented for daily refresh
         return 0

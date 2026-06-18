@@ -41,9 +41,13 @@ services:
     environment:
       DATABASE_URL: postgresql://postgres:postgres@db:5432/etfdata
       LOG_LEVEL: INFO
+      BACKEND_URL: http://backend:8000
+      ADMIN_SECRET: ${ADMIN_SECRET:-changeme}
     depends_on:
       db:
         condition: service_healthy
+      backend:
+        condition: service_started
     volumes:
       - ./worker:/app
 
