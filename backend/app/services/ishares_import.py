@@ -394,7 +394,10 @@ def _upsert_price_row(db, etf_id, row_date, close: float, currency: str) -> None
         index_elements=["etf_id", "date"],
         set_={"close_price": round(close, 4), "currency": currency},
     )
-    db.execute(stmt)(db: Session) -> dict:
+    db.execute(stmt)
+
+
+def refresh_daily_prices(db: Session) -> dict:
     """
     Fetch the latest 7 calendar days of closing prices for every ETF in the
     database and upsert into the performance table.  Existing rows are updated
