@@ -65,10 +65,75 @@ def refresh_prices_endpoint(
     db: Session = Depends(get_db),
     _: None = Depends(verify_admin_secret),
 ):
-    """Fetch the latest closing prices for all tracked ETFs from Yahoo Finance
+    """Fetch the latest closing prices for all tracked ETFs from EODHD (or yfinance fallback)
     and upsert into the performance table. Safe to call daily — no data is deleted."""
     from app.services.ishares_import import refresh_daily_prices
     return refresh_daily_prices(db)
+
+
+@router.post("/backfill-eodhd-symbols")
+def backfill_eodhd_symbols(
+    db: Session = Depends(get_db),
+    _: None = Depends(verify_admin_secret),
+):
+    """
+    One-time migration: populate etf.listings['eodhd_symbol'] for ETFs that were
+    imported before this field was tracked. Derives the symbol from the ETF ticker
+    and the exchange suffix inferred from their price history currency.
+    After running this, 'Refresh Prices' will use EODHD for all ETFs.
+    """
+    from app.schemas import ETF as ETFModel
+    from app.services.ishares_import import _YF_PERF_SYMBOL, _eodhd_symbol_for_etf
+    import os, requests as req_lib
+
+    token = os.getenv("EODHD_TOKEN")
+    if not token:
+        raise HTTPException(status_code=503, detail="EODHD_TOKEN not set — cannot verify symbols.")
+
+    etfs = db.query(ETFModel).order_by(ETFModel.ticker).all()
+    updated = []
+    skipped = []
+
+    for etf in etfs:
+        # Already has a symbol stored
+        if etf.listings and etf.listings.get("eodhd_symbol"):
+            skipped.append({"ticker": etf.ticker, "reason": "already set",
+                            "eodhd_symbol": etf.listings["eodhd_symbol"]})
+            continue
+
+        # Try to derive from catalogue yfinance symbol
+        yf_sym = _YF_PERF_SYMBOL.get(etf.ticker)
+        if yf_sym:
+            if "." not in yf_sym:
+                candidate = yf_sym + ".US"
+            elif yf_sym.endswith(".L"):
+                candidate = yf_sym[:-2] + ".LSE"
+            else:
+                candidate = yf_sym
+        else:
+            # Guess based on currency: USD→.SW, GBP→.LSE, EUR→.AS (best effort)
+            suffix = {"USD": ".SW", "GBP": ".LSE", "EUR": ".AS"}.get(etf.currency or "", ".SW")
+            candidate = etf.ticker + suffix
+
+        # Verify the candidate actually returns data from EODHD
+        try:
+            resp = req_lib.get(
+                f"https://eodhd.com/api/eod/{candidate}",
+                params={"api_token": token, "fmt": "json", "from": "2026-01-01",
+                        "to": "2026-01-31", "period": "d"},
+                timeout=15,
+            )
+            if resp.status_code == 200 and resp.json():
+                etf.listings = {**(etf.listings or {}), "eodhd_symbol": candidate}
+                db.commit()
+                updated.append({"ticker": etf.ticker, "eodhd_symbol": candidate})
+            else:
+                skipped.append({"ticker": etf.ticker, "reason": f"HTTP {resp.status_code} or empty",
+                                "candidate": candidate})
+        except Exception as exc:
+            skipped.append({"ticker": etf.ticker, "reason": str(exc), "candidate": candidate})
+
+    return {"updated": updated, "skipped": skipped}
 
 
 @router.post("/import-etf")

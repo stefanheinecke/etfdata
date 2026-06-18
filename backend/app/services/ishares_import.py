@@ -353,76 +353,119 @@ def import_ishares(db: Session, tickers: Optional[list[str]] = None) -> dict:
 # Daily price refresh (incremental — does NOT delete existing rows)
 # ---------------------------------------------------------------------------
 
-# Lookup table: our internal ticker → the yfinance symbol used for price history
+# Fallback lookup for ISHares catalogue ETFs that were imported before the
+# EODHD symbol was stored in listings (old yfinance-based import path).
 _YF_PERF_SYMBOL: dict[str, str] = {
     m["ticker"]: m.get("perf_yf_symbol") or m["yf_symbol"]
     for m in ISHARES_ETFS
 }
 
 
-def refresh_daily_prices(db: Session) -> dict:
+def _eodhd_symbol_for_etf(etf) -> str | None:
+    """
+    Return the EODHD-format price symbol for an ETF.
+    Priority:
+      1. etf.listings["eodhd_symbol"]  — stored during import (all EODHD-imported ETFs)
+      2. Catalogue yfinance perf symbol converted to EODHD format (iShares catalogue ETFs)
+      3. None (unknown — will fall back to yfinance)
+    """
+    if etf.listings and etf.listings.get("eodhd_symbol"):
+        return etf.listings["eodhd_symbol"]
+    yf_sym = _YF_PERF_SYMBOL.get(etf.ticker)
+    if yf_sym:
+        # Convert yfinance format → EODHD format
+        if "." not in yf_sym:
+            return yf_sym + ".US"
+        if yf_sym.endswith(".L"):
+            return yf_sym[:-2] + ".LSE"
+        return yf_sym   # .SW, .AS etc. are unchanged
+    return None
+
+
+def _upsert_price_row(db, etf_id, row_date, close: float, currency: str) -> None:
+    """Used by the yfinance fallback path in refresh_daily_prices."""
+    stmt = pg_insert(Performance).values(
+        id=uuid4(),
+        etf_id=etf_id,
+        date=row_date,
+        close_price=round(close, 4),
+        currency=currency,
+    ).on_conflict_do_update(
+        index_elements=["etf_id", "date"],
+        set_={"close_price": round(close, 4), "currency": currency},
+    )
+    db.execute(stmt)(db: Session) -> dict:
     """
     Fetch the latest 7 calendar days of closing prices for every ETF in the
     database and upsert into the performance table.  Existing rows are updated
     in-place; no data is deleted.  Designed to be called once per trading day.
+
+    Uses EODHD when EODHD_TOKEN is set (preferred — no rate-limit issues).
+    Falls back to yfinance for any ETF where no EODHD token is available.
     """
+    import os
+    from datetime import datetime, timedelta
+    from app.services.etf_import_service import upsert_eodhd_prices
+
+    token = os.getenv("EODHD_TOKEN")
+    from_date = (datetime.utcnow() - timedelta(days=7)).strftime("%Y-%m-%d")
+
     etfs = db.query(ETF).order_by(ETF.ticker).all()
     total_rows = 0
     etf_results = []
     errors = []
 
     for etf in etfs:
-        yf_sym = _YF_PERF_SYMBOL.get(etf.ticker, etf.ticker)
+        eodhd_sym = _eodhd_symbol_for_etf(etf)
+        source = "eodhd" if (token and eodhd_sym) else "yfinance"
+
         try:
-            ticker_obj = yf.Ticker(yf_sym)
-            hist = ticker_obj.history(period="7d")
-            if hist is None or hist.empty:
-                errors.append(f"{etf.ticker}: no price data from Yahoo Finance ({yf_sym})")
-                continue
-
-            # Detect currency (handles GBX pence conversion)
             actual_currency = etf.currency or "USD"
-            gbx_factor = 1.0
-            try:
-                reported = ticker_obj.fast_info.currency or ""
-                if reported:
-                    actual_currency = reported
-            except Exception:
-                pass
-            if actual_currency in ("GBp", "GBX", "GBx"):
-                gbx_factor = 0.01
-                actual_currency = "GBP"
 
-            count = 0
-            for idx, row in hist.iterrows():
-                close = float(row["Close"]) * gbx_factor
-                if close <= 0:
-                    continue
-                stmt = pg_insert(Performance).values(
-                    id=uuid4(),
+            if token and eodhd_sym:
+                # ── EODHD path (shared function) ──────────────────────────
+                count = upsert_eodhd_prices(
                     etf_id=etf.id,
-                    date=idx.date(),
-                    close_price=round(close, 4),
+                    eodhd_symbol=eodhd_sym,
+                    token=token,
+                    db=db,
+                    from_date=from_date,
                     currency=actual_currency,
-                ).on_conflict_do_update(
-                    index_elements=["etf_id", "date"],
-                    set_={
-                        "close_price": round(close, 4),
-                        "currency": actual_currency,
-                    },
                 )
-                db.execute(stmt)
-                count += 1
+            else:
+                # ── yfinance fallback ──────────────────────────────────────
+                yf_sym = _YF_PERF_SYMBOL.get(etf.ticker, etf.ticker)
+                ticker_obj = yf.Ticker(yf_sym)
+                hist = ticker_obj.history(period="7d")
+                if hist is None or hist.empty:
+                    errors.append(f"{etf.ticker}: no data from yfinance ({yf_sym})")
+                    continue
+                gbx_factor = 1.0
+                try:
+                    reported = ticker_obj.fast_info.currency or ""
+                    if reported:
+                        actual_currency = reported
+                    if actual_currency in ("GBp", "GBX", "GBx"):
+                        gbx_factor = 0.01
+                        actual_currency = "GBP"
+                except Exception:
+                    pass
+                count = 0
+                for idx, row in hist.iterrows():
+                    close = float(row["Close"]) * gbx_factor
+                    if close <= 0:
+                        continue
+                    _upsert_price_row(db, etf.id, idx.date(), close, actual_currency)
+                    count += 1
 
             db.commit()
             total_rows += count
-            etf_results.append({"ticker": etf.ticker, "rows_upserted": count})
-            logger.info("refresh_daily_prices: %s — %d rows upserted", etf.ticker, count)
+            etf_results.append({"ticker": etf.ticker, "rows_upserted": count, "source": source})
+            logger.info("refresh_daily_prices: %s — %d rows via %s", etf.ticker, count, source)
 
         except Exception as exc:
             db.rollback()
-            msg = f"{etf.ticker}: {exc}"
-            errors.append(msg)
+            errors.append(f"{etf.ticker}: {exc}")
             logger.error("refresh_daily_prices failed for %s: %s", etf.ticker, exc)
 
     return {

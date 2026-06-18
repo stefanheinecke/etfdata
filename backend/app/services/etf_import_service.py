@@ -9,13 +9,76 @@ import io
 import os
 from datetime import date, timedelta
 from decimal import Decimal
+from uuid import uuid4
 
 import pandas as pd
+import requests as _req
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.schemas import ETF, Performance, Holding, Allocation
 from app.services.ishares_import import _COUNTRY_ISO, _lookup_country
 
 _EODHD_BASE = "https://eodhd.com/api"
+
+
+# ---------------------------------------------------------------------------
+# Shared EODHD price upsert — used by both full import and daily refresh
+# ---------------------------------------------------------------------------
+
+def upsert_eodhd_prices(
+    etf_id,
+    eodhd_symbol: str,
+    token: str,
+    db,
+    from_date: str = "2000-01-01",
+    currency: str | None = None,
+) -> int:
+    """
+    Fetch closing prices from EODHD for `eodhd_symbol` starting at `from_date`
+    and upsert them into the performance table.
+
+    - Full import:  call with from_date="2000-01-01"  (no data deleted — safe to re-run)
+    - Daily refresh: call with from_date=7 days ago
+
+    Returns the number of rows upserted.
+    """
+    resp = _req.get(
+        f"{_EODHD_BASE}/eod/{eodhd_symbol}",
+        params={"api_token": token, "fmt": "json",
+                "from": from_date, "to": date.today().isoformat(), "period": "d"},
+        timeout=60,
+    )
+    if resp.status_code != 200:
+        raise RuntimeError(f"EODHD HTTP {resp.status_code} for '{eodhd_symbol}'")
+    rows = resp.json()
+    if not rows:
+        raise RuntimeError(f"EODHD returned empty history for '{eodhd_symbol}'")
+
+    actual_currency = (currency or "USD").strip()
+    gbx_factor = 1.0
+    if actual_currency in ("GBp", "GBX", "GBx"):
+        gbx_factor = 0.01
+        actual_currency = "GBP"
+    actual_currency = actual_currency[:3].upper()
+
+    count = 0
+    for row in rows:
+        close = float(row.get("adjusted_close") or row.get("close") or 0) * gbx_factor
+        if close <= 0:
+            continue
+        stmt = pg_insert(Performance).values(
+            id=uuid4(),
+            etf_id=etf_id,
+            date=date.fromisoformat(row["date"]),
+            close_price=round(close, 4),
+            currency=actual_currency,
+        ).on_conflict_do_update(
+            index_elements=["etf_id", "date"],
+            set_={"close_price": round(close, 4), "currency": actual_currency},
+        )
+        db.execute(stmt)
+        count += 1
+    return count
 
 
 def _eodhd_token() -> str | None:
@@ -211,73 +274,35 @@ def _fetch_eodhd_currency(eodhd_sym: str, token: str, logs: list) -> str | None:
     return None
 
 
-def _fetch_eodhd_history(eodhd_sym: str, token: str, logs: list):
-    """Fetch full price history from EODHD (from 2000-01-01). Returns a DataFrame or None."""
-    import requests
-    url = f"{_EODHD_BASE}/eod/{eodhd_sym}"
-    try:
-        resp = requests.get(url, params={
-            "api_token": token, "fmt": "json",
-            "from": "2000-01-01", "to": date.today().isoformat(), "period": "d"
-        }, timeout=60)
-        if resp.status_code != 200:
-            logs.append(f"  EODHD history HTTP {resp.status_code} for '{eodhd_sym}'.")
-            return None
-        rows = resp.json()
-        if not rows:
-            logs.append(f"  EODHD returned empty history for '{eodhd_sym}'.")
-            return None
-        df = pd.DataFrame(rows)
-        df["date"] = pd.to_datetime(df["date"])
-        df = df.rename(columns={"adjusted_close": "Close", "date": "Date"})
-        df = df[["Date", "Close"]].dropna()
-        logs.append(f"  EODHD history: {len(df)} rows for '{eodhd_sym}' "
-                    f"({df['Date'].min().date()} – {df['Date'].max().date()}).")
-        return df
-    except Exception as exc:
-        logs.append(f"  EODHD history fetch failed ({exc}).")
-        return None
-
-
 def _upload_performance(etf: ETF, eodhd_symbol: str, currency: str | None, db, logs: list) -> int:
-    """Fetch price history from EODHD and insert Performance rows."""
+    """Fetch full price history from EODHD (since 2000) and upsert into performance table."""
     token = _eodhd_token()
     if not token:
         logs.append("  Skipping performance (EODHD_TOKEN not set).")
         return 0
 
-    actual_currency = currency or ""
-    ext_df = _fetch_eodhd_history(eodhd_symbol, token, logs)
-    if ext_df is None:
-        logs.append("  No price data available from EODHD.")
-        return 0
-
-    # Detect the actual trading currency for this listing
+    # Detect the actual trading currency for this listing (handles GBX pence)
     detected = _fetch_eodhd_currency(eodhd_symbol, token, logs)
+    actual_currency = detected or currency or "USD"
     if detected:
-        actual_currency = detected
         logs.append(f"  Price currency for {eodhd_symbol}: {actual_currency}")
-
-    gbx_factor = 1.0
     if actual_currency in ("GBp", "GBX", "GBx"):
-        gbx_factor = 0.01
-        actual_currency = "GBP"
         logs.append("  Prices are in pence (GBX), converting to GBP.")
 
-    db.query(Performance).filter_by(etf_id=etf.id).delete()
-    count = 0
-    for _, row in ext_df.iterrows():
-        close = float(row["Close"]) * gbx_factor
-        if close <= 0:
-            continue
-        db.add(Performance(
+    try:
+        count = upsert_eodhd_prices(
             etf_id=etf.id,
-            date=row["Date"].date(),
-            close_price=round(close, 4),
-            currency=actual_currency[:3].upper() if actual_currency else None,
-        ))
-        count += 1
-    return count
+            eodhd_symbol=eodhd_symbol,
+            token=token,
+            db=db,
+            from_date="2000-01-01",
+            currency=actual_currency,
+        )
+        logs.append(f"  EODHD: {count} price rows upserted for '{eodhd_symbol}'.")
+        return count
+    except Exception as exc:
+        logs.append(f"  EODHD price fetch failed: {exc}")
+        return 0
 
 
 # ---------------------------------------------------------------------------
@@ -533,6 +558,8 @@ def import_etf(
             etf.provider = provider
         if domicile:
             etf.domicile = domicile
+        # Always persist the EODHD symbol so daily refresh can find it
+        etf.listings = {**(etf.listings or {}), "eodhd_symbol": eodhd_symbol}
         db.commit()
         db.refresh(etf)
         logs.append(f"Updated existing ETF: {etf.name} ({etf.ticker}), id={etf.id}")
@@ -545,6 +572,7 @@ def import_etf(
             fund_size=fund_size, benchmark=benchmark,
             currency=currency[:3].upper() if currency else None,
             dividend_policy=div_policy,
+            listings={"eodhd_symbol": eodhd_symbol},
         )
         db.add(etf)
         db.commit()

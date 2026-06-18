@@ -99,11 +99,19 @@
             <button class="btn btn-outline" style="width:100%" @click="triggerRefreshPrices" :disabled="!adminVerified || refreshPricesLoading">
               {{ refreshPricesLoading ? 'Refreshing…' : '🔄 Refresh Prices (latest close)' }}
             </button>
-            <p style="font-size:.75rem;color:var(--text-muted);margin-top:.3rem">Fetches the latest closing prices for all ETFs from Yahoo Finance (upserts last 7 days).</p>
+            <p style="font-size:.75rem;color:var(--text-muted);margin-top:.3rem">Fetches the latest closing prices for all ETFs from EODHD (upserts last 7 days).</p>
+          </div>
+          <div>
+            <button class="btn btn-outline" style="width:100%" @click="triggerBackfillSymbols" :disabled="!adminVerified || backfillLoading">
+              {{ backfillLoading ? 'Backfilling…' : '🔗 Backfill EODHD Symbols' }}
+            </button>
+            <p style="font-size:.75rem;color:var(--text-muted);margin-top:.3rem">One-time setup: links existing ETFs to their EODHD symbol so daily price refresh works. Run once after upgrading.</p>
           </div>
         </div>
         <div v-if="refreshPricesResult" class="success-msg" style="margin-top:.75rem">{{ refreshPricesResult }}</div>
         <div v-if="refreshPricesError" class="error-box" style="margin-top:.75rem">{{ refreshPricesError }}</div>
+        <div v-if="backfillResult" class="success-msg" style="margin-top:.75rem">{{ backfillResult }}</div>
+        <div v-if="backfillError" class="error-box" style="margin-top:.75rem">{{ backfillError }}</div>
         <div v-if="dbResult" class="success-msg" style="margin-top:.75rem">{{ dbResult }}</div>
         <div v-if="dbError" class="error-box" style="margin-top:.75rem">{{ dbError }}</div>
       </div>
@@ -566,6 +574,9 @@ const dbError = ref('')
 const refreshPricesLoading = ref(false)
 const refreshPricesResult = ref('')
 const refreshPricesError = ref('')
+const backfillLoading = ref(false)
+const backfillResult = ref('')
+const backfillError = ref('')
 
 const importSymbol = ref('')
 const importName = ref('')
@@ -679,6 +690,19 @@ async function triggerRefreshPrices() {
     refreshPricesError.value = e.response?.data?.detail || e.message
   } finally {
     refreshPricesLoading.value = false
+  }
+}
+
+async function triggerBackfillSymbols() {
+  backfillLoading.value = true; backfillResult.value = ''; backfillError.value = ''
+  try {
+    const r = await adminService.backfillEodhdSymbols(adminSecret.value)
+    const d = r.data
+    backfillResult.value = `✓ ${d.updated?.length ?? 0} ETF(s) linked to EODHD symbols, ${d.skipped?.length ?? 0} skipped.`
+  } catch(e) {
+    backfillError.value = e.response?.data?.detail || e.message
+  } finally {
+    backfillLoading.value = false
   }
 }
 
