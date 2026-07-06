@@ -284,7 +284,7 @@ def compute_portfolio_score(
       overlap_penalty = weighted avg pairwise weight_overlap * 2  (max 2 pts)
       allocation_bonus= max(0, portfolio_geo_div − avg_individual_geo_div)  (0–1 pt)
       final         = clamp(base − penalty + bonus, 1, 10)
-    Also computes a single-swap improvement tip.
+    Also computes a single-ETF alternative insight.
     """
     from app.services.analytics_service import AnalyticsService
 
@@ -294,7 +294,7 @@ def compute_portfolio_score(
 
     total_w = sum(p["weight"] for p in active)
 
-    # All ETF scores (universe for tip generation)
+    # All ETF scores (universe for insight generation)
     all_scores = compute_goetf_scores(db, rf_annual)
     score_map = {s["etf_id"]: s.get("goetf_score") or 5.0 for s in all_scores}
     geo_map = {s["etf_id"]: s.get("geo_div", 0.5) for s in all_scores}
@@ -363,7 +363,7 @@ def compute_portfolio_score(
 
     final_score = max(1.0, min(10.0, base - overlap_penalty + allocation_bonus))
 
-    # 4. Tip
+    # 4. Insight
     tip = _compute_tip(db, active, total_w, rf_annual, all_scores, score_map, geo_map, ticker_map, final_score)
 
     # Build individual scores list
@@ -396,7 +396,7 @@ def compute_portfolio_score(
 
 
 # ---------------------------------------------------------------------------
-# Tip computation: try single-ETF swaps
+# Insight computation: evaluate single-ETF alternatives
 # ---------------------------------------------------------------------------
 def _compute_tip(
     db: Session,
@@ -410,9 +410,9 @@ def _compute_tip(
     current_score: float,
 ) -> Optional[Dict]:
     """
-    Try replacing each ETF with each alternative from the universe.
-    Return the single swap that most improves the portfolio score.
-    Only considers swaps with improvement > 0.1 points.
+    Test each ETF against each alternative from the universe.
+    Return the strongest outcome that improves the portfolio score.
+    Only considers outcomes with improvement > 0.1 points.
     """
     from app.services.analytics_service import AnalyticsService
 
@@ -431,7 +431,7 @@ def _compute_tip(
 
     for i, item in enumerate(active):
         for alt in alternatives:
-            # Build candidate portfolio with the swap
+            # Build candidate portfolio with this one-at-a-time alternative
             candidate = [
                 {"etf_id": alt["etf_id"] if j == i else p["etf_id"], "weight": p["weight"]}
                 for j, p in enumerate(active)
@@ -488,7 +488,7 @@ def _compute_tip(
                     "new_score": round(best_score, 1),
                     "improvement": round(best_score - current_score, 1),
                     "reason": (
-                        f"Replacing {old_ticker} with {new_ticker} reduces holdings overlap "
+                        f"{new_ticker} has lower holdings overlap than {old_ticker} "
                         f"and improves portfolio diversification."
                     ),
                 }

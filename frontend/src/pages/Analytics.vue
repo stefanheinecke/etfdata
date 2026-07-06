@@ -83,14 +83,15 @@
         <div v-if="portfolioScoreResult.tip" class="tip-box">
           <span class="tip-icon">💡</span>
           <div>
-            <strong>Swap Tip:</strong> Replace <strong style="color:var(--green-600)">{{ portfolioScoreResult.tip.replace_ticker }}</strong>
-            with <strong style="color:var(--green-600)">{{ portfolioScoreResult.tip.with_ticker }}</strong>
-            → new portfolio score <strong>{{ portfolioScoreResult.tip.new_score }}</strong>
-            (<span style="color:#0b6aa5">+{{ portfolioScoreResult.tip.improvement }}</span> pts)
+            <strong style="color:var(--green-600)">{{ portfolioScoreResult.tip.with_ticker }}</strong>
+            has lower holdings overlap than <strong style="color:var(--green-600)">{{ portfolioScoreResult.tip.replace_ticker }}</strong>.
+            Using <strong style="color:var(--green-600)">{{ portfolioScoreResult.tip.with_ticker }}</strong>
+            instead would increase your portfolio score to <strong>{{ portfolioScoreResult.tip.new_score }}</strong>
+            (<span style="color:#0b6aa5">+{{ portfolioScoreResult.tip.improvement }}</span>).
             <div style="font-size:.8rem;color:var(--text-muted);margin-top:.2rem">{{ portfolioScoreResult.tip.reason }}</div>
           </div>
         </div>
-        <div v-else-if="portfolioScoreResult.tip === null" style="font-size:.8rem;color:var(--text-muted)">No single-ETF swap improves the portfolio score by more than 0.1 pts.</div>
+        <div v-else-if="portfolioScoreResult.tip === null" style="font-size:.8rem;color:var(--text-muted)">No higher-scoring alternative cleared the +0.1 threshold.</div>
         <p style="font-size:.7rem;color:var(--text-muted);margin-top:.75rem;margin-bottom:0">
           Base = weighted avg of individual GoETF Scores &nbsp;·&nbsp; Overlap Penalty: max −2 pts for 100% overlap &nbsp;·&nbsp; Bonus: portfolio country diversification vs individual weighted avg
           &nbsp;<button class="meth-link" @click="navigateTo('methodology')">→ Methodology</button>

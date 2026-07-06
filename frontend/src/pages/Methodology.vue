@@ -169,13 +169,13 @@
         <p style="font-size:.85rem;color:var(--text-muted);margin-top:.75rem;margin-bottom:0">The score is clamped to the range 1-10. A perfectly diversified, non-overlapping portfolio of high-scoring ETFs can reach a score close to 10.</p>
       </div>
 
-      <!-- Swap Tip -->
+      <!-- Portfolio Insight -->
       <div class="card meth-card">
-        <h3 class="card-title">💡 Swap Tip</h3>
-        <p style="font-size:.875rem;color:var(--text)">After computing the portfolio score, the engine tries every single-ETF replacement: each ETF in the portfolio is temporarily swapped for each alternative ETF in the universe, and the resulting portfolio score is estimated. If any swap improves the score by more than 0.1 pts, the best one is returned as a suggestion.</p>
+        <h3 class="card-title">💡 Portfolio Insight</h3>
+        <p style="font-size:.875rem;color:var(--text)">After computing the portfolio score, the engine tests one ETF at a time against each alternative ETF in the tracked universe and estimates the resulting portfolio score. If any tested alternative improves the score by more than 0.1 pts, the strongest outcome is shown.</p>
         <div style="margin-top:.75rem;display:flex;flex-direction:column;gap:.3rem">
-          <div class="meth-tip-row"><span class="meth-tip-key">Scope</span><span>One ETF replaced at a time; all others remain unchanged.</span></div>
-          <div class="meth-tip-row"><span class="meth-tip-key">Threshold</span><span>Minimum improvement of +0.1 pts required to surface a tip.</span></div>
+          <div class="meth-tip-row"><span class="meth-tip-key">Scope</span><span>One ETF is changed at a time; all others remain unchanged.</span></div>
+          <div class="meth-tip-row"><span class="meth-tip-key">Threshold</span><span>Minimum improvement of +0.1 pts required to show an insight.</span></div>
           <div class="meth-tip-row"><span class="meth-tip-key">Universe</span><span>All ETFs tracked in GoETF are considered as candidates.</span></div>
         </div>
       </div>
@@ -184,7 +184,7 @@
     <!-- Disclaimer -->
     <div class="card" style="background:var(--bg-3);border-color:var(--border)">
       <p style="font-size:.8rem;color:var(--text-muted);margin:0;line-height:1.7">
-        <strong>Note:</strong> GoETF Scores are quantitative summaries derived from historical data. They are provided for informational purposes only and do not constitute investment advice or a recommendation to buy or sell any ETF. Past performance and historical statistics are not indicative of future results. Score values depend on the available data history and the composition of the current GoETF ETF universe.
+        <strong>Note:</strong> GoETF Scores are quantitative summaries derived from historical data. They are provided for informational purposes only and do not constitute investment advice or an invitation to buy or sell any ETF. Past performance and historical statistics are not indicative of future results. Score values depend on the available data history and the composition of the current GoETF ETF universe.
       </p>
     </div>
   </div>

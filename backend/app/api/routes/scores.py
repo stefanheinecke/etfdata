@@ -61,7 +61,6 @@ async def get_portfolio_score(
     - Weighted average of individual GoETF Scores (base)
     - Pairwise holdings overlap penalty (up to −2 pts for 100% overlap)
     - Geographic diversification bonus (up to +1 pt)
-    - A swap tip: the single-ETF replacement that most improves the score.
 
     Request body: {"portfolio": [{"etf_id": "SWDA", "weight": 60}, ...]}
     """

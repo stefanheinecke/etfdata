@@ -210,7 +210,7 @@ const groups = [
         ],
       },
       { id: 'score-portfolio', method: 'POST', short: '/scores/portfolio', path: '/scores/portfolio',
-        title: 'GoETF Score: Portfolio', desc: 'Computes a composite GoETF Portfolio Score (1-10) from: weighted average of individual GoETF Scores (base), minus pairwise holdings overlap penalty (up to -2 pts), plus geographic diversification bonus (up to +1 pt). Also returns a single-ETF swap tip that maximises improvement.',
+        title: 'GoETF Score: Portfolio', desc: 'Computes a composite GoETF Portfolio Score (1-10) from: weighted average of individual GoETF Scores (base), minus pairwise holdings overlap penalty (up to -2 pts), plus geographic diversification bonus (up to +1 pt).',
         body: `{\n  "portfolio": [\n    {"etf_id": "SWDA", "weight": 60},\n    {"etf_id": "CSSPX", "weight": 40}\n  ]\n}`,
         params: [
           {name:'rf_rate',in:'query',type:'float',required:false,desc:'Annual risk-free rate as decimal (default 0.04 = 4%)'},
