@@ -1,644 +1,582 @@
 <template>
-  <div>
-    <!-- Hero -->
+  <div class="home-page">
     <section class="hero">
-      <div class="hero-inner">
-        <div class="hero-badge">GoETF</div>
-        <h1 class="hero-title">ETF Portfolio<br/><span class="gradient-text">Analytics API</span></h1>
-        <p class="hero-sub">Real ETF data via REST API. Query holdings, allocations and portfolio exposure analysis. FREE API key.</p>
-        <div class="hero-actions">
-          <button class="btn btn-primary btn-lg" @click="$emit('navigate','etfs')">Browse ETFs</button>
-          <button class="btn btn-outline btn-lg" @click="$emit('navigate','docs')">View Docs</button>
-        </div>
-        <button class="hero-live-btn" @click="scrollToTryout">
-          <span class="live-dot"></span> Live API Explorer
-        </button>
-        <p class="hero-disclaimer">For informational purposes only. Not investment advice.</p>
-      </div>
-      <!-- Score Carousel -->
-      <div class="hero-carousel">
-        <div class="hd-chrome">
-          <span class="hd-dot hd-r"></span>
-          <span class="hd-dot hd-y"></span>
-          <span class="hd-dot hd-g"></span>
-          <code class="hd-url">{{ scoreCarouselSlides[scoreCarouselIdx].label }}</code>
-        </div>
-        <transition name="cs" mode="out-in">
-          <div :key="scoreCarouselIdx" class="hc-body">
-            <!-- Slide 0: ETF GoETF Scores -->
-            <template v-if="scoreCarouselIdx === 0">
-              <div class="hd-score-row"><span class="hd-ticker">SWDA</span><div class="hd-score-track"><div class="hd-score-fill" style="width:78%"></div></div><span class="hds-num hds-high">7.8</span></div>
-              <div class="hd-score-row"><span class="hd-ticker">CSSPX</span><div class="hd-score-track"><div class="hd-score-fill" style="width:72%"></div></div><span class="hds-num hds-high">7.2</span></div>
-              <div class="hd-score-row"><span class="hd-ticker">ISF</span><div class="hd-score-track"><div class="hd-score-fill hd-score-fill-mid" style="width:65%"></div></div><span class="hds-num hds-mid">6.5</span></div>
-              <div class="hd-score-row"><span class="hd-ticker">SEDY</span><div class="hd-score-track"><div class="hd-score-fill hd-score-fill-mid" style="width:59%"></div></div><span class="hds-num hds-mid">5.9</span></div>
-              <div class="hd-footer"><span class="hd-status">200 OK</span><span class="hd-count">GoETF Score / 10</span></div>
-            </template>
-            <!-- Slide 1: Portfolio Score + Tip -->
-            <template v-else>
-              <div class="hd-ps-header">
-                <div><div class="hd-ps-port">SWDA 60% + CSSPX 40%</div><div class="hd-ps-label">Portfolio GoETF Score</div></div>
-                <span class="hd-ps-badge">7.1</span>
-              </div>
-              <div class="hd-ps-rows">
-                <div class="hd-ps-row"><span>Base score</span><span>7.5</span></div>
-                <div class="hd-ps-row"><span>Overlap penalty</span><span class="hd-neg">−0.8</span></div>
-                <div class="hd-ps-row"><span>Div. bonus</span><span class="hd-pos">+0.4</span></div>
-              </div>
-              <div class="hd-tip-row">💡 Swap <b>CSSPX</b> → <b>ISF</b> &nbsp;·&nbsp; score +0.6 pts</div>
-              <div class="hd-footer"><span class="hd-status">200 OK</span><span class="hd-count">portfolio score</span></div>
-            </template>
+      <div class="container hero-grid">
+        <div>
+          <div class="hero-eyebrow">
+            <span class="badge badge-accent"><span class="live-dot"></span>Beta · {{ trackedCount }} ETFs tracked</span>
           </div>
-        </transition>
-        <div class="hc-dots">
-          <button v-for="(_, i) in scoreCarouselSlides" :key="i"
-            :class="['hc-dot-btn', { active: scoreCarouselIdx === i }]"
-            @click="scoreCarouselIdx = i"></button>
-        </div>
-      </div>
-      <!-- API Data Carousel -->
-      <div class="hero-carousel">
-        <div class="hd-chrome">
-          <span class="hd-dot hd-r"></span>
-          <span class="hd-dot hd-y"></span>
-          <span class="hd-dot hd-g"></span>
-          <code class="hd-url">{{ carouselSlides[carouselIdx].label }}</code>
-        </div>
-        <transition name="cs" mode="out-in">
-          <div :key="carouselIdx" class="hc-body">
-            <!-- Slide 0: ETF list -->
-            <template v-if="carouselIdx === 0">
-              <div class="hd-row"><span class="hd-ticker">SWDA</span><span class="hd-name">iShares Core MSCI World <span class="hd-pill">Acc</span></span><span class="hd-ter">0.20%</span></div>
-              <div class="hd-row"><span class="hd-ticker">CSSPX</span><span class="hd-name">iShares Core S&amp;P 500 <span class="hd-pill">Acc</span></span><span class="hd-ter">0.07%</span></div>
-              <div class="hd-row"><span class="hd-ticker">ISF</span><span class="hd-name">iShares Core FTSE 100 <span class="hd-pill hd-pill-dist">Dist</span></span><span class="hd-ter">0.07%</span></div>
-              <div class="hd-footer"><span class="hd-status">200 OK</span><span class="hd-count">10 ETFs tracked</span></div>
-            </template>
-            <!-- Slide 1: Holdings -->
-            <template v-else-if="carouselIdx === 1">
-              <div class="hd-row"><span class="hd-rank">#1</span><span class="hd-hold-name">Apple Inc.</span><span class="hd-ter">5.81%</span></div>
-              <div class="hd-row"><span class="hd-rank">#2</span><span class="hd-hold-name">Microsoft Corp.</span><span class="hd-ter">5.43%</span></div>
-              <div class="hd-row"><span class="hd-rank">#3</span><span class="hd-hold-name">NVIDIA Corp.</span><span class="hd-ter">4.92%</span></div>
-              <div class="hd-footer"><span class="hd-status">200 OK</span><span class="hd-count">1,340 holdings</span></div>
-            </template>
-            <!-- Slide 2: Allocations -->
-            <template v-else-if="carouselIdx === 2">
-              <div class="hd-alloc-row"><span class="hd-alloc-lbl">North America</span><div class="hd-bar-track"><div class="hd-bar" style="width:68%"></div></div><span class="hd-alloc-val">68%</span></div>
-              <div class="hd-alloc-row"><span class="hd-alloc-lbl">Europe</span><div class="hd-bar-track"><div class="hd-bar" style="width:22%"></div></div><span class="hd-alloc-val">22%</span></div>
-              <div class="hd-alloc-row"><span class="hd-alloc-lbl">Asia Pacific</span><div class="hd-bar-track"><div class="hd-bar" style="width:10%"></div></div><span class="hd-alloc-val">10%</span></div>
-              <div class="hd-footer"><span class="hd-status">200 OK</span><span class="hd-count">country breakdown</span></div>
-            </template>
-            <!-- Slide 3: Portfolio Exposure -->
-            <template v-else>
-              <div class="hd-expo-header"><span class="hd-expo-port">SWDA 60% + CSSPX 40%</span><span class="hd-expo-lbl">portfolio</span></div>
-              <div class="hd-alloc-row"><span class="hd-alloc-lbl">North America</span><div class="hd-bar-track"><div class="hd-bar" style="width:72%"></div></div><span class="hd-alloc-val">72%</span></div>
-              <div class="hd-alloc-row"><span class="hd-alloc-lbl">Technology</span><div class="hd-bar-track"><div class="hd-bar hd-bar-sec" style="width:28%"></div></div><span class="hd-alloc-val">28%</span></div>
-              <div class="hd-footer"><span class="hd-status">200 OK</span><span class="hd-count">exposure analysis</span></div>
-            </template>
+          <h1>ETF Analysis<br />that actually computes.</h1>
+          <p class="lead">
+            GoETF scores every ETF with a weighted rating, reveals true portfolio overlap, and suggests simplifications.
+            Real analysis instead of price lists.
+          </p>
+          <div class="hero-actions">
+            <button class="btn btn-primary" @click="emit('navigate', 'etfs')">ETF Explorer</button>
+            <button class="btn btn-outline" @click="openApiKey">Get API Key</button>
           </div>
-        </transition>
-        <div class="hc-dots">
-          <button v-for="(_, i) in carouselSlides" :key="i"
-            :class="['hc-dot-btn', { active: carouselIdx === i }]"
-            @click="carouselIdx = i"></button>
+          <p class="hero-disclaimer">For informational purposes only. Not investment advice.</p>
         </div>
-      </div>
-    </section>
 
-    <!-- Features -->
-    <section class="features-section">
-      <div class="page">
-        <div class="section-header">
-          <h2 class="section-title">What you can do</h2>
-          <p class="section-sub">Clean data endpoints for developers and researchers</p>
-        </div>
-        <div class="grid-2">
-          <!-- ETF Explorer -->
-          <div class="feature-card" @click="$emit('navigate','etfs')">
-            <div class="feature-top">
-              <div class="feature-chip fi-etf">ETF</div>
-              <div style="flex:1">
-                <h3 class="feature-title">ETF Explorer</h3>
-                <p class="feature-desc">Browse all tracked ETFs, view holdings, allocations and performance metrics.</p>
+        <div class="score-widget">
+          <div class="widget-header">
+            <span class="live-dot"></span>
+            <span class="endpoint">GET /scores/etfs</span>
+            <span class="ok-badge" style="margin-left:auto">200 OK</span>
+          </div>
+          <div v-if="loadingScores" class="widget-loading">Fetching live scores...</div>
+          <div v-else class="score-rows">
+            <div v-for="row in topScores" :key="row.ticker" class="score-row">
+              <span class="score-ticker">{{ row.ticker }}</span>
+              <span class="score-name">{{ row.name }}</span>
+              <div class="score-bar-wrap">
+                <div class="score-bar" :class="barClass(row.score)" :style="{ width: ((row.score || 0) * 10) + '%' }"></div>
               </div>
-              <span class="feature-arrow">→</span>
-            </div>
-            <div class="feature-preview">
-              <div class="fp-etf-row"><span class="fp-ticker">SWDA</span><span class="fp-name">iShares Core MSCI World</span><span class="fp-badge">Acc</span><span class="fp-ter">0.20%</span></div>
-              <div class="fp-etf-row"><span class="fp-ticker">VUSA</span><span class="fp-name">Vanguard S&amp;P 500 UCITS ETF</span><span class="fp-badge fp-dist">Dist</span><span class="fp-ter">0.07%</span></div>
-              <div class="fp-more">+ more ETFs tracked →</div>
+              <span class="score-num" :class="scoreClass(row.score)">{{ row.score?.toFixed(1) ?? '-' }}</span>
             </div>
           </div>
-          <!-- Exposure Analysis -->
-          <div class="feature-card" @click="navigateTo('analytics','exposure')">
-            <div class="feature-top">
-              <div class="feature-chip fi-geo">GEO</div>
-              <div style="flex:1">
-                <h3 class="feature-title">Exposure Analysis</h3>
-                <p class="feature-desc">Analyse sector, country and currency exposure of a custom portfolio.</p>
-              </div>
-              <span class="feature-arrow">→</span>
-            </div>
-            <div class="feature-preview">
-              <div class="fp-bar-row"><span class="fp-bar-lbl">North America</span><div class="fp-bar-track"><div class="fp-bar-fill" style="width:68%"></div></div><span class="fp-bar-val">68%</span></div>
-              <div class="fp-bar-row"><span class="fp-bar-lbl">Europe</span><div class="fp-bar-track"><div class="fp-bar-fill" style="width:22%"></div></div><span class="fp-bar-val">22%</span></div>
-              <div class="fp-bar-row"><span class="fp-bar-lbl">Asia Pacific</span><div class="fp-bar-track"><div class="fp-bar-fill" style="width:10%"></div></div><span class="fp-bar-val">10%</span></div>
-            </div>
-          </div>
-          <!-- API Reference -->
-          <div class="feature-card" @click="$emit('navigate','docs')">
-            <div class="feature-top">
-              <div class="feature-chip fi-api">API</div>
-              <div style="flex:1">
-                <h3 class="feature-title">API Reference</h3>
-                <p class="feature-desc">Full documentation with per-endpoint code examples for Python, JavaScript and cURL.</p>
-              </div>
-              <span class="feature-arrow">→</span>
-            </div>
-            <div class="feature-preview fp-api-preview">
-              <div class="fp-api-row"><span class="fp-get">GET</span><code class="fp-path">/etfs</code></div>
-              <div class="fp-api-row"><span class="fp-get">GET</span><code class="fp-path">/etfs/{id}/holdings</code></div>
-              <div class="fp-api-row"><span class="fp-post">POST</span><code class="fp-path">/analytics/overlap</code></div>
-            </div>
+          <div class="widget-footer">
+            <span>GoETF Score · 1 = very poor, 10 = excellent</span>
+            <span>{{ scoreError ? 'Fallback data' : 'Live data' }}</span>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- Try it out -->
-    <section class="page" id="live-explorer">
-      <div class="card tryout-card">
-        <div class="tryout-header">
-          <div>
-            <h2 class="card-title" style="font-size:1.2rem;margin:0">Live API Explorer</h2>
-            <p style="font-size:.875rem;color:var(--text-muted);margin-top:.25rem">
-              Live SWDA data · public <code class="tryout-key" style="font-size:.8rem;display:inline">demo</code> key · no sign-up needed
-            </p>
-          </div>
-          <span class="live-badge">LIVE</span>
+    <div class="strip">
+      <div class="container strip-grid">
+        <div class="strip-item">
+          <h3>GoETF Score</h3>
+          <p>Every ETF receives a score from 1-10 based on performance, risk, diversification, and cost.</p>
         </div>
-        <div class="demo-tabs">
-          <button v-for="ep in demoEndpoints" :key="ep.key"
-            :class="['demo-tab', { active: activeDemo === ep.key }]"
-            @click="switchDemo(ep.key)">
-            <span class="demo-method">GET</span>{{ ep.short }}
+        <div class="strip-item">
+          <h3>Overlap Analysis</h3>
+          <p>How much of your portfolio is in the exact same positions? GoETF shows it.</p>
+        </div>
+        <div class="strip-item">
+          <h3>Portfolio Simplifier</h3>
+          <p>Reduce redundant ETFs and keep exposure quality with less complexity.</p>
+        </div>
+        <div class="strip-item">
+          <h3>API & Docs</h3>
+          <p>REST API with free key and live response examples in the docs.</p>
+        </div>
+      </div>
+    </div>
+
+    <section class="section score-section">
+      <div class="container score-grid">
+        <div>
+          <p class="section-label">GoETF Score</p>
+          <h2>A score grounded in facts</h2>
+          <p class="section-copy">
+            Morningstar stars measure relative past performance within a category. The GoETF Score calculates on an
+            absolute basis, making apples-to-apples comparisons across ETFs.
+          </p>
+
+          <div class="score-pillars">
+            <div class="pillar"><span>Performance</span><div class="pillar-track"><div class="pillar-fill" style="width:40%"></div></div><em>40%</em></div>
+            <div class="pillar"><span>Risk</span><div class="pillar-track"><div class="pillar-fill risk" style="width:30%"></div></div><em>30%</em></div>
+            <div class="pillar"><span>Diversification</span><div class="pillar-track"><div class="pillar-fill div" style="width:20%"></div></div><em>20%</em></div>
+            <div class="pillar"><span>Cost (TER)</span><div class="pillar-track"><div class="pillar-fill cost" style="width:10%"></div></div><em>10%</em></div>
+          </div>
+
+          <button class="btn btn-outline" @click="emit('navigate', 'methodology')">Read methodology</button>
+
+          <div class="comp-table">
+            <h3>ETF Comparison</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th>ETF</th>
+                  <th>Score</th>
+                  <th>TER</th>
+                  <th>Sharpe</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="row in topScores" :key="row.ticker + '-table'">
+                  <td>{{ row.ticker }}</td>
+                  <td>{{ row.score?.toFixed(1) ?? '-' }}</td>
+                  <td>{{ row.terText }}</td>
+                  <td>{{ row.sharpeText }}</td>
+                </tr>
+              </tbody>
+            </table>
+            <button class="link-btn" @click="navigateTo('analytics', 'goetf')">View all ETF scores</button>
+          </div>
+        </div>
+
+        <div class="score-card" v-if="featuredScore">
+          <div class="score-card-head">
+            <div>
+              <strong>{{ featuredScore.ticker }}</strong>
+              <small>{{ featuredScore.name }}</small>
+            </div>
+            <span class="badge badge-blue">{{ featuredScore.provider || 'ETF' }}</span>
+          </div>
+          <div class="gauge-wrap">
+            <svg width="200" height="120" viewBox="0 0 200 120">
+              <path d="M 20 110 A 80 80 0 0 1 180 110" fill="none" stroke="#e5e7eb" stroke-width="14" stroke-linecap="round"/>
+              <path
+                d="M 20 110 A 80 80 0 0 1 180 110"
+                fill="none"
+                stroke="#22c55e"
+                stroke-width="14"
+                stroke-linecap="round"
+                :stroke-dasharray="251.2"
+                :stroke-dashoffset="251.2 - ((featuredScore.score || 0) / 10) * 251.2"
+              />
+              <text x="100" y="104" text-anchor="middle" class="gauge-text">{{ featuredScore.score?.toFixed(1) ?? '-' }}</text>
+            </svg>
+          </div>
+          <div class="score-meta">
+            <div><span>TER</span><strong>{{ featuredScore.terText }}</strong></div>
+            <div><span>Fund Size</span><strong>{{ featuredScore.fundSizeText }}</strong></div>
+            <div><span>Sharpe</span><strong>{{ featuredScore.sharpeText }}</strong></div>
+            <div><span>Max Drawdown</span><strong>{{ featuredScore.ddText }}</strong></div>
+          </div>
+          <button class="btn btn-outline" style="width:100%" @click="openFeaturedETF">{{ featuredScore.ticker }} Full Analysis</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="section overlap-section">
+      <div class="container">
+        <p class="section-label light">Portfolio Overlap</p>
+        <h2>Do you know what's really in your portfolio?</h2>
+        <p class="overlap-copy">
+          Select ETFs to estimate pairwise overlap using live portfolio-score analytics.
+        </p>
+
+        <div class="overlap-selectors">
+          <button
+            v-for="ticker in overlapUniverse"
+            :key="ticker"
+            class="etf-toggle"
+            :class="{ active: activeETFs.includes(ticker) }"
+            @click="toggleETF(ticker)"
+          >
+            {{ ticker }}
           </button>
         </div>
-        <div v-if="currentDemo.loading" class="loading" style="font-size:.875rem">
-          <div class="spinner"></div> Fetching live data…
+
+        <div class="matrix-wrap">
+          <table class="matrix-table">
+            <thead>
+              <tr>
+                <th></th>
+                <th v-for="col in activeETFs" :key="'col-' + col">{{ col }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="row in activeETFs" :key="'row-' + row">
+                <th class="row-label">{{ row }}</th>
+                <td v-for="col in activeETFs" :key="row + '-' + col">
+                  <div class="matrix-cell" :class="matrixClass(row, col)">
+                    {{ row === col ? '-' : matrixLabel(row, col) }}
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
-        <transition name="fade">
-          <div v-if="!currentDemo.loading && currentDemo.result" class="tryout-result">
-            <div class="tryout-result-header">
-              <span class="tryout-status">200 OK</span>
-              <span style="font-size:.75rem;color:var(--text-muted)">SWDA · iShares Core MSCI World</span>
-            </div>
-            <pre class="tryout-pre">{{ currentDemo.result }}</pre>
-          </div>
-        </transition>
-        <div v-if="currentDemo.error" class="tryout-error">{{ currentDemo.error }}</div>
-        <button class="btn btn-outline" style="width:fit-content" @click="$emit('navigate','docs')">
-          See all APIs →
-        </button>
+
+        <p class="overlap-insight">
+          {{ overlapInsight }}
+        </p>
+
+        <div class="centered-row">
+          <button class="btn btn-accent" @click="navigateTo('analytics', 'exposure')">Analyze my portfolio</button>
+        </div>
       </div>
     </section>
 
-    <!-- Disclaimer -->
-    <section class="page">
-      <div class="disclaimer-card">
-        <h3>📋 Important Disclaimer</h3>
-        <p>
-          GoETF.ch is provided strictly for <strong>informational and educational purposes</strong>.
-          None of the data, analysis, or tools on this platform constitute financial, investment,
-          legal, or tax advice. GoETF.ch does not recommend any specific ETF, fund, or investment
-          strategy. Past performance is not indicative of future results. Investment in ETFs involves
-          risk, including the possible loss of principal. Always consult a qualified financial adviser,
-          accountant, or legal professional before making any investment decisions.
-        </p>
+    <section class="section tools-section">
+      <div class="container">
+        <p class="section-label">Portfolio Tools</p>
+        <h2>Fewer ETFs. Better portfolio.</h2>
+        <div class="tools-grid">
+          <div class="tool-card">
+            <h3>Portfolio Simplifier</h3>
+            <p>Detect redundant ETF combinations and move to cleaner exposure with fewer lines.</p>
+            <button class="btn btn-outline" @click="navigateTo('analytics', 'exposure')">Try it</button>
+          </div>
+          <div class="tool-card">
+            <h3>Portfolio Enhancer</h3>
+            <p>Add targeted exposure while checking overlap and portfolio quality in one place.</p>
+            <button class="btn btn-outline" @click="navigateTo('analytics', 'exposure')">Try it</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section api-section">
+      <div class="container api-grid">
+        <div>
+          <p class="section-label light">API & Integration</p>
+          <h2>For developers and asset managers</h2>
+          <ul class="api-points">
+            <li>Full REST API for holdings, allocations, analytics, and scores.</li>
+            <li>Free API key without credit card.</li>
+            <li>Live examples in API docs with demo key support.</li>
+          </ul>
+          <div class="hero-actions">
+            <button class="btn btn-accent" @click="openApiKey">Get API Key</button>
+            <button class="btn btn-ghost-light" @click="emit('navigate', 'docs')">Read the docs</button>
+          </div>
+        </div>
+
+        <div class="code-block-wrap">
+          <div class="code-tabs">
+            <button
+              v-for="tab in ['python', 'js', 'curl']"
+              :key="tab"
+              class="code-tab"
+              :class="{ active: codeTab === tab }"
+              @click="codeTab = tab"
+            >
+              {{ tab === 'js' ? 'JavaScript' : tab.toUpperCase() }}
+            </button>
+          </div>
+          <pre class="code-content">{{ codeSnippets[codeTab] }}</pre>
+        </div>
       </div>
     </section>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, inject } from 'vue'
-import axios from 'axios'
+import { computed, inject, onMounted, ref, watch } from 'vue'
+import { etfService, scoreService } from '../services/api.js'
 
-const API_BASE = import.meta.env.VITE_API_URL || 'https://etfdata-production.up.railway.app'
-
-defineEmits(['navigate'])
-
+const emit = defineEmits(['navigate'])
+const showApiKeyModal = inject('showApiKeyModal')
 const navigateTo = inject('navigateTo')
+const navigateToETF = inject('navigateToETF')
 
-const carouselIdx = ref(0)
-const carouselSlides = [
-  { label: 'GET /etfs' },
-  { label: 'GET /etfs/{id}/holdings' },
-  { label: 'GET /etfs/{id}/allocations' },
-  { label: 'POST /analytics/exposure' },
-]
-let _carouselTimer = null
+const loadingScores = ref(false)
+const scoreError = ref('')
+const codeTab = ref('python')
 
-const scoreCarouselIdx = ref(0)
-const scoreCarouselSlides = [
-  { label: 'GET /scores/etfs' },
-  { label: 'POST /scores/portfolio' },
-]
-let _scoreCarouselTimer = null
+const topScores = ref([
+  { ticker: 'SWDA', name: 'iShares Core MSCI World', score: 7.8, terText: '0.20%', sharpeText: '0.82', fundSizeText: '$101.7bn', ddText: '-32.9%' },
+  { ticker: 'CSSPX', name: 'iShares Core S&P 500', score: 7.2, terText: '0.07%', sharpeText: '0.91', fundSizeText: '-', ddText: '-' },
+  { ticker: 'VUSA', name: 'Vanguard S&P 500 UCITS ETF', score: 6.9, terText: '0.07%', sharpeText: '0.88', fundSizeText: '-', ddText: '-' },
+  { ticker: 'ISF', name: 'iShares Core FTSE 100', score: 6.5, terText: '0.07%', sharpeText: '0.64', fundSizeText: '-', ddText: '-' },
+  { ticker: 'SEDY', name: 'SPDR S&P Em. Mkts Dividend', score: 5.9, terText: '0.40%', sharpeText: '0.51', fundSizeText: '-', ddText: '-' },
+])
 
-function scrollToTryout() {
-  document.getElementById('live-explorer')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+const featuredScore = computed(() => topScores.value[0])
+const trackedCount = computed(() => topScores.value.length)
+
+function fmtTer(value) {
+  if (value === null || value === undefined || value === '') return '-'
+  return `${Number(value).toFixed(2)}%`
 }
 
-onMounted(() => {
-  fetchDemo('etfs')
-  _carouselTimer = setInterval(() => {
-    carouselIdx.value = (carouselIdx.value + 1) % carouselSlides.length
-  }, 3600)
-  _scoreCarouselTimer = setInterval(() => {
-    scoreCarouselIdx.value = (scoreCarouselIdx.value + 1) % scoreCarouselSlides.length
-  }, 4200)
-})
-onUnmounted(() => { clearInterval(_carouselTimer); clearInterval(_scoreCarouselTimer) })
+function fmtSize(value) {
+  if (!value) return '-'
+  if (value >= 1e9) return `$${(value / 1e9).toFixed(1)}bn`
+  if (value >= 1e6) return `$${(value / 1e6).toFixed(0)}m`
+  return `$${Number(value).toLocaleString()}`
+}
 
-const codeTabs = [
-  {
-    label: 'cURL', code:
-`# List all ETFs
-curl https://api.goetf.ch/etfs \\
-  -H "x-api-key: YOUR_API_KEY"
-
-# Overlap between two ETFs
-curl https://api.goetf.ch/analytics/overlap/ETF_A/ETF_B \\
-  -H "x-api-key: YOUR_API_KEY"`
-  },
-  {
-    label: 'Python', code:
-`import requests
-
-BASE = "https://api.goetf.ch"
-HEADERS = {"x-api-key": "YOUR_API_KEY"}
-
-# List ETFs
-etfs = requests.get(f"{BASE}/etfs", headers=HEADERS).json()
-
-# Overlap
-overlap = requests.get(
-    f"{BASE}/analytics/overlap/{etfs[0]['id']}/{etfs[1]['id']}",
-    headers=HEADERS
-).json()`
-  },
-  {
-    label: 'JavaScript', code:
-`const BASE = "https://api.goetf.ch";
-const HEADERS = { "x-api-key": "YOUR_API_KEY" };
-
-// List ETFs
-const etfs = await fetch(\`\${BASE}/etfs\`, { headers: HEADERS })
-  .then(r => r.json());
-
-// Overlap
-const overlap = await fetch(
-  \`\${BASE}/analytics/overlap/\${etfs[0].id}/\${etfs[1].id}\`,
-  { headers: HEADERS }
-).then(r => r.json());`
-  },
-]
-
-// Live API Explorer
-const swdaId = ref(null)
-const activeDemo = ref('etfs')
-const demoEndpoints = [
-  { key: 'etfs',         short: '/etfs' },
-  { key: 'holdings',     short: '/etfs/{id}/holdings' },
-  { key: 'allocations',  short: '/etfs/{id}/allocations' },
-  { key: 'risk-metrics', short: '/etfs/risk-metrics' },
-  { key: 'scores-etfs',  short: '/scores/etfs' },
-]
-const demoStates = ref({
-  etfs:          { loading: false, result: null, error: null },
-  holdings:      { loading: false, result: null, error: null },
-  allocations:   { loading: false, result: null, error: null },
-  'risk-metrics':{ loading: false, result: null, error: null },
-  'scores-etfs': { loading: false, result: null, error: null },
-})
-const currentDemo = computed(() => demoStates.value[activeDemo.value])
-
-async function fetchDemo(key) {
-  const state = demoStates.value[key]
-  if (state.result !== null || state.loading) return
-  state.loading = true; state.error = null
+async function loadScores() {
+  loadingScores.value = true
+  scoreError.value = ''
   try {
-    let url, params
-    if (key === 'etfs') {
-      url = `${API_BASE}/etfs`
-    } else if (key === 'risk-metrics') {
-      url = `${API_BASE}/etfs/risk-metrics`
-      params = { tickers: 'SWDA' }
-    } else if (key === 'scores-etfs') {
-      url = `${API_BASE}/scores/etfs`
-      params = { tickers: 'SWDA' }
-    } else {
-      if (!swdaId.value) {
-        const r = await axios.get(`${API_BASE}/etfs`, { headers: { 'x-api-key': 'demo' } })
-        swdaId.value = r.data[0]?.id ?? null
-        if (!demoStates.value.etfs.result && r.data[0]) {
-          demoStates.value.etfs.result = JSON.stringify(r.data[0], null, 2)
-        }
+    const tickers = ['SWDA', 'CSSPX', 'VUSA', 'ISF', 'SEDY']
+    const [scoresRes, etfRes] = await Promise.all([
+      scoreService.getEtfScores(tickers, 0.04),
+      etfService.getETFs(0, 200),
+    ])
+
+    const detailsByTicker = new Map((etfRes.data || []).map(e => [e.ticker, e]))
+    const scoreByTicker = new Map((scoresRes.data || []).map(s => [s.ticker, s]))
+
+    topScores.value = tickers.map(ticker => {
+      const details = detailsByTicker.get(ticker) || {}
+      const scoreData = scoreByTicker.get(ticker) || {}
+      return {
+        ticker,
+        name: details.name || scoreData.name || ticker,
+        provider: details.provider || '',
+        score: scoreData.goetf_score ?? scoreData.score ?? null,
+        terText: fmtTer(details.ter),
+        sharpeText: scoreData.sharpe_ratio != null ? Number(scoreData.sharpe_ratio).toFixed(2) : '-',
+        fundSizeText: fmtSize(details.fund_size),
+        ddText: scoreData.max_drawdown != null ? `${Number(scoreData.max_drawdown).toFixed(1)}%` : '-',
       }
-      url = `${API_BASE}/etfs/${swdaId.value}/${key}`
-    }
-    const res = await axios.get(url, { headers: { 'x-api-key': 'demo' }, params })
-    const data = res.data
-    if (key === 'etfs') {
-      state.result = data[0] ? JSON.stringify(data[0], null, 2) : '[]'
-      if (!swdaId.value) swdaId.value = data[0]?.id ?? null
-    } else if (Array.isArray(data)) {
-      state.result = JSON.stringify(data.slice(0, 5), null, 2) +
-        (data.length > 5 ? `\n// … ${data.length - 5} more items` : '')
-    } else {
-      state.result = JSON.stringify(data, null, 2)
-    }
+    })
   } catch (e) {
-    state.error = e?.response?.data?.detail || 'Request failed. Is the API reachable?'
+    scoreError.value = e?.response?.data?.detail || e.message || 'Failed to load live scores'
   } finally {
-    state.loading = false
+    loadingScores.value = false
   }
 }
 
-function switchDemo(key) {
-  activeDemo.value = key
-  fetchDemo(key)
+function openApiKey() {
+  if (showApiKeyModal) showApiKeyModal.value = true
 }
+
+async function openFeaturedETF() {
+  const ticker = featuredScore.value?.ticker
+  if (!ticker) {
+    emit('navigate', 'etfs')
+    return
+  }
+  try {
+    const res = await etfService.getETFs(0, 200)
+    const found = (res.data || []).find(e => e.ticker === ticker)
+    if (found && navigateToETF) {
+      navigateToETF(found)
+      return
+    }
+  } catch {}
+  emit('navigate', 'etfs')
+}
+
+function scoreClass(score) {
+  if (score == null) return ''
+  if (score >= 7) return 'hi'
+  if (score >= 6) return 'md'
+  return 'lo'
+}
+
+function barClass(score) {
+  if (score == null) return ''
+  if (score >= 7) return 'bar-hi'
+  if (score >= 6) return 'bar-md'
+  return 'bar-lo'
+}
+
+const overlapUniverse = ['SWDA', 'CSSPX', 'VUSA', 'ISF', 'SEDY']
+const activeETFs = ref(['SWDA', 'CSSPX', 'VUSA', 'ISF'])
+const overlapMap = ref({})
+
+const fallbackOverlap = {
+  SWDA: { SWDA: 100, CSSPX: 78, VUSA: 71, ISF: 12, SEDY: 8 },
+  CSSPX: { SWDA: 78, CSSPX: 100, VUSA: 95, ISF: 8, SEDY: 7 },
+  VUSA: { SWDA: 71, CSSPX: 95, VUSA: 100, ISF: 9, SEDY: 6 },
+  ISF: { SWDA: 12, CSSPX: 8, VUSA: 9, ISF: 100, SEDY: 4 },
+  SEDY: { SWDA: 8, CSSPX: 7, VUSA: 6, ISF: 4, SEDY: 100 },
+}
+
+function pairKey(a, b) {
+  return [a, b].sort().join('__')
+}
+
+async function loadPairOverlap(a, b) {
+  const key = pairKey(a, b)
+  if (overlapMap.value[key] != null) return
+  try {
+    const res = await scoreService.getPortfolioScore(
+      [
+        { etf_id: a, weight: 50 },
+        { etf_id: b, weight: 50 },
+      ],
+      0.04
+    )
+    const pair = res.data?.pairwise_overlaps?.[0]
+    overlapMap.value[key] = pair?.weight_overlap_pct ?? res.data?.avg_overlap_pct ?? fallbackOverlap[a][b]
+  } catch {
+    overlapMap.value[key] = fallbackOverlap[a][b]
+  }
+}
+
+async function refreshOverlap() {
+  const tasks = []
+  for (let i = 0; i < activeETFs.value.length; i += 1) {
+    for (let j = i + 1; j < activeETFs.value.length; j += 1) {
+      tasks.push(loadPairOverlap(activeETFs.value[i], activeETFs.value[j]))
+    }
+  }
+  await Promise.all(tasks)
+}
+
+function toggleETF(ticker) {
+  const idx = activeETFs.value.indexOf(ticker)
+  if (idx >= 0) {
+    if (activeETFs.value.length <= 2) return
+    activeETFs.value = activeETFs.value.filter(t => t !== ticker)
+  } else {
+    activeETFs.value = [...activeETFs.value, ticker]
+  }
+}
+
+function overlapValue(a, b) {
+  if (a === b) return 100
+  const value = overlapMap.value[pairKey(a, b)]
+  return value != null ? value : fallbackOverlap[a][b]
+}
+
+function matrixLabel(a, b) {
+  const v = overlapValue(a, b)
+  return `${Number(v).toFixed(0)}%`
+}
+
+function matrixClass(a, b) {
+  if (a === b) return 'cell-self'
+  const v = overlapValue(a, b)
+  if (v >= 60) return 'cell-hi'
+  if (v >= 30) return 'cell-md'
+  return 'cell-lo'
+}
+
+const overlapInsight = computed(() => {
+  const pairs = []
+  for (let i = 0; i < activeETFs.value.length; i += 1) {
+    for (let j = i + 1; j < activeETFs.value.length; j += 1) {
+      const a = activeETFs.value[i]
+      const b = activeETFs.value[j]
+      pairs.push({ a, b, v: overlapValue(a, b) })
+    }
+  }
+  if (!pairs.length) return 'Select at least two ETFs to evaluate overlap.'
+  pairs.sort((x, y) => y.v - x.v)
+  const top = pairs[0]
+  return `Highest overlap right now: ${top.a} vs ${top.b} at ${top.v.toFixed(1)}%. Consider simplifying if several pairs are above 60%.`
+})
+
+const codeSnippets = {
+  python: `import requests\n\nbase = "https://api.goetf.ch"\nheaders = {"x-api-key": "YOUR_API_KEY"}\n\n# ETF scores\nscores = requests.get(f"{base}/scores/etfs", headers=headers).json()\n\n# Portfolio analysis\nportfolio = {"portfolio": [{"etf_id": "SWDA", "weight": 60}, {"etf_id": "CSSPX", "weight": 40}]}\nresult = requests.post(f"{base}/analytics/exposure", json=portfolio, headers=headers).json()`,
+  js: `const base = "https://api.goetf.ch";\nconst headers = { "x-api-key": "YOUR_API_KEY", "Content-Type": "application/json" };\n\nconst scores = await fetch(base + "/scores/etfs", { headers }).then(r => r.json());\n\nconst exposure = await fetch(base + "/analytics/exposure", {\n  method: "POST",\n  headers,\n  body: JSON.stringify({ portfolio: [{ etf_id: "SWDA", weight: 60 }, { etf_id: "CSSPX", weight: 40 }] })\n}).then(r => r.json());`,
+  curl: `curl -H "x-api-key: YOUR_API_KEY" https://api.goetf.ch/scores/etfs\n\ncurl -X POST https://api.goetf.ch/analytics/exposure \\\n  -H "x-api-key: YOUR_API_KEY" \\\n  -H "Content-Type: application/json" \\\n  -d '{"portfolio":[{"etf_id":"SWDA","weight":60},{"etf_id":"CSSPX","weight":40}]}'`,
+}
+
+watch(activeETFs, () => {
+  refreshOverlap()
+}, { deep: true })
+
+onMounted(async () => {
+  await loadScores()
+  await refreshOverlap()
+})
 </script>
 
 <style scoped>
-.hero {
-  background: linear-gradient(135deg, var(--green-50) 0%, #fff 55%);
-  border-bottom: 1px solid var(--border);
-  padding: 1.5rem 1.5rem;
-  display: flex; align-items: center; justify-content: center;
-  gap: 2.5rem; flex-wrap: wrap; overflow: hidden;
-}
-[data-theme="dark"] .hero { background: linear-gradient(135deg, #060e1a 0%, #050a12 55%); }
-.hero-inner { max-width: 500px; }
-.hero-badge {
-  display: inline-block; padding: .15rem .55rem; border-radius: 5px;
-  background: var(--green-100); color: var(--green-700);
-  font-size: .68rem; font-weight: 700; letter-spacing: .07em; text-transform: uppercase;
-  margin-bottom: .6rem;
-}
-[data-theme="dark"] .hero-badge { background: #082d5e; color: #7ec8e3; }
-.hero-title { font-size: clamp(1.5rem, 3.5vw, 2.1rem); font-weight: 800; line-height: 1.1; letter-spacing: -.04em; color: var(--text); }
-.gradient-text { background: linear-gradient(135deg, #1585c8, #0b6aa5); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
-.hero-sub { font-size: .875rem; color: var(--text-muted); margin: .6rem 0 1rem; line-height: 1.55; }
-.hero-actions { display: flex; gap: .75rem; flex-wrap: wrap; }
-.btn-lg { padding: .5rem 1.1rem; font-size: .875rem; }
-.hero-disclaimer { margin-top: .7rem; font-size: .68rem; color: var(--text-muted); opacity: .8; }
+.home-page { background: #f8f9fb; color: #111827; }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+.section { padding: 88px 0; }
+.hero { padding: 96px 0 72px; }
+.hero-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 56px; align-items: center; }
+h1 { font-size: clamp(2rem, 4.6vw, 3.2rem); line-height: 1.1; letter-spacing: -0.02em; margin-bottom: 16px; }
+.lead { color: #6b7280; max-width: 520px; margin-bottom: 30px; }
+.hero-actions { display: flex; gap: 12px; flex-wrap: wrap; }
+.hero-disclaimer { margin-top: 18px; color: #9ca3af; font-size: 12px; }
+.hero-eyebrow { margin-bottom: 14px; }
+.badge { border-radius: 999px; font-size: 12px; font-weight: 600; padding: 4px 12px; display: inline-flex; align-items: center; gap: 6px; }
+.badge-accent { background: rgba(0,201,167,.12); color: #009f86; }
+.badge-blue { background: rgba(15,76,129,.1); color: #0f4c81; }
+.live-dot { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; display: inline-block; animation: pulse 1.8s infinite; }
+@keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.4; } }
 
-/* Hero API carousel */
-.hero-carousel {
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: var(--radius); overflow: hidden;
-  box-shadow: var(--shadow-lg); width: 300px; flex-shrink: 0;
-}
-.hd-chrome {
-  display: flex; align-items: center; gap: .45rem;
-  padding: .35rem .7rem;
-  background: var(--bg-2); border-bottom: 1px solid var(--border);
-}
-.hd-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
-.hd-r { background: #ff5f57; }
-.hd-y { background: #febc2e; }
-.hd-g { background: #28c840; }
-.hd-url {
-  flex: 1; text-align: center; font-size: .65rem;
-  color: var(--text-muted); white-space: nowrap;
-}
-.hd-row {
-  display: flex; align-items: center; gap: .55rem;
-  padding: .38rem .7rem; border-bottom: 1px solid var(--border);
-  font-size: .76rem;
-}
-.hd-ticker { font-family: monospace; font-weight: 700; color: var(--text); min-width: 42px; }
-.hd-name { flex: 1; color: var(--text-muted); font-size: .72rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.hd-pill {
-  display: inline-block; font-size: .57rem; font-weight: 700;
-  background: #c3e5ff; color: #0b6aa5;
-  padding: .02rem .28rem; border-radius: 5px; margin-left: .25rem; vertical-align: middle;
-}
-.hd-pill-dist { background: #dbeafe; color: #1e40af; }
-[data-theme="dark"] .hd-pill { background: #082d5e; color: #7ec8e3; }
-[data-theme="dark"] .hd-pill-dist { background: #1e3a8a; color: #93c5fd; }
-.hd-ter { font-weight: 600; color: var(--text); font-size: .74rem; flex-shrink: 0; }
-.hd-footer {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: .3rem .7rem; background: var(--bg-2);
-}
-.hd-status {
-  font-size: .66rem; font-weight: 700; color: var(--green-700);
-  background: var(--green-50); border: 1px solid var(--green-200);
-  padding: .07rem .38rem; border-radius: 4px;
-}
-[data-theme="dark"] .hd-status { background: #061829; border-color: #0e3060; color: #2d9ee0; }
-.hd-count { font-size: .66rem; color: var(--text-muted); }
-/* Carousel body, dots, transitions */
-.hc-body { height: 152px; overflow: hidden; }
-.hc-dots {
-  display: flex; align-items: center; justify-content: center; gap: .4rem;
-  padding: .3rem; border-top: 1px solid var(--border); background: var(--bg-2);
-}
-.hc-dot-btn {
-  width: 6px; height: 6px; border-radius: 50%;
-  background: var(--border); border: none; cursor: pointer;
-  padding: 0; transition: all .25s;
-}
-.hc-dot-btn.active { background: var(--green-500); width: 18px; border-radius: 3px; }
-.cs-enter-active, .cs-leave-active { transition: opacity .2s ease, transform .2s ease; }
-.cs-enter-from { opacity: 0; transform: translateX(10px); }
-.cs-leave-to   { opacity: 0; transform: translateX(-10px); }
-/* Holdings slide */
-.hd-rank { font-family: monospace; font-size: .67rem; color: var(--text-muted); min-width: 22px; flex-shrink: 0; }
-.hd-hold-name { flex: 1; color: var(--text); font-size: .75rem; }
-/* Allocations slide */
-.hd-alloc-row {
-  display: flex; align-items: center; gap: .5rem;
-  padding: .38rem .7rem; border-bottom: 1px solid var(--border);
-}
-.hd-alloc-lbl { font-size: .71rem; color: var(--text-muted); width: 90px; flex-shrink: 0; }
-.hd-bar-track { flex: 1; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
-.hd-bar { height: 100%; background: var(--green-500); border-radius: 2px; }
-.hd-alloc-val { font-size: .69rem; font-weight: 600; color: var(--text); width: 26px; text-align: right; flex-shrink: 0; }
-/* Overlap/exposure slide */
-.hd-expo-header {
-  display: flex; align-items: baseline; justify-content: space-between;
-  padding: .38rem .7rem; border-bottom: 1px solid var(--border);
-}
-.hd-expo-port { font-family: monospace; font-size: .72rem; font-weight: 700; color: var(--text); }
-.hd-expo-lbl { font-size: .65rem; color: var(--text-muted); }
-.hd-bar-sec { background: #6366f1; }
-/* Score carousel elements */
-.hd-score-row { display:flex; align-items:center; gap:.5rem; padding:.35rem .7rem; border-bottom:1px solid var(--border); }
-.hd-score-track { flex:1; height:5px; background:var(--border); border-radius:3px; overflow:hidden; }
-.hd-score-fill { height:100%; background:var(--green-500); border-radius:3px; }
-.hd-score-fill-mid { background:#2d9ee0; }
-.hds-num { font-size:.82rem; font-weight:700; min-width:2.1rem; text-align:right; }
-.hds-high { color:var(--green-700); }
-.hds-mid { color:#2d9ee0; }
-[data-theme="dark"] .hds-high { color:#93d5f0; }
-/* Portfolio score carousel */
-.hd-ps-header { display:flex; align-items:center; justify-content:space-between; padding:.4rem .7rem; border-bottom:1px solid var(--border); gap:.5rem; }
-.hd-ps-port { font-size:.68rem; color:var(--text-muted); font-family:monospace; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.hd-ps-label { font-size:.62rem; color:var(--text-muted); margin-top:.1rem; }
-.hd-ps-badge { font-size:1.4rem; font-weight:800; color:var(--green-700); line-height:1; flex-shrink:0; }
-[data-theme="dark"] .hd-ps-badge { color:#93d5f0; }
-.hd-ps-rows { display:flex; flex-direction:column; }
-.hd-ps-row { display:flex; justify-content:space-between; font-size:.73rem; padding:.26rem .7rem; border-bottom:1px solid var(--border); }
-.hd-ps-row span:first-child { color:var(--text-muted); }
-.hd-ps-row span:last-child { font-weight:600; }
-.hd-neg { color:#ef4444; }
-.hd-pos { color:var(--green-600); }
-[data-theme="dark"] .hd-pos { color:#2d9ee0; }
-.hd-tip-row { font-size:.71rem; padding:.32rem .7rem; background:var(--bg-3); border-bottom:1px solid var(--border); color:var(--text); }
-/* Live API Explorer button */
-.hero-live-btn {
-  display: inline-flex; align-items: center; gap: .45rem;
-  margin-top: .6rem;
-  background: var(--green-50); border: 1px solid var(--green-200);
-  color: var(--green-700); font-size: .75rem; font-weight: 600;
-  padding: .35rem .85rem; border-radius: 8px;
-  cursor: pointer; font-family: inherit; transition: all .15s;
-}
-.hero-live-btn:hover { background: var(--green-100); border-color: var(--green-400); }
-[data-theme="dark"] .hero-live-btn { background: #041a33; border-color: #0d3b72; color: #93d5f0; }
-[data-theme="dark"] .hero-live-btn:hover { background: #082d5e; }
-.live-dot {
-  width: 7px; height: 7px; border-radius: 50%; background: var(--green-500);
-  flex-shrink: 0; animation: pulse-badge 1.5s ease-in-out infinite;
-}
-.section-header { text-align: center; margin-bottom: 2rem; }
-.section-title { font-size: 1.5rem; font-weight: 700; color: var(--text); letter-spacing: -.03em; }
-.section-sub { color: var(--text-muted); margin-top: .35rem; }
-.features-section { background: var(--bg-2); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 2.25rem 0; }
-.feature-card {
-  display: flex; flex-direction: column; gap: 0;
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: var(--radius); padding: 1.25rem;
-  cursor: pointer; transition: all .2s; box-shadow: var(--shadow);
-}
-.feature-card:hover { border-color: var(--green-400); box-shadow: var(--shadow-md); transform: translateY(-2px); }
-.feature-top { display: flex; align-items: flex-start; gap: .85rem; }
-.feature-chip {
-  display: flex; align-items: center; justify-content: center;
-  width: 38px; height: 38px; border-radius: 8px;
-  font-size: .65rem; font-weight: 800; letter-spacing: .06em;
-  flex-shrink: 0; font-family: monospace;
-}
-.fi-etf { background: var(--green-100); color: var(--green-700); }
-.fi-geo { background: #dbeafe; color: #1d4ed8; }
-.fi-api { background: #f3e8ff; color: #7e22ce; }
-[data-theme="dark"] .fi-etf { background: #082d5e; color: #7ec8e3; }
-[data-theme="dark"] .fi-geo { background: #1e3a8a; color: #93c5fd; }
-[data-theme="dark"] .fi-api { background: #3b0764; color: #d8b4fe; }
-.feature-title { font-size: .95rem; font-weight: 600; color: var(--text); margin-bottom: .2rem; }
-.feature-desc { font-size: .83rem; color: var(--text-muted); line-height: 1.5; }
-.feature-arrow { margin-left: auto; font-size: 1rem; color: var(--green-400); flex-shrink: 0; align-self: center; padding-left: .25rem; }
-.feature-preview { border-top: 1px solid var(--border); margin-top: 1rem; padding-top: .85rem; }
-.fp-etf-row { display: flex; align-items: center; gap: .4rem; padding: .25rem 0; border-bottom: 1px solid var(--border); font-size: .75rem; }
-.fp-etf-row:last-child { border-bottom: none; }
-.fp-ticker { font-family: monospace; font-weight: 700; color: var(--text); min-width: 40px; }
-.fp-name { color: var(--text-muted); flex: 1; }
-.fp-badge { font-size: .62rem; font-weight: 600; background: #c3e5ff; color: #0b6aa5; padding: .05rem .35rem; border-radius: 10px; flex-shrink: 0; }
-.fp-dist { background: #dbeafe; color: #1e40af; }
-.fp-ter { color: var(--text-muted); margin-left: auto; flex-shrink: 0; }
-.fp-more { color: var(--green-600); font-weight: 500; padding-top: .3rem; font-size: .72rem; }
-.fp-bar-row { display: flex; align-items: center; gap: .5rem; margin-bottom: .35rem; }
-.fp-bar-lbl { font-size: .7rem; color: var(--text-muted); width: 95px; flex-shrink: 0; }
-.fp-bar-track { flex: 1; height: 4px; background: var(--border); border-radius: 2px; }
-.fp-bar-fill { height: 100%; background: var(--green-500); border-radius: 2px; }
-.fp-bar-val { font-size: .7rem; font-weight: 600; color: var(--text); width: 28px; text-align: right; }
-.fp-api-preview { display: flex; flex-direction: column; gap: .3rem; }
-.fp-api-row { display: flex; align-items: center; gap: .5rem; font-size: .75rem; }
-.fp-get { font-weight: 700; font-size: .63rem; color: #1d4ed8; background: #dbeafe; padding: .05rem .3rem; border-radius: 3px; flex-shrink: 0; }
-.fp-post { font-weight: 700; font-size: .63rem; color: #0b6aa5; background: #c3e5ff; padding: .05rem .3rem; border-radius: 3px; flex-shrink: 0; }
-.fp-path { font-family: monospace; color: var(--text-muted); }
-[data-theme="dark"] .fp-badge { background: #082d5e; color: #7ec8e3; }
-[data-theme="dark"] .fp-dist { background: #1e3a8a; color: #93c5fd; }
-[data-theme="dark"] .fp-get { background: #1e3a8a; color: #93c5fd; }
-[data-theme="dark"] .fp-post { background: #0d3b72; color: #93d5f0; }
-.disclaimer-card {
-  background: var(--bg-3); border: 1px solid var(--green-200);
-  border-radius: var(--radius); padding: 1.5rem;
-}
-.disclaimer-card h3 { font-size: 1rem; font-weight: 600; color: var(--text); margin-bottom: .75rem; }
-.disclaimer-card p { font-size: .875rem; color: var(--text-muted); line-height: 1.7; }
-/* Try it out */
-.tryout-card { display: flex; flex-direction: column; gap: 1.25rem; }
-.tryout-header { display: flex; justify-content: space-between; align-items: flex-start; }
-.live-badge {
-  background: #1585c8; color: #fff; font-size: .7rem; font-weight: 700;
-  letter-spacing: .1em; padding: .2rem .55rem; border-radius: 20px;
-  animation: pulse-badge 2s ease-in-out infinite;
-}
-@keyframes pulse-badge {
-  0%, 100% { opacity: 1; }
-  50% { opacity: .6; }
-}
-.tryout-meta { display: flex; flex-direction: column; gap: .6rem; }
-.tryout-row { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; }
-.tryout-label { font-size: .8rem; color: var(--text-muted); min-width: 90px; }
-.tryout-key {
-  background: var(--green-50); border: 1px solid var(--green-200);
-  color: var(--green-700); padding: .2rem .6rem; border-radius: 6px;
-  font-family: monospace; font-size: .9rem; font-weight: 600; letter-spacing: .05em;
-}
-[data-theme="dark"] .tryout-key { background: #061829; border-color: #0e3060; color: #2d9ee0; }
-.tryout-endpoint {
-  background: var(--bg-3); border: 1px solid var(--border);
-  color: var(--text-muted); padding: .2rem .6rem; border-radius: 6px;
-  font-family: monospace; font-size: .85rem;
-}
-.tryout-result { display: flex; flex-direction: column; gap: .5rem; }
-.tryout-result-header { display: flex; align-items: center; gap: 1rem; }
-.demo-tabs { display:flex; gap:.4rem; flex-wrap:wrap; }
-.demo-tab {
-  display:flex; align-items:center; gap:.35rem;
-  background:var(--bg-3); border:1px solid var(--border);
-  cursor:pointer; padding:.3rem .85rem; border-radius:20px;
-  font-size:.78rem; font-weight:500; color:var(--text-muted);
-  font-family:inherit; transition:all .15s;
-}
-.demo-tab:hover { border-color:var(--green-400); color:var(--text); }
-.demo-tab.active { background:var(--green-100); border-color:var(--green-400); color:var(--green-700); font-weight:600; }
-[data-theme="dark"] .demo-tab.active { background:#0d2d0d; border-color:#1a5c1a; color:#4ade80; }
-.demo-method { font-weight:700; font-size:.65rem; color:#1d4ed8; background:#dbeafe; padding:.05rem .3rem; border-radius:3px; flex-shrink:0; }
-[data-theme="dark"] .demo-method { background:#1e3a8a; color:#93c5fd; }
-.tryout-status {
-  background: var(--green-50); border: 1px solid var(--green-200);
-  color: var(--green-700); font-size: .75rem; font-weight: 700;
-  padding: .15rem .5rem; border-radius: 4px;
-}
-[data-theme="dark"] .tryout-status { background: #0d2d0d; border-color: #1a4d1a; color: #4ade80; }
-.tryout-pre {
-  background: var(--bg-3); border: 1px solid var(--border);
-  border-radius: var(--radius); padding: 1.25rem; overflow-x: auto;
-  font-size: .8rem; line-height: 1.6; max-height: 380px; overflow-y: auto;
-  white-space: pre; color: var(--text);
-}
-.tryout-error {
-  color: #dc2626; background: #fef2f2; border: 1px solid #fecaca;
-  border-radius: 8px; padding: .75rem 1rem; font-size: .875rem;
-}
-[data-theme="dark"] .tryout-error { background: #2d0a0a; border-color: #7f1d1d; color: #f87171; }
-.fade-enter-active { transition: opacity .35s, transform .35s; }
-.fade-enter-from { opacity: 0; transform: translateY(-6px); }
+.btn { border: none; border-radius: 8px; padding: 11px 20px; font-size: 14px; font-weight: 600; cursor: pointer; }
+.btn-primary { background: #0f4c81; color: #fff; }
+.btn-primary:hover { background: #1a6ab8; }
+.btn-outline { background: transparent; border: 1.5px solid #0f4c81; color: #0f4c81; }
+.btn-outline:hover { background: #0f4c81; color: #fff; }
+.btn-accent { background: #00c9a7; color: #111827; }
+.btn-ghost-light { background: rgba(255,255,255,.15); color: #fff; border: 1px solid rgba(255,255,255,.28); }
 
-/* ── Mobile responsive ── */
-@media (max-width: 640px) {
-  .hero { flex-direction: column; padding: 1.5rem 1rem; gap: 1.5rem; align-items: stretch; }
-  .hero-inner { max-width: 100%; }
-  .hero-carousel { width: 100%; flex-shrink: 1; }
-  .section-title { font-size: 1.2rem; }
-  .section-header { margin-bottom: 1.25rem; }
-  .demo-tabs { gap: .2rem; }
-  .demo-tab { padding: .25rem .6rem; font-size: .72rem; }
+.score-widget { background: #fff; border: 1px solid #e5e7eb; border-radius: 16px; box-shadow: 0 8px 40px rgba(15,76,129,.12); overflow: hidden; }
+.widget-header { display: flex; align-items: center; gap: 8px; padding: 14px 18px; border-bottom: 1px solid #e5e7eb; font-size: 12px; color: #6b7280; }
+.endpoint { font-family: 'JetBrains Mono', monospace; color: #0f4c81; }
+.ok-badge { background: #dcfce7; color: #15803d; border-radius: 4px; font-size: 11px; font-weight: 700; padding: 2px 7px; }
+.widget-loading { padding: 16px 18px; color: #6b7280; font-size: 13px; }
+.score-row { display: flex; align-items: center; gap: 10px; padding: 9px 18px; }
+.score-ticker { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 12px; width: 48px; }
+.score-name { flex: 1; color: #6b7280; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.score-bar-wrap { width: 80px; height: 6px; border-radius: 999px; background: #f3f4f6; overflow: hidden; }
+.score-bar { height: 6px; }
+.bar-hi { background: #22c55e; }
+.bar-md { background: #f59e0b; }
+.bar-lo { background: #ef4444; }
+.score-num { width: 30px; text-align: right; font-weight: 700; font-size: 13px; }
+.score-num.hi { color: #22c55e; }
+.score-num.md { color: #f59e0b; }
+.score-num.lo { color: #ef4444; }
+.widget-footer { padding: 10px 18px; border-top: 1px solid #e5e7eb; font-size: 11px; color: #9ca3af; display: flex; justify-content: space-between; gap: 8px; }
+
+.strip { background: #111827; }
+.strip-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: rgba(255,255,255,.08); }
+.strip-item { background: #111827; padding: 30px 24px; }
+.strip-item h3 { color: #fff; margin-bottom: 8px; font-size: 16px; }
+.strip-item p { color: rgba(255,255,255,.62); font-size: 14px; }
+
+.score-section { background: #fff; }
+.score-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 56px; align-items: start; }
+.section-label { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; font-weight: 700; color: #00c9a7; margin-bottom: 10px; }
+.section-label.light { color: rgba(0,201,167,.85); }
+h2 { font-size: clamp(1.65rem, 3vw, 2.2rem); line-height: 1.2; letter-spacing: -0.02em; margin-bottom: 12px; }
+.section-copy { color: #6b7280; margin-bottom: 22px; }
+.score-pillars { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
+.pillar { display: flex; align-items: center; gap: 12px; }
+.pillar span { width: 160px; font-size: 14px; }
+.pillar em { width: 36px; text-align: right; color: #6b7280; font-style: normal; font-size: 13px; }
+.pillar-track { flex: 1; height: 8px; border-radius: 999px; background: #f3f4f6; overflow: hidden; }
+.pillar-fill { height: 8px; background: #0f4c81; }
+.pillar-fill.risk { background: #1a6ab8; }
+.pillar-fill.div { background: #00c9a7; }
+.pillar-fill.cost { background: #9ca3af; }
+.comp-table { margin-top: 24px; }
+.comp-table h3 { margin-bottom: 10px; }
+.comp-table table { width: 100%; border-collapse: collapse; }
+.comp-table th, .comp-table td { padding: 10px 0; border-bottom: 1px solid #e5e7eb; text-align: left; font-size: 14px; }
+.comp-table th:not(:first-child), .comp-table td:not(:first-child) { text-align: right; }
+.link-btn { margin-top: 12px; background: none; border: none; color: #0f4c81; cursor: pointer; font-weight: 600; }
+
+.score-card { position: sticky; top: 82px; background: #f8f9fb; border: 1px solid #e5e7eb; border-radius: 12px; padding: 24px; }
+.score-card-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
+.score-card-head small { display: block; color: #6b7280; margin-top: 2px; }
+.gauge-wrap { display: flex; justify-content: center; margin-bottom: 10px; }
+.gauge-text { font-size: 38px; font-weight: 700; fill: #111827; font-family: Inter, sans-serif; }
+.score-meta { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 14px; }
+.score-meta div { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px; }
+.score-meta span { display: block; color: #6b7280; font-size: 11px; margin-bottom: 2px; }
+.score-meta strong { font-size: 14px; }
+
+.overlap-section { background: #111827; color: #fff; }
+.overlap-copy { color: rgba(255,255,255,.72); margin-bottom: 18px; }
+.overlap-selectors { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 18px; }
+.etf-toggle { border: 1px solid rgba(255,255,255,.2); border-radius: 8px; padding: 7px 14px; background: transparent; color: rgba(255,255,255,.7); cursor: pointer; }
+.etf-toggle.active { background: #00c9a7; color: #111827; border-color: #00c9a7; font-weight: 700; }
+.matrix-wrap { overflow-x: auto; }
+.matrix-table { border-collapse: collapse; min-width: 430px; }
+.matrix-table th, .matrix-table td { width: 88px; height: 50px; text-align: center; font-size: 13px; }
+.row-label { text-align: right; padding-right: 12px; color: rgba(255,255,255,.7); font-family: 'JetBrains Mono', monospace; }
+.matrix-cell { border-radius: 6px; height: 38px; display: flex; align-items: center; justify-content: center; }
+.cell-self { background: rgba(255,255,255,.07); color: rgba(255,255,255,.35); }
+.cell-hi { background: rgba(239,68,68,.25); color: #fca5a5; }
+.cell-md { background: rgba(245,158,11,.22); color: #fcd34d; }
+.cell-lo { background: rgba(34,197,94,.2); color: #86efac; }
+.overlap-insight { margin-top: 20px; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.15); border-radius: 12px; padding: 16px 18px; color: rgba(255,255,255,.8); }
+.centered-row { text-align: center; margin-top: 26px; }
+
+.tools-section { background: #f8f9fb; }
+.tools-grid { margin-top: 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.tool-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 24px; }
+.tool-card p { color: #6b7280; margin: 10px 0 18px; }
+
+.api-section { background: #111827; color: #fff; }
+.api-grid { display: grid; grid-template-columns: 1fr 1.25fr; gap: 48px; align-items: start; }
+.api-points { margin: 20px 0 28px; padding-left: 18px; color: rgba(255,255,255,.75); }
+.api-points li { margin-bottom: 10px; }
+.code-block-wrap { border: 1px solid rgba(255,255,255,.08); background: #0d1117; border-radius: 12px; overflow: hidden; }
+.code-tabs { display: flex; border-bottom: 1px solid rgba(255,255,255,.08); }
+.code-tab { border: none; background: transparent; color: rgba(255,255,255,.45); cursor: pointer; font-family: 'JetBrains Mono', monospace; font-size: 12px; padding: 11px 16px; }
+.code-tab.active { color: #00c9a7; border-bottom: 2px solid #00c9a7; }
+.code-content { margin: 0; padding: 20px; color: #e2e8f0; font-size: 13px; line-height: 1.65; overflow-x: auto; }
+
+@media (max-width: 980px) {
+  .hero-grid, .score-grid, .api-grid { grid-template-columns: 1fr; }
+  .tools-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 720px) {
+  .container { padding: 0 16px; }
+  .hero { padding-top: 84px; }
+  .strip-grid { grid-template-columns: 1fr; }
+  .pillar span { width: 130px; }
 }
 </style>
