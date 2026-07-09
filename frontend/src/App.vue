@@ -1,7 +1,7 @@
 <template>
   <div :data-theme="theme">
     <!-- Navbar -->
-    <nav class="navbar">
+    <nav v-if="currentPage !== 'home'" class="navbar">
       <div class="nav-inner">
         <div class="nav-brand" @click="currentPage = 'home'">
           <img src="/goetf_logo.png" class="brand-logo" alt="GoETF" />
@@ -55,13 +55,13 @@
     </main>
 
     <!-- Disclaimer -->
-    <div class="disclaimer-bar">
+    <div v-if="currentPage !== 'home'" class="disclaimer-bar">
       ⚠ Disclaimer: GoETF is for informational purposes only. Nothing on this platform constitutes financial or investment advice.
       Past performance is not indicative of future results. Always consult a qualified financial adviser before making investment decisions.
     </div>
 
     <!-- Footer -->
-    <footer class="footer">
+    <footer v-if="currentPage !== 'home'" class="footer">
       <div class="footer-inner">
         <div class="footer-brand">
           <img src="/goetf_logo.png" class="brand-logo" alt="GoETF" />

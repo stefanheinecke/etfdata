@@ -1,582 +1,923 @@
 <template>
-  <div class="home-page">
-    <section class="hero">
-      <div class="container hero-grid">
-        <div>
-          <div class="hero-eyebrow">
-            <span class="badge badge-accent"><span class="live-dot"></span>Beta · {{ trackedCount }} ETFs tracked</span>
-          </div>
-          <h1>ETF Analysis<br />that actually computes.</h1>
-          <p class="lead">
-            GoETF scores every ETF with a weighted rating, reveals true portfolio overlap, and suggests simplifications.
-            Real analysis instead of price lists.
-          </p>
-          <div class="hero-actions">
-            <button class="btn btn-primary" @click="emit('navigate', 'etfs')">ETF Explorer</button>
-            <button class="btn btn-outline" @click="openApiKey">Get API Key</button>
-          </div>
-          <p class="hero-disclaimer">For informational purposes only. Not investment advice.</p>
-        </div>
+  <div>
+    <nav class="navbar" :class="{ scrolled: navbarScrolled }" id="navbar">
+      <div class="nav-inner">
+        <a href="#" class="logo" @click.prevent="emit('navigate', 'home')">Go<span>ETF</span></a>
+        <ul class="nav-links">
+          <li><a href="#" @click.prevent="emit('navigate', 'etfs')">ETF Explorer</a></li>
+          <li><a href="#" @click.prevent="navigateTo('analytics', 'goetf')">Scores</a></li>
+          <li><a href="#" @click.prevent="navigateTo('analytics', 'exposure')">Portfolio</a></li>
+          <li><a href="#" @click.prevent="emit('navigate', 'docs')">API</a></li>
+          <li><a href="#" @click.prevent="emit('navigate', 'methodology')">Methodology</a></li>
+        </ul>
+        <a href="#" class="btn btn-outline nav-cta" @click.prevent="openApiKey">Get API Key</a>
+        <button class="hamburger" id="hamburger" aria-label="Open menu" @click="drawerOpen = true">
+          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
+      </div>
+    </nav>
 
-        <div class="score-widget">
-          <div class="widget-header">
-            <span class="live-dot"></span>
-            <span class="endpoint">GET /scores/etfs</span>
-            <span class="ok-badge" style="margin-left:auto">200 OK</span>
-          </div>
-          <div v-if="loadingScores" class="widget-loading">Fetching live scores...</div>
-          <div v-else class="score-rows">
-            <div v-for="row in topScores" :key="row.ticker" class="score-row">
-              <span class="score-ticker">{{ row.ticker }}</span>
-              <span class="score-name">{{ row.name }}</span>
-              <div class="score-bar-wrap">
-                <div class="score-bar" :class="barClass(row.score)" :style="{ width: ((row.score || 0) * 10) + '%' }"></div>
-              </div>
-              <span class="score-num" :class="scoreClass(row.score)">{{ row.score?.toFixed(1) ?? '-' }}</span>
+    <div class="nav-drawer" id="navDrawer" :class="{ open: drawerOpen }">
+      <div class="drawer-backdrop" id="drawerBackdrop" @click="drawerOpen = false"></div>
+      <div class="drawer-panel">
+        <a href="#" @click.prevent="goToAndClose('etfs')">ETF Explorer</a>
+        <a href="#" @click.prevent="goToAndClose('analytics', 'goetf')">Scores</a>
+        <a href="#" @click.prevent="goToAndClose('analytics', 'exposure')">Portfolio</a>
+        <a href="#" @click.prevent="goToAndClose('docs')">API</a>
+        <a href="#" @click.prevent="goToAndClose('methodology')">Methodology</a>
+        <a href="#" class="btn btn-primary" @click.prevent="openApiKey; drawerOpen = false">Get API Key</a>
+      </div>
+    </div>
+
+    <section class="hero">
+      <div class="container">
+        <div class="hero-grid">
+          <div class="hero-text">
+            <div class="hero-eyebrow">
+              <span class="badge badge-accent"><span class="live-dot"></span>Beta · 8 ETFs tracked</span>
             </div>
+            <h1>ETF Analysis<br>that actually computes.</h1>
+            <p class="lead">GoETF scores every ETF with a weighted rating, reveals true portfolio overlap, and suggests simplifications. Real analysis instead of price lists.</p>
+            <div class="hero-actions">
+              <a href="#" class="btn btn-primary" @click.prevent="emit('navigate', 'etfs')">ETF Explorer</a>
+              <a href="#" class="btn btn-outline" @click.prevent="openApiKey">Get API Key</a>
+            </div>
+            <p class="hero-disclaimer">For informational purposes only. Not investment advice.</p>
           </div>
-          <div class="widget-footer">
-            <span>GoETF Score · 1 = very poor, 10 = excellent</span>
-            <span>{{ scoreError ? 'Fallback data' : 'Live data' }}</span>
+
+          <div>
+            <div class="score-widget">
+              <div class="widget-header">
+                <span class="live-dot"></span>
+                <span class="endpoint">GET /scores/etfs</span>
+                <span class="ok-badge" style="margin-left:auto">200 OK</span>
+              </div>
+              <div class="score-rows" id="scoreWidgetRows">
+                <div class="score-row" v-for="etf in ETF_SCORES" :key="etf.ticker">
+                  <span class="score-ticker">{{ etf.ticker }}</span>
+                  <span class="score-name">{{ etf.name }}</span>
+                  <div class="score-bar-wrap"><div class="score-bar" :class="barClass(etf.score)" :style="{ width: ((etf.score / 10) * 100) + '%' }"></div></div>
+                  <span class="score-num" :class="numClass(etf.score)">{{ etf.score }}</span>
+                </div>
+              </div>
+              <div class="widget-footer">
+                <span>GoETF Score · 1 = very poor, 10 = excellent</span>
+                <span>Live data</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
     </section>
 
     <div class="strip">
-      <div class="container strip-grid">
-        <div class="strip-item">
-          <h3>GoETF Score</h3>
-          <p>Every ETF receives a score from 1-10 based on performance, risk, diversification, and cost.</p>
-        </div>
-        <div class="strip-item">
-          <h3>Overlap Analysis</h3>
-          <p>How much of your portfolio is in the exact same positions? GoETF shows it.</p>
-        </div>
-        <div class="strip-item">
-          <h3>Portfolio Simplifier</h3>
-          <p>Reduce redundant ETFs and keep exposure quality with less complexity.</p>
-        </div>
-        <div class="strip-item">
-          <h3>API & Docs</h3>
-          <p>REST API with free key and live response examples in the docs.</p>
+      <div class="strip-grid">
+        <div class="strip-item animate-on-scroll" v-for="item in stripItems" :key="item.title">
+          <div class="strip-icon" v-html="item.icon"></div>
+          <h3>{{ item.title }}</h3>
+          <p>{{ item.text }}</p>
         </div>
       </div>
     </div>
 
     <section class="section score-section">
-      <div class="container score-grid">
-        <div>
-          <p class="section-label">GoETF Score</p>
-          <h2>A score grounded in facts</h2>
-          <p class="section-copy">
-            Morningstar stars measure relative past performance within a category. The GoETF Score calculates on an
-            absolute basis, making apples-to-apples comparisons across ETFs.
-          </p>
+      <div class="container">
+        <div class="score-grid">
+          <div class="animate-on-scroll">
+            <p class="section-label">GoETF Score</p>
+            <h2>A score grounded in facts</h2>
+            <p class="mt-3" style="font-size:.95rem">Morningstar stars measure relative past performance within a category. The GoETF Score calculates on an absolute basis — making apples-to-apples comparisons across all ETFs.</p>
 
-          <div class="score-pillars">
-            <div class="pillar"><span>Performance</span><div class="pillar-track"><div class="pillar-fill" style="width:40%"></div></div><em>40%</em></div>
-            <div class="pillar"><span>Risk</span><div class="pillar-track"><div class="pillar-fill risk" style="width:30%"></div></div><em>30%</em></div>
-            <div class="pillar"><span>Diversification</span><div class="pillar-track"><div class="pillar-fill div" style="width:20%"></div></div><em>20%</em></div>
-            <div class="pillar"><span>Cost (TER)</span><div class="pillar-track"><div class="pillar-fill cost" style="width:10%"></div></div><em>10%</em></div>
-          </div>
-
-          <button class="btn btn-outline" @click="emit('navigate', 'methodology')">Read methodology</button>
-
-          <div class="comp-table">
-            <h3>ETF Comparison</h3>
-            <table>
-              <thead>
-                <tr>
-                  <th>ETF</th>
-                  <th>Score</th>
-                  <th>TER</th>
-                  <th>Sharpe</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="row in topScores" :key="row.ticker + '-table'">
-                  <td>{{ row.ticker }}</td>
-                  <td>{{ row.score?.toFixed(1) ?? '-' }}</td>
-                  <td>{{ row.terText }}</td>
-                  <td>{{ row.sharpeText }}</td>
-                </tr>
-              </tbody>
-            </table>
-            <button class="link-btn" @click="navigateTo('analytics', 'goetf')">View all ETF scores</button>
-          </div>
-        </div>
-
-        <div class="score-card" v-if="featuredScore">
-          <div class="score-card-head">
-            <div>
-              <strong>{{ featuredScore.ticker }}</strong>
-              <small>{{ featuredScore.name }}</small>
+            <div class="score-pillars mt-6" id="pillars">
+              <div class="pillar" v-for="p in pillars" :key="p.label">
+                <span class="pillar-label">{{ p.label }}</span>
+                <div class="pillar-bar-track"><div class="pillar-bar" :data-width="p.width" :style="{ background: p.color, width: barsAnimated ? (p.width + '%') : '0' }"></div></div>
+                <span class="pillar-pct">{{ p.text }}</span>
+              </div>
             </div>
-            <span class="badge badge-blue">{{ featuredScore.provider || 'ETF' }}</span>
+
+            <p style="font-size:.85rem; margin-top:16px">Weights and formulas are openly documented. No black-box rating.</p>
+            <a href="#" class="btn btn-outline mt-6" style="margin-top:20px" @click.prevent="emit('navigate', 'methodology')">Read methodology →</a>
+
+            <div class="comp-table mt-8 animate-on-scroll">
+              <h3 style="margin-bottom:16px; font-size:1rem">ETF Comparison</h3>
+              <table>
+                <thead>
+                  <tr>
+                    <th>ETF</th>
+                    <th>Score</th>
+                    <th>TER</th>
+                    <th>Sharpe</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="row in comparisonRows" :key="row.ticker">
+                    <td><span class="ticker-tag">{{ row.ticker }}</span></td>
+                    <td><span class="score-chip" :style="row.scoreStyle">{{ row.score }}</span></td>
+                    <td>{{ row.ter }}</td>
+                    <td>{{ row.sharpe }}</td>
+                  </tr>
+                </tbody>
+              </table>
+              <a href="#" style="font-size:.84rem; color:var(--primary); font-weight:600; display:inline-block; margin-top:14px" @click.prevent="navigateTo('analytics', 'goetf')">View all ETF scores →</a>
+            </div>
           </div>
-          <div class="gauge-wrap">
-            <svg width="200" height="120" viewBox="0 0 200 120">
-              <path d="M 20 110 A 80 80 0 0 1 180 110" fill="none" stroke="#e5e7eb" stroke-width="14" stroke-linecap="round"/>
-              <path
-                d="M 20 110 A 80 80 0 0 1 180 110"
-                fill="none"
-                stroke="#22c55e"
-                stroke-width="14"
-                stroke-linecap="round"
-                :stroke-dasharray="251.2"
-                :stroke-dashoffset="251.2 - ((featuredScore.score || 0) / 10) * 251.2"
-              />
-              <text x="100" y="104" text-anchor="middle" class="gauge-text">{{ featuredScore.score?.toFixed(1) ?? '-' }}</text>
-            </svg>
+
+          <div class="animate-on-scroll">
+            <div class="score-card">
+              <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:18px;">
+                <div>
+                  <div style="font-family:var(--mono); font-weight:700; font-size:.95rem">SWDA</div>
+                  <div style="font-size:.8rem; color:var(--text-muted)">iShares Core MSCI World</div>
+                </div>
+                <span class="badge badge-blue">iShares</span>
+              </div>
+
+              <div class="gauge-wrap">
+                <svg class="gauge-svg" width="200" height="120" viewBox="0 0 200 120">
+                  <path d="M 20 110 A 80 80 0 0 1 180 110" fill="none" stroke="#F3F4F6" stroke-width="14" stroke-linecap="round"/>
+                  <path id="gaugeArc" d="M 20 110 A 80 80 0 0 1 180 110" fill="none" stroke="#22C55E" stroke-width="14" stroke-linecap="round"
+                        stroke-dasharray="251.2" :stroke-dashoffset="gaugeOffset"/>
+                  <text x="100" y="105" text-anchor="middle" class="gauge-text" id="gaugeNum">{{ gaugeValue.toFixed(1) }}</text>
+                </svg>
+              </div>
+
+              <div class="score-meta">
+                <div class="meta-item">
+                  <div class="meta-label">TER</div>
+                  <div class="meta-val">0.20%</div>
+                </div>
+                <div class="meta-item">
+                  <div class="meta-label">Fund size</div>
+                  <div class="meta-val">$101.7bn</div>
+                </div>
+                <div class="meta-item">
+                  <div class="meta-label">Sharpe Ratio</div>
+                  <div class="meta-val">0.82</div>
+                </div>
+                <div class="meta-item">
+                  <div class="meta-label">Max. Drawdown</div>
+                  <div class="meta-val">−32.9%</div>
+                </div>
+              </div>
+
+              <div style="margin-top:20px; display:flex; flex-direction:column; gap:10px">
+                <div class="pillar" v-for="row in scoreCardRows" :key="row.label">
+                  <span class="pillar-label" style="font-size:.8rem; width:120px">{{ row.label }}</span>
+                  <div class="pillar-bar-track"><div class="pillar-bar" :data-width="row.width" :style="{ background: row.color, width: barsAnimated ? (row.width + '%') : '0' }"></div></div>
+                  <span class="pillar-pct">{{ row.value }}</span>
+                </div>
+              </div>
+
+              <a href="#" class="btn btn-outline" style="width:100%; justify-content:center; margin-top:22px" @click.prevent="emit('navigate', 'etfs')">SWDA Full Analysis</a>
+            </div>
           </div>
-          <div class="score-meta">
-            <div><span>TER</span><strong>{{ featuredScore.terText }}</strong></div>
-            <div><span>Fund Size</span><strong>{{ featuredScore.fundSizeText }}</strong></div>
-            <div><span>Sharpe</span><strong>{{ featuredScore.sharpeText }}</strong></div>
-            <div><span>Max Drawdown</span><strong>{{ featuredScore.ddText }}</strong></div>
-          </div>
-          <button class="btn btn-outline" style="width:100%" @click="openFeaturedETF">{{ featuredScore.ticker }} Full Analysis</button>
         </div>
       </div>
     </section>
 
     <section class="section overlap-section">
       <div class="container">
-        <p class="section-label light">Portfolio Overlap</p>
-        <h2>Do you know what's really in your portfolio?</h2>
-        <p class="overlap-copy">
-          Select ETFs to estimate pairwise overlap using live portfolio-score analytics.
-        </p>
-
-        <div class="overlap-selectors">
-          <button
-            v-for="ticker in overlapUniverse"
-            :key="ticker"
-            class="etf-toggle"
-            :class="{ active: activeETFs.includes(ticker) }"
-            @click="toggleETF(ticker)"
-          >
-            {{ ticker }}
-          </button>
+        <div class="overlap-intro animate-on-scroll">
+          <p class="section-label light">Portfolio Overlap</p>
+          <h2>Do you know what's really in your portfolio?</h2>
+          <p class="mt-3">Most investors hold 4–6 ETFs and think they're diversified. GoETF shows that up to 95% of their holdings are the exact same stocks.</p>
         </div>
 
-        <div class="matrix-wrap">
-          <table class="matrix-table">
-            <thead>
-              <tr>
-                <th></th>
-                <th v-for="col in activeETFs" :key="'col-' + col">{{ col }}</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="row in activeETFs" :key="'row-' + row">
-                <th class="row-label">{{ row }}</th>
-                <td v-for="col in activeETFs" :key="row + '-' + col">
-                  <div class="matrix-cell" :class="matrixClass(row, col)">
-                    {{ row === col ? '-' : matrixLabel(row, col) }}
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        <div class="animate-on-scroll">
+          <div class="overlap-selectors" id="overlapToggles">
+            <button class="etf-toggle" :class="{ active: activeETFs.includes('SWDA') }" @click="toggleETF('SWDA')">SWDA</button>
+            <button class="etf-toggle" :class="{ active: activeETFs.includes('CSSPX') }" @click="toggleETF('CSSPX')">CSSPX</button>
+            <button class="etf-toggle" :class="{ active: activeETFs.includes('VUSA') }" @click="toggleETF('VUSA')">VUSA</button>
+            <button class="etf-toggle" :class="{ active: activeETFs.includes('ISF') }" @click="toggleETF('ISF')">ISF</button>
+            <button class="etf-toggle" :class="{ active: activeETFs.includes('SEDY') }" @click="toggleETF('SEDY')">SEDY</button>
+          </div>
 
-        <p class="overlap-insight">
-          {{ overlapInsight }}
-        </p>
+          <div class="matrix-wrap">
+            <table class="matrix-table" id="overlapMatrix">
+              <thead>
+                <tr>
+                  <th></th>
+                  <th v-for="e in activeETFs" :key="'h-' + e">{{ e }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="r in activeETFs" :key="'r-' + r">
+                  <th class="row-label">{{ r }}</th>
+                  <td v-for="c in activeETFs" :key="r + '-' + c">
+                    <div :class="cellClass(overlapValue(r, c), r === c)">{{ r === c ? '—' : overlapValue(r, c) + '%' }}</div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
 
-        <div class="centered-row">
-          <button class="btn btn-accent" @click="navigateTo('analytics', 'exposure')">Analyze my portfolio</button>
+          <div class="overlap-legend">
+            <div class="legend-item"><div class="legend-dot" style="background:rgba(239,68,68,.4)"></div>High overlap (>60%)</div>
+            <div class="legend-item"><div class="legend-dot" style="background:rgba(245,158,11,.4)"></div>Medium overlap (30–60%)</div>
+            <div class="legend-item"><div class="legend-dot" style="background:rgba(34,197,94,.3)"></div>Low overlap (<30%)</div>
+          </div>
+
+          <div class="overlap-insight mt-6" id="overlapInsight">
+            <p><strong>Insight:</strong> SWDA, CSSPX and VUSA share 71–95% of their positions. Holding all three means paying triple the TER for nearly identical exposure. <strong>A single ETF would do.</strong></p>
+          </div>
+
+          <div style="text-align:center; margin-top:36px">
+            <a href="#" class="btn btn-accent" @click.prevent="navigateTo('analytics', 'exposure')">Analyse my portfolio</a>
+          </div>
         </div>
       </div>
     </section>
 
     <section class="section tools-section">
       <div class="container">
-        <p class="section-label">Portfolio Tools</p>
-        <h2>Fewer ETFs. Better portfolio.</h2>
+        <div class="animate-on-scroll mb-6">
+          <p class="section-label">Portfolio Tools</p>
+          <h2>Fewer ETFs. Better portfolio.</h2>
+        </div>
         <div class="tools-grid">
-          <div class="tool-card">
+          <div class="tool-card animate-on-scroll">
+            <div class="tool-icon icon-blue">⟳</div>
             <h3>Portfolio Simplifier</h3>
-            <p>Detect redundant ETF combinations and move to cleaner exposure with fewer lines.</p>
-            <button class="btn btn-outline" @click="navigateTo('analytics', 'exposure')">Try it</button>
+            <p>You hold 5 ETFs and pay 5× transaction fees, 5× rebalancing overhead, 5× mental load. GoETF finds the one ETF that covers the same exposure, risk profile, and geographic mix.</p>
+            <div class="tool-demo">
+              <div class="demo-row"><span class="etf">SWDA</span> <span class="demo-arrow">+</span> <span class="etf">CSSPX</span> <span class="demo-arrow">+</span> <span class="etf">VUSA</span></div>
+              <div class="demo-row" style="margin-top:6px; color:#6B7280; font-size:.8rem">⬇ Overlap 78–95% detected</div>
+              <div class="demo-row" style="margin-top:6px"><span class="demo-result">→ SWDA</span> <span class="savings" style="margin-left:8px">−0.14% TER saved</span></div>
+            </div>
+            <a href="#" class="btn btn-outline" @click.prevent="navigateTo('analytics', 'exposure')">Try it →</a>
           </div>
-          <div class="tool-card">
+
+          <div class="tool-card animate-on-scroll">
+            <div class="tool-icon icon-accent">＋</div>
             <h3>Portfolio Enhancer</h3>
-            <p>Add targeted exposure while checking overlap and portfolio quality in one place.</p>
-            <button class="btn btn-outline" @click="navigateTo('analytics', 'exposure')">Try it</button>
+            <p>You want more biotech exposure, more CHF allocation, or more emerging markets — but without duplicating existing holdings. GoETF suggests ETFs that complement your portfolio, not repeat it.</p>
+            <div class="tool-demo">
+              <div class="demo-row" style="font-size:.8rem; color:#6B7280">Existing portfolio: SWDA + ISF</div>
+              <div class="demo-row" style="margin-top:6px; font-size:.8rem; color:#6B7280">Goal: +Biotech, minimum overlap</div>
+              <div class="demo-row" style="margin-top:6px"><span class="demo-result">→ XBIO</span> <span style="font-size:.8rem; color:#6B7280; margin-left:8px">Overlap with portfolio: 3.2%</span></div>
+            </div>
+            <a href="#" class="btn btn-outline" @click.prevent="navigateTo('analytics', 'exposure')">Try it →</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section-sm palette-section">
+      <div class="container">
+        <div class="palette-header animate-on-scroll">
+          <p class="section-label">Score Suite</p>
+          <h2>A score for every strategy</h2>
+          <p class="mt-2" style="max-width:560px">Not every investor thinks alike. GoETF will offer a full suite of specialised scores.</p>
+        </div>
+        <div class="scores-scroll mt-8">
+          <div class="score-type-card active">
+            <div class="score-type-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="2" y="13" width="3.5" height="8" rx="1"/><rect x="8.5" y="8" width="3.5" height="13" rx="1"/><rect x="15" y="3" width="3.5" height="18" rx="1"/>
+                <path d="M3.8 13 C6 7 10 8 12.2 8 C14.5 8 17 3.5 16.8 3" stroke-dasharray="2.5 2" opacity=".6"/>
+              </svg>
+            </div>
+            <h3>GoETF Score</h3>
+            <p>Weighted composite score from performance, risk, diversification, and cost.</p>
+            <span class="badge badge-done">Available</span>
+          </div>
+          <div class="score-type-card">
+            <div class="score-type-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="3,17 7.5,11 11,13.5 16,7 21,7"/>
+                <polyline points="17,7 21,7 21,11"/>
+                <path d="M3,17 Q7,14 11,14 Q15,14 16,11 Q17,8 21,7" stroke-dasharray="2.5 2" opacity=".45" stroke-width="1"/>
+              </svg>
+            </div>
+            <h3>Trend Score</h3>
+            <p>Technical trend indicators: moving averages, momentum, and relative strength.</p>
+            <span class="badge badge-soon">Q3 2026</span>
+          </div>
+          <div class="score-type-card">
+            <div class="score-type-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="9"/>
+                <path d="M15 9.5a3.5 3.5 0 0 0-6 2.5c0 3 6 3 6 6a3.5 3.5 0 0 1-6 .5"/>
+                <line x1="12" y1="6" x2="12" y2="7.5"/><line x1="12" y1="16.5" x2="12" y2="18"/>
+              </svg>
+            </div>
+            <h3>Dividend Score</h3>
+            <p>Distribution history, dividend yield, growth rate, and dividend sustainability.</p>
+            <span class="badge badge-soon">Q4 2026</span>
+          </div>
+          <div class="score-type-card">
+            <div class="score-type-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="2,12 5,6 7.5,17 10,9 12.5,14 15,8 17.5,15 20,10 22,12"/>
+              </svg>
+            </div>
+            <h3>Trader Score</h3>
+            <p>Short-term technical signals, volatility, liquidity, and bid-ask spread analysis.</p>
+            <span class="badge badge-future">2027</span>
+          </div>
+          <div class="score-type-card">
+            <div class="score-type-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+                <line x1="4" y1="6" x2="20" y2="6"/>
+                <line x1="4" y1="12" x2="20" y2="12"/>
+                <line x1="4" y1="18" x2="20" y2="18"/>
+                <circle cx="9"  cy="6"  r="2.2" fill="white" stroke="currentColor" stroke-width="1.5"/>
+                <circle cx="15" cy="12" r="2.2" fill="white" stroke="currentColor" stroke-width="1.5"/>
+                <circle cx="8"  cy="18" r="2.2" fill="white" stroke="currentColor" stroke-width="1.5"/>
+              </svg>
+            </div>
+            <h3>Custom Score</h3>
+            <p>Configure your own weights. Prioritise TER? Sharpe ratio? Concentration risk?</p>
+            <span class="badge badge-future">Planned</span>
           </div>
         </div>
       </div>
     </section>
 
     <section class="section api-section">
-      <div class="container api-grid">
-        <div>
-          <p class="section-label light">API & Integration</p>
-          <h2>For developers and asset managers</h2>
-          <ul class="api-points">
-            <li>Full REST API for holdings, allocations, analytics, and scores.</li>
-            <li>Free API key without credit card.</li>
-            <li>Live examples in API docs with demo key support.</li>
-          </ul>
-          <div class="hero-actions">
-            <button class="btn btn-accent" @click="openApiKey">Get API Key</button>
-            <button class="btn btn-ghost-light" @click="emit('navigate', 'docs')">Read the docs</button>
+      <div class="container">
+        <div class="api-grid">
+          <div class="animate-on-scroll">
+            <p class="section-label light">API & Integration</p>
+            <h2>For developers and asset managers</h2>
+            <div class="api-points">
+              <div class="api-point">
+                <div class="api-point-dot"></div>
+                <p><strong>Full REST API</strong> — holdings, allocations, scores, overlap analysis. Everything the UI can do, the API can do too.</p>
+              </div>
+              <div class="api-point">
+                <div class="api-point-dot"></div>
+                <p><strong>Free API key</strong> — no credit card, no waiting. An email address is all it takes. Key delivered instantly.</p>
+              </div>
+              <div class="api-point">
+                <div class="api-point-dot"></div>
+                <p><strong>MCP integration</strong> planned — use GoETF directly in LLM workflows, no scraping required.</p>
+              </div>
+              <div class="api-point">
+                <div class="api-point-dot"></div>
+                <p><strong>Live explorer</strong> on the API docs page — with a demo key, no sign-up needed.</p>
+              </div>
+            </div>
+            <div style="display:flex; gap:12px; flex-wrap:wrap">
+              <a href="#" class="btn btn-accent" @click.prevent="openApiKey">Get API Key</a>
+              <a href="#" class="btn btn-ghost-light" @click.prevent="emit('navigate', 'docs')">Read the docs</a>
+            </div>
           </div>
-        </div>
 
-        <div class="code-block-wrap">
-          <div class="code-tabs">
-            <button
-              v-for="tab in ['python', 'js', 'curl']"
-              :key="tab"
-              class="code-tab"
-              :class="{ active: codeTab === tab }"
-              @click="codeTab = tab"
-            >
-              {{ tab === 'js' ? 'JavaScript' : tab.toUpperCase() }}
-            </button>
+          <div class="animate-on-scroll">
+            <div class="code-block-wrap">
+              <div class="code-tabs">
+                <button class="code-tab" :class="{ active: codeTab === 'python' }" @click="codeTab = 'python'">Python</button>
+                <button class="code-tab" :class="{ active: codeTab === 'js' }" @click="codeTab = 'js'">JavaScript</button>
+                <button class="code-tab" :class="{ active: codeTab === 'curl' }" @click="codeTab = 'curl'">cURL</button>
+              </div>
+              <div class="code-content" :class="{ active: codeTab === 'python' }" id="tab-python"><pre><span class="kw">import</span> requests
+
+API_KEY = <span class="st">"your_key_here"</span>
+BASE    = <span class="st">"https://api.goetf.ch/v1"</span>
+
+<span class="cm"># Fetch ETF scores</span>
+r = requests.<span class="fn">get</span>(
+    <span class="st">f"</span>{BASE}<span class="st">/scores/etfs"</span>,
+    headers={<span class="st">"X-API-Key"</span>: API_KEY}
+)
+scores = r.<span class="fn">json</span>()
+<span class="cm"># → [{ticker: "SWDA", score: 7.8, ...}, ...]</span>
+
+<span class="cm"># Calculate portfolio overlap</span>
+r = requests.<span class="fn">post</span>(
+    <span class="st">f"</span>{BASE}<span class="st">/analytics/overlap"</span>,
+    json={<span class="st">"tickers"</span>: [<span class="st">"SWDA"</span>, <span class="st">"CSSPX"</span>, <span class="st">"VUSA"</span>]},
+    headers={<span class="st">"X-API-Key"</span>: API_KEY}
+)
+overlap = r.<span class="fn">json</span>()
+<span class="cm"># → {"SWDA_CSSPX": 0.78, "SWDA_VUSA": 0.71, ...}</span></pre></div>
+              <div class="code-content" :class="{ active: codeTab === 'js' }" id="tab-js"><pre><span class="kw">const</span> API_KEY = <span class="st">"your_key_here"</span>;
+<span class="kw">const</span> BASE    = <span class="st">"https://api.goetf.ch/v1"</span>;
+
+<span class="cm">// Fetch ETF scores</span>
+<span class="kw">const</span> scores = <span class="kw">await</span> <span class="fn">fetch</span>(<span class="st">`</span>${BASE}<span class="st">/scores/etfs`</span>, {
+  headers: { <span class="st">"X-API-Key"</span>: API_KEY }
+}).<span class="fn">then</span>(r => r.<span class="fn">json</span>());
+
+<span class="cm">// Calculate portfolio overlap</span>
+<span class="kw">const</span> overlap = <span class="kw">await</span> <span class="fn">fetch</span>(<span class="st">`</span>${BASE}<span class="st">/analytics/overlap`</span>, {
+  method: <span class="st">"POST"</span>,
+  headers: {
+    <span class="st">"X-API-Key"</span>: API_KEY,
+    <span class="st">"Content-Type"</span>: <span class="st">"application/json"</span>
+  },
+  body: <span class="fn">JSON.stringify</span>({
+    tickers: [<span class="st">"SWDA"</span>, <span class="st">"CSSPX"</span>, <span class="st">"VUSA"</span>]
+  })
+}).<span class="fn">then</span>(r => r.<span class="fn">json</span>());</pre></div>
+              <div class="code-content" :class="{ active: codeTab === 'curl' }" id="tab-curl"><pre><span class="cm"># Fetch ETF scores</span>
+<span class="fn">curl</span> -H <span class="st">"X-API-Key: your_key_here"</span> \
+     https://api.goetf.ch/v1/scores/etfs
+
+<span class="cm"># Calculate portfolio overlap</span>
+<span class="fn">curl</span> -X POST \
+     -H <span class="st">"X-API-Key: your_key_here"</span> \
+     -H <span class="st">"Content-Type: application/json"</span> \
+     -d <span class="st">'{"tickers":["SWDA","CSSPX","VUSA"]}'</span> \
+     https://api.goetf.ch/v1/analytics/overlap</pre></div>
+            </div>
           </div>
-          <pre class="code-content">{{ codeSnippets[codeTab] }}</pre>
         </div>
       </div>
     </section>
+
+    <footer class="footer">
+      <div class="container">
+        <div class="footer-inner">
+          <div class="footer-top">
+            <div class="footer-brand">
+              <div class="footer-logo">Go<span>ETF</span></div>
+              <p>ETF analysis for investors and developers. Not investment advice.</p>
+            </div>
+            <div class="footer-links">
+              <div class="footer-col">
+                <h4>Product</h4>
+                <ul>
+                  <li><a href="#" @click.prevent="emit('navigate', 'etfs')">ETF Explorer</a></li>
+                  <li><a href="#" @click.prevent="navigateTo('analytics', 'goetf')">Scores</a></li>
+                  <li><a href="#" @click.prevent="navigateTo('analytics', 'exposure')">Portfolio</a></li>
+                  <li><a href="#" @click.prevent="emit('navigate', 'methodology')">Methodology</a></li>
+                </ul>
+              </div>
+              <div class="footer-col">
+                <h4>Developers</h4>
+                <ul>
+                  <li><a href="#" @click.prevent="emit('navigate', 'docs')">API Docs</a></li>
+                  <li><a href="#" @click.prevent="openApiKey">Get API Key</a></li>
+                  <li><a href="#" @click.prevent="emit('navigate', 'docs')">Live Explorer</a></li>
+                </ul>
+              </div>
+              <div class="footer-col">
+                <h4>Legal</h4>
+                <ul>
+                  <li><a href="#" @click.prevent>Imprint</a></li>
+                  <li><a href="#" @click.prevent>Disclaimer</a></li>
+                  <li><a href="#" @click.prevent>Privacy</a></li>
+                </ul>
+              </div>
+            </div>
+          </div>
+          <div class="footer-bottom">
+            <p>© 2026 GoETF.ch · Not investment advice · All data for informational purposes only.</p>
+            <a href="mailto:info@goetf.ch">info@goetf.ch</a>
+          </div>
+        </div>
+      </div>
+    </footer>
   </div>
 </template>
 
 <script setup>
-import { computed, inject, onMounted, ref, watch } from 'vue'
-import { etfService, scoreService } from '../services/api.js'
+import { computed, inject, onMounted, onUnmounted, ref } from 'vue'
 
 const emit = defineEmits(['navigate'])
 const showApiKeyModal = inject('showApiKeyModal')
 const navigateTo = inject('navigateTo')
-const navigateToETF = inject('navigateToETF')
 
-const loadingScores = ref(false)
-const scoreError = ref('')
+const drawerOpen = ref(false)
+const navbarScrolled = ref(false)
 const codeTab = ref('python')
+const barsAnimated = ref(false)
 
-const topScores = ref([
-  { ticker: 'SWDA', name: 'iShares Core MSCI World', score: 7.8, terText: '0.20%', sharpeText: '0.82', fundSizeText: '$101.7bn', ddText: '-32.9%' },
-  { ticker: 'CSSPX', name: 'iShares Core S&P 500', score: 7.2, terText: '0.07%', sharpeText: '0.91', fundSizeText: '-', ddText: '-' },
-  { ticker: 'VUSA', name: 'Vanguard S&P 500 UCITS ETF', score: 6.9, terText: '0.07%', sharpeText: '0.88', fundSizeText: '-', ddText: '-' },
-  { ticker: 'ISF', name: 'iShares Core FTSE 100', score: 6.5, terText: '0.07%', sharpeText: '0.64', fundSizeText: '-', ddText: '-' },
-  { ticker: 'SEDY', name: 'SPDR S&P Em. Mkts Dividend', score: 5.9, terText: '0.40%', sharpeText: '0.51', fundSizeText: '-', ddText: '-' },
-])
+const ETF_SCORES = [
+  { ticker: 'SWDA',  name: 'iShares Core MSCI World',    score: 7.8 },
+  { ticker: 'CSSPX', name: 'iShares Core S&P 500',       score: 7.2 },
+  { ticker: 'VUSA',  name: 'Vanguard S&P 500 UCITS ETF', score: 6.9 },
+  { ticker: 'ISF',   name: 'iShares Core FTSE 100',      score: 6.5 },
+  { ticker: 'SEDY',  name: 'SPDR S&P Em. Mkts. Dividend',score: 5.9 },
+]
 
-const featuredScore = computed(() => topScores.value[0])
-const trackedCount = computed(() => topScores.value.length)
-
-function fmtTer(value) {
-  if (value === null || value === undefined || value === '') return '-'
-  return `${Number(value).toFixed(2)}%`
+const OVERLAP = {
+  SWDA:  { SWDA: 100, CSSPX: 78, VUSA: 71, ISF: 12, SEDY: 8  },
+  CSSPX: { SWDA:  78, CSSPX:100, VUSA: 95, ISF:  8, SEDY: 7  },
+  VUSA:  { SWDA:  71, CSSPX: 95, VUSA:100, ISF:  9, SEDY: 6  },
+  ISF:   { SWDA:  12, CSSPX:  8, VUSA:  9, ISF:100, SEDY: 4  },
+  SEDY:  { SWDA:   8, CSSPX:  7, VUSA:  6, ISF:  4, SEDY:100 },
 }
 
-function fmtSize(value) {
-  if (!value) return '-'
-  if (value >= 1e9) return `$${(value / 1e9).toFixed(1)}bn`
-  if (value >= 1e6) return `$${(value / 1e6).toFixed(0)}m`
-  return `$${Number(value).toLocaleString()}`
-}
+const activeETFs = ref(['SWDA', 'CSSPX', 'VUSA', 'ISF'])
+const scoreTarget = 7.8
+const gaugeValue = ref(0)
+const gaugeOffset = computed(() => 251.2 - (gaugeValue.value / 10) * 251.2)
 
-async function loadScores() {
-  loadingScores.value = true
-  scoreError.value = ''
-  try {
-    const tickers = ['SWDA', 'CSSPX', 'VUSA', 'ISF', 'SEDY']
-    const [scoresRes, etfRes] = await Promise.all([
-      scoreService.getEtfScores(tickers, 0.04),
-      etfService.getETFs(0, 200),
-    ])
+const pillars = [
+  { label: 'Performance', width: 40, text: '40%', color: '#0F4C81' },
+  { label: 'Risk', width: 30, text: '30%', color: '#1A6AB8' },
+  { label: 'Diversification', width: 20, text: '20%', color: '#00C9A7' },
+  { label: 'Cost (TER)', width: 10, text: '10%', color: '#6B7280' },
+]
 
-    const detailsByTicker = new Map((etfRes.data || []).map(e => [e.ticker, e]))
-    const scoreByTicker = new Map((scoresRes.data || []).map(s => [s.ticker, s]))
+const scoreCardRows = [
+  { label: 'Performance', width: 82, value: '8.2', color: '#22C55E' },
+  { label: 'Risk', width: 71, value: '7.1', color: '#F59E0B' },
+  { label: 'Diversification', width: 78, value: '7.8', color: '#00C9A7' },
+  { label: 'Cost', width: 65, value: '6.5', color: '#9CA3AF' },
+]
 
-    topScores.value = tickers.map(ticker => {
-      const details = detailsByTicker.get(ticker) || {}
-      const scoreData = scoreByTicker.get(ticker) || {}
-      return {
-        ticker,
-        name: details.name || scoreData.name || ticker,
-        provider: details.provider || '',
-        score: scoreData.goetf_score ?? scoreData.score ?? null,
-        terText: fmtTer(details.ter),
-        sharpeText: scoreData.sharpe_ratio != null ? Number(scoreData.sharpe_ratio).toFixed(2) : '-',
-        fundSizeText: fmtSize(details.fund_size),
-        ddText: scoreData.max_drawdown != null ? `${Number(scoreData.max_drawdown).toFixed(1)}%` : '-',
-      }
-    })
-  } catch (e) {
-    scoreError.value = e?.response?.data?.detail || e.message || 'Failed to load live scores'
-  } finally {
-    loadingScores.value = false
-  }
-}
+const comparisonRows = [
+  { ticker: 'SWDA', score: '7.8', ter: '0.20%', sharpe: '0.82', scoreStyle: 'background:rgba(34,197,94,.12);color:#16A34A' },
+  { ticker: 'CSSPX', score: '7.2', ter: '0.07%', sharpe: '0.91', scoreStyle: 'background:rgba(34,197,94,.12);color:#16A34A' },
+  { ticker: 'VUSA', score: '6.9', ter: '0.07%', sharpe: '0.88', scoreStyle: 'background:rgba(34,197,94,.12);color:#16A34A' },
+  { ticker: 'ISF', score: '6.5', ter: '0.07%', sharpe: '0.64', scoreStyle: 'background:rgba(245,158,11,.12);color:#B45309' },
+  { ticker: 'SEDY', score: '5.9', ter: '0.40%', sharpe: '0.51', scoreStyle: 'background:rgba(245,158,11,.12);color:#B45309' },
+]
+
+const stripItems = [
+  {
+    title: 'GoETF Score',
+    text: 'Every ETF receives a score from 1–10 based on performance, risk, diversification, and cost.',
+    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>'
+  },
+  {
+    title: 'Overlap Analysis',
+    text: 'How much of your portfolio is in the exact same positions? GoETF shows you to the decimal.',
+    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>'
+  },
+  {
+    title: 'Portfolio Simplifier',
+    text: '6 ETFs → 1 ETF with identical exposure. Less complexity, lower TER, no loss of information.',
+    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>'
+  },
+  {
+    title: 'API & MCP',
+    text: 'REST API with free key, fully documented. MCP integration planned for LLM workflows.',
+    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/></svg>'
+  },
+]
 
 function openApiKey() {
   if (showApiKeyModal) showApiKeyModal.value = true
 }
 
-async function openFeaturedETF() {
-  const ticker = featuredScore.value?.ticker
-  if (!ticker) {
-    emit('navigate', 'etfs')
-    return
-  }
-  try {
-    const res = await etfService.getETFs(0, 200)
-    const found = (res.data || []).find(e => e.ticker === ticker)
-    if (found && navigateToETF) {
-      navigateToETF(found)
-      return
-    }
-  } catch {}
-  emit('navigate', 'etfs')
-}
-
-function scoreClass(score) {
-  if (score == null) return ''
-  if (score >= 7) return 'hi'
-  if (score >= 6) return 'md'
-  return 'lo'
+function goToAndClose(page, tab = null) {
+  if (page === 'analytics' && tab) navigateTo('analytics', tab)
+  else emit('navigate', page)
+  drawerOpen.value = false
 }
 
 function barClass(score) {
-  if (score == null) return ''
   if (score >= 7) return 'bar-hi'
   if (score >= 6) return 'bar-md'
   return 'bar-lo'
 }
 
-const overlapUniverse = ['SWDA', 'CSSPX', 'VUSA', 'ISF', 'SEDY']
-const activeETFs = ref(['SWDA', 'CSSPX', 'VUSA', 'ISF'])
-const overlapMap = ref({})
-
-const fallbackOverlap = {
-  SWDA: { SWDA: 100, CSSPX: 78, VUSA: 71, ISF: 12, SEDY: 8 },
-  CSSPX: { SWDA: 78, CSSPX: 100, VUSA: 95, ISF: 8, SEDY: 7 },
-  VUSA: { SWDA: 71, CSSPX: 95, VUSA: 100, ISF: 9, SEDY: 6 },
-  ISF: { SWDA: 12, CSSPX: 8, VUSA: 9, ISF: 100, SEDY: 4 },
-  SEDY: { SWDA: 8, CSSPX: 7, VUSA: 6, ISF: 4, SEDY: 100 },
+function numClass(score) {
+  if (score >= 7) return 'hi'
+  if (score >= 6) return 'md'
+  return 'lo'
 }
 
-function pairKey(a, b) {
-  return [a, b].sort().join('__')
+function cellClass(val, isSelf) {
+  if (isSelf) return 'matrix-cell cell-self'
+  if (val >= 60) return 'matrix-cell cell-hi'
+  if (val >= 30) return 'matrix-cell cell-md'
+  return 'matrix-cell cell-lo'
 }
 
-async function loadPairOverlap(a, b) {
-  const key = pairKey(a, b)
-  if (overlapMap.value[key] != null) return
-  try {
-    const res = await scoreService.getPortfolioScore(
-      [
-        { etf_id: a, weight: 50 },
-        { etf_id: b, weight: 50 },
-      ],
-      0.04
-    )
-    const pair = res.data?.pairwise_overlaps?.[0]
-    overlapMap.value[key] = pair?.weight_overlap_pct ?? res.data?.avg_overlap_pct ?? fallbackOverlap[a][b]
-  } catch {
-    overlapMap.value[key] = fallbackOverlap[a][b]
-  }
+function overlapValue(row, col) {
+  return OVERLAP[row][col]
 }
 
-async function refreshOverlap() {
-  const tasks = []
-  for (let i = 0; i < activeETFs.value.length; i += 1) {
-    for (let j = i + 1; j < activeETFs.value.length; j += 1) {
-      tasks.push(loadPairOverlap(activeETFs.value[i], activeETFs.value[j]))
-    }
-  }
-  await Promise.all(tasks)
-}
-
-function toggleETF(ticker) {
-  const idx = activeETFs.value.indexOf(ticker)
-  if (idx >= 0) {
+function toggleETF(etf) {
+  const exists = activeETFs.value.includes(etf)
+  if (exists) {
     if (activeETFs.value.length <= 2) return
-    activeETFs.value = activeETFs.value.filter(t => t !== ticker)
+    activeETFs.value = activeETFs.value.filter(e => e !== etf)
   } else {
-    activeETFs.value = [...activeETFs.value, ticker]
+    activeETFs.value.push(etf)
   }
 }
 
-function overlapValue(a, b) {
-  if (a === b) return 100
-  const value = overlapMap.value[pairKey(a, b)]
-  return value != null ? value : fallbackOverlap[a][b]
+function onScroll() {
+  navbarScrolled.value = window.scrollY > 20
 }
 
-function matrixLabel(a, b) {
-  const v = overlapValue(a, b)
-  return `${Number(v).toFixed(0)}%`
-}
+let observer
+let gaugeObserver
 
-function matrixClass(a, b) {
-  if (a === b) return 'cell-self'
-  const v = overlapValue(a, b)
-  if (v >= 60) return 'cell-hi'
-  if (v >= 30) return 'cell-md'
-  return 'cell-lo'
-}
+onMounted(() => {
+  window.addEventListener('scroll', onScroll, { passive: true })
 
-const overlapInsight = computed(() => {
-  const pairs = []
-  for (let i = 0; i < activeETFs.value.length; i += 1) {
-    for (let j = i + 1; j < activeETFs.value.length; j += 1) {
-      const a = activeETFs.value[i]
-      const b = activeETFs.value[j]
-      pairs.push({ a, b, v: overlapValue(a, b) })
+  observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible')
+        barsAnimated.value = true
+      }
+    })
+  }, { threshold: 0.12 })
+
+  document.querySelectorAll('.animate-on-scroll').forEach(el => observer.observe(el))
+
+  const scoreCard = document.querySelector('.score-card')
+  gaugeObserver = new IntersectionObserver((entries) => {
+    if (entries[0].isIntersecting && gaugeValue.value === 0) {
+      const duration = 1200
+      const start = performance.now()
+      const animate = (now) => {
+        const t = Math.min((now - start) / duration, 1)
+        const ease = 1 - Math.pow(1 - t, 3)
+        gaugeValue.value = scoreTarget * ease
+        if (t < 1) requestAnimationFrame(animate)
+        else gaugeValue.value = scoreTarget
+      }
+      requestAnimationFrame(animate)
     }
-  }
-  if (!pairs.length) return 'Select at least two ETFs to evaluate overlap.'
-  pairs.sort((x, y) => y.v - x.v)
-  const top = pairs[0]
-  return `Highest overlap right now: ${top.a} vs ${top.b} at ${top.v.toFixed(1)}%. Consider simplifying if several pairs are above 60%.`
+  }, { threshold: 0.3 })
+
+  if (scoreCard) gaugeObserver.observe(scoreCard)
 })
 
-const codeSnippets = {
-  python: `import requests\n\nbase = "https://api.goetf.ch"\nheaders = {"x-api-key": "YOUR_API_KEY"}\n\n# ETF scores\nscores = requests.get(f"{base}/scores/etfs", headers=headers).json()\n\n# Portfolio analysis\nportfolio = {"portfolio": [{"etf_id": "SWDA", "weight": 60}, {"etf_id": "CSSPX", "weight": 40}]}\nresult = requests.post(f"{base}/analytics/exposure", json=portfolio, headers=headers).json()`,
-  js: `const base = "https://api.goetf.ch";\nconst headers = { "x-api-key": "YOUR_API_KEY", "Content-Type": "application/json" };\n\nconst scores = await fetch(base + "/scores/etfs", { headers }).then(r => r.json());\n\nconst exposure = await fetch(base + "/analytics/exposure", {\n  method: "POST",\n  headers,\n  body: JSON.stringify({ portfolio: [{ etf_id: "SWDA", weight: 60 }, { etf_id: "CSSPX", weight: 40 }] })\n}).then(r => r.json());`,
-  curl: `curl -H "x-api-key: YOUR_API_KEY" https://api.goetf.ch/scores/etfs\n\ncurl -X POST https://api.goetf.ch/analytics/exposure \\\n  -H "x-api-key: YOUR_API_KEY" \\\n  -H "Content-Type: application/json" \\\n  -d '{"portfolio":[{"etf_id":"SWDA","weight":60},{"etf_id":"CSSPX","weight":40}]}'`,
-}
-
-watch(activeETFs, () => {
-  refreshOverlap()
-}, { deep: true })
-
-onMounted(async () => {
-  await loadScores()
-  await refreshOverlap()
+onUnmounted(() => {
+  window.removeEventListener('scroll', onScroll)
+  if (observer) observer.disconnect()
+  if (gaugeObserver) gaugeObserver.disconnect()
 })
 </script>
 
 <style scoped>
-.home-page { background: #f8f9fb; color: #111827; }
-.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
-.section { padding: 88px 0; }
-.hero { padding: 96px 0 72px; }
-.hero-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 56px; align-items: center; }
-h1 { font-size: clamp(2rem, 4.6vw, 3.2rem); line-height: 1.1; letter-spacing: -0.02em; margin-bottom: 16px; }
-.lead { color: #6b7280; max-width: 520px; margin-bottom: 30px; }
-.hero-actions { display: flex; gap: 12px; flex-wrap: wrap; }
-.hero-disclaimer { margin-top: 18px; color: #9ca3af; font-size: 12px; }
-.hero-eyebrow { margin-bottom: 14px; }
-.badge { border-radius: 999px; font-size: 12px; font-weight: 600; padding: 4px 12px; display: inline-flex; align-items: center; gap: 6px; }
-.badge-accent { background: rgba(0,201,167,.12); color: #009f86; }
-.badge-blue { background: rgba(15,76,129,.1); color: #0f4c81; }
-.live-dot { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; display: inline-block; animation: pulse 1.8s infinite; }
-@keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.4; } }
+    :root {
+      --primary:       #0F4C81;
+      --primary-lt:    #1A6AB8;
+      --accent:        #00C9A7;
+      --accent-dk:     #009F86;
+      --bg:            #F8F9FB;
+      --bg-dark:       #111827;
+      --bg-dark2:      #1E293B;
+      --card:          #ffffff;
+      --text:          #111827;
+      --text-muted:    #6B7280;
+      --border:        #E5E7EB;
+      --score-hi:      #22C55E;
+      --score-md:      #F59E0B;
+      --score-lo:      #EF4444;
+      --font:          'Inter', sans-serif;
+      --mono:          'JetBrains Mono', monospace;
+      --r:             12px;
+      --r-sm:          8px;
+      --shadow:        0 2px 16px rgba(15,76,129,.07);
+      --shadow-lg:     0 8px 40px rgba(15,76,129,.13);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    a { color: inherit; text-decoration: none; }
+    ul { list-style: none; }
+    img { display: block; max-width: 100%; }
 
-.btn { border: none; border-radius: 8px; padding: 11px 20px; font-size: 14px; font-weight: 600; cursor: pointer; }
-.btn-primary { background: #0f4c81; color: #fff; }
-.btn-primary:hover { background: #1a6ab8; }
-.btn-outline { background: transparent; border: 1.5px solid #0f4c81; color: #0f4c81; }
-.btn-outline:hover { background: #0f4c81; color: #fff; }
-.btn-accent { background: #00c9a7; color: #111827; }
-.btn-ghost-light { background: rgba(255,255,255,.15); color: #fff; border: 1px solid rgba(255,255,255,.28); }
+    h1 { font-size: clamp(2.2rem, 5vw, 3.4rem); font-weight: 700; line-height: 1.15; letter-spacing: -.02em; }
+    h2 { font-size: clamp(1.6rem, 3vw, 2.2rem); font-weight: 700; letter-spacing: -.02em; line-height: 1.2; }
+    h3 { font-size: 1.15rem; font-weight: 600; }
+    p  { color: var(--text-muted); }
 
-.score-widget { background: #fff; border: 1px solid #e5e7eb; border-radius: 16px; box-shadow: 0 8px 40px rgba(15,76,129,.12); overflow: hidden; }
-.widget-header { display: flex; align-items: center; gap: 8px; padding: 14px 18px; border-bottom: 1px solid #e5e7eb; font-size: 12px; color: #6b7280; }
-.endpoint { font-family: 'JetBrains Mono', monospace; color: #0f4c81; }
-.ok-badge { background: #dcfce7; color: #15803d; border-radius: 4px; font-size: 11px; font-weight: 700; padding: 2px 7px; }
-.widget-loading { padding: 16px 18px; color: #6b7280; font-size: 13px; }
-.score-row { display: flex; align-items: center; gap: 10px; padding: 9px 18px; }
-.score-ticker { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 12px; width: 48px; }
-.score-name { flex: 1; color: #6b7280; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.score-bar-wrap { width: 80px; height: 6px; border-radius: 999px; background: #f3f4f6; overflow: hidden; }
-.score-bar { height: 6px; }
-.bar-hi { background: #22c55e; }
-.bar-md { background: #f59e0b; }
-.bar-lo { background: #ef4444; }
-.score-num { width: 30px; text-align: right; font-weight: 700; font-size: 13px; }
-.score-num.hi { color: #22c55e; }
-.score-num.md { color: #f59e0b; }
-.score-num.lo { color: #ef4444; }
-.widget-footer { padding: 10px 18px; border-top: 1px solid #e5e7eb; font-size: 11px; color: #9ca3af; display: flex; justify-content: space-between; gap: 8px; }
+    .container { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+    .section    { padding: 96px 0; }
+    .section-sm { padding: 64px 0; }
 
-.strip { background: #111827; }
-.strip-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: rgba(255,255,255,.08); }
-.strip-item { background: #111827; padding: 30px 24px; }
-.strip-item h3 { color: #fff; margin-bottom: 8px; font-size: 16px; }
-.strip-item p { color: rgba(255,255,255,.62); font-size: 14px; }
+    .btn { display: inline-flex; align-items: center; gap: 8px; padding: 11px 24px; border-radius: 8px; font-size: .9rem; font-weight: 600; cursor: pointer; border: none; transition: all .18s ease; white-space: nowrap; }
+    .btn-primary   { background: var(--primary); color: #fff; }
+    .btn-primary:hover { background: var(--primary-lt); transform: translateY(-1px); box-shadow: 0 4px 16px rgba(15,76,129,.25); }
+    .btn-outline   { background: transparent; color: var(--primary); border: 1.5px solid var(--primary); }
+    .btn-outline:hover { background: var(--primary); color: #fff; transform: translateY(-1px); }
+    .btn-accent    { background: var(--accent); color: var(--bg-dark); }
+    .btn-accent:hover { background: var(--accent-dk); transform: translateY(-1px); }
+    .btn-ghost-light { background: rgba(255,255,255,.12); color: #fff; border: 1.5px solid rgba(255,255,255,.25); }
+    .btn-ghost-light:hover { background: rgba(255,255,255,.22); }
 
-.score-section { background: #fff; }
-.score-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 56px; align-items: start; }
-.section-label { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; font-weight: 700; color: #00c9a7; margin-bottom: 10px; }
-.section-label.light { color: rgba(0,201,167,.85); }
-h2 { font-size: clamp(1.65rem, 3vw, 2.2rem); line-height: 1.2; letter-spacing: -0.02em; margin-bottom: 12px; }
-.section-copy { color: #6b7280; margin-bottom: 22px; }
-.score-pillars { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
-.pillar { display: flex; align-items: center; gap: 12px; }
-.pillar span { width: 160px; font-size: 14px; }
-.pillar em { width: 36px; text-align: right; color: #6b7280; font-style: normal; font-size: 13px; }
-.pillar-track { flex: 1; height: 8px; border-radius: 999px; background: #f3f4f6; overflow: hidden; }
-.pillar-fill { height: 8px; background: #0f4c81; }
-.pillar-fill.risk { background: #1a6ab8; }
-.pillar-fill.div { background: #00c9a7; }
-.pillar-fill.cost { background: #9ca3af; }
-.comp-table { margin-top: 24px; }
-.comp-table h3 { margin-bottom: 10px; }
-.comp-table table { width: 100%; border-collapse: collapse; }
-.comp-table th, .comp-table td { padding: 10px 0; border-bottom: 1px solid #e5e7eb; text-align: left; font-size: 14px; }
-.comp-table th:not(:first-child), .comp-table td:not(:first-child) { text-align: right; }
-.link-btn { margin-top: 12px; background: none; border: none; color: #0f4c81; cursor: pointer; font-weight: 600; }
+    .badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 100px; font-size: .78rem; font-weight: 600; letter-spacing: .02em; }
+    .badge-accent { background: rgba(0,201,167,.12); color: var(--accent-dk); }
+    .badge-blue   { background: rgba(15,76,129,.1); color: var(--primary); }
+    .badge-done   { background: rgba(34,197,94,.12); color: #16A34A; }
+    .badge-soon   { background: rgba(245,158,11,.12); color: #B45309; }
+    .badge-future { background: rgba(107,114,128,.1); color: var(--text-muted); }
+    .live-dot     { width: 7px; height: 7px; background: var(--score-hi); border-radius: 50%; animation: pulse 2s infinite; }
 
-.score-card { position: sticky; top: 82px; background: #f8f9fb; border: 1px solid #e5e7eb; border-radius: 12px; padding: 24px; }
-.score-card-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
-.score-card-head small { display: block; color: #6b7280; margin-top: 2px; }
-.gauge-wrap { display: flex; justify-content: center; margin-bottom: 10px; }
-.gauge-text { font-size: 38px; font-weight: 700; fill: #111827; font-family: Inter, sans-serif; }
-.score-meta { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 14px; }
-.score-meta div { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px; }
-.score-meta span { display: block; color: #6b7280; font-size: 11px; margin-bottom: 2px; }
-.score-meta strong { font-size: 14px; }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .4; } }
 
-.overlap-section { background: #111827; color: #fff; }
-.overlap-copy { color: rgba(255,255,255,.72); margin-bottom: 18px; }
-.overlap-selectors { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 18px; }
-.etf-toggle { border: 1px solid rgba(255,255,255,.2); border-radius: 8px; padding: 7px 14px; background: transparent; color: rgba(255,255,255,.7); cursor: pointer; }
-.etf-toggle.active { background: #00c9a7; color: #111827; border-color: #00c9a7; font-weight: 700; }
-.matrix-wrap { overflow-x: auto; }
-.matrix-table { border-collapse: collapse; min-width: 430px; }
-.matrix-table th, .matrix-table td { width: 88px; height: 50px; text-align: center; font-size: 13px; }
-.row-label { text-align: right; padding-right: 12px; color: rgba(255,255,255,.7); font-family: 'JetBrains Mono', monospace; }
-.matrix-cell { border-radius: 6px; height: 38px; display: flex; align-items: center; justify-content: center; }
-.cell-self { background: rgba(255,255,255,.07); color: rgba(255,255,255,.35); }
-.cell-hi { background: rgba(239,68,68,.25); color: #fca5a5; }
-.cell-md { background: rgba(245,158,11,.22); color: #fcd34d; }
-.cell-lo { background: rgba(34,197,94,.2); color: #86efac; }
-.overlap-insight { margin-top: 20px; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.15); border-radius: 12px; padding: 16px 18px; color: rgba(255,255,255,.8); }
-.centered-row { text-align: center; margin-top: 26px; }
+    .navbar {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      background: rgba(248,249,251,.85); backdrop-filter: blur(12px);
+      border-bottom: 1px solid transparent;
+      transition: border-color .2s, background .2s;
+    }
+    .navbar.scrolled { border-color: var(--border); background: rgba(248,249,251,.97); }
+    .nav-inner { max-width: 1200px; margin: 0 auto; padding: 0 24px; height: 60px; display: flex; align-items: center; gap: 32px; }
+    .logo { font-size: 1.2rem; font-weight: 700; color: var(--primary); letter-spacing: -.03em; margin-right: 8px; }
+    .logo span { color: var(--accent); }
+    .nav-links { display: flex; gap: 4px; flex: 1; }
+    .nav-links a { padding: 6px 12px; border-radius: 6px; font-size: .88rem; font-weight: 500; color: var(--text-muted); transition: all .15s; }
+    .nav-links a:hover { color: var(--primary); background: rgba(15,76,129,.06); }
+    .nav-cta { margin-left: auto; }
+    .hamburger { display: none; background: none; border: none; cursor: pointer; padding: 6px; color: var(--text); }
+    .hamburger svg { width: 22px; height: 22px; }
 
-.tools-section { background: #f8f9fb; }
-.tools-grid { margin-top: 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-.tool-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 24px; }
-.tool-card p { color: #6b7280; margin: 10px 0 18px; }
+    .hero { padding: 120px 0 80px; }
+    .hero-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: center; }
+    .hero-eyebrow { margin-bottom: 20px; }
+    .hero h1 { margin-bottom: 20px; }
+    .hero p.lead { font-size: 1.05rem; color: var(--text-muted); margin-bottom: 36px; max-width: 480px; }
+    .hero-actions { display: flex; gap: 12px; flex-wrap: wrap; }
+    .hero-disclaimer { margin-top: 20px; font-size: .78rem; color: #9CA3AF; }
 
-.api-section { background: #111827; color: #fff; }
-.api-grid { display: grid; grid-template-columns: 1fr 1.25fr; gap: 48px; align-items: start; }
-.api-points { margin: 20px 0 28px; padding-left: 18px; color: rgba(255,255,255,.75); }
-.api-points li { margin-bottom: 10px; }
-.code-block-wrap { border: 1px solid rgba(255,255,255,.08); background: #0d1117; border-radius: 12px; overflow: hidden; }
-.code-tabs { display: flex; border-bottom: 1px solid rgba(255,255,255,.08); }
-.code-tab { border: none; background: transparent; color: rgba(255,255,255,.45); cursor: pointer; font-family: 'JetBrains Mono', monospace; font-size: 12px; padding: 11px 16px; }
-.code-tab.active { color: #00c9a7; border-bottom: 2px solid #00c9a7; }
-.code-content { margin: 0; padding: 20px; color: #e2e8f0; font-size: 13px; line-height: 1.65; overflow-x: auto; }
+    .score-widget {
+      background: var(--card); border-radius: 16px;
+      box-shadow: var(--shadow-lg);
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+    .widget-header {
+      padding: 14px 18px; display: flex; align-items: center; gap: 8px;
+      border-bottom: 1px solid var(--border); font-size: .8rem; font-weight: 600; color: var(--text-muted);
+    }
+    .widget-header .endpoint { font-family: var(--mono); color: var(--primary); font-size: .75rem; }
+    .score-rows { padding: 6px 0; }
+    .score-row { display: flex; align-items: center; gap: 12px; padding: 9px 18px; transition: background .15s; }
+    .score-row:hover { background: rgba(15,76,129,.03); }
+    .score-ticker { font-family: var(--mono); font-size: .82rem; font-weight: 600; color: var(--text); width: 52px; }
+    .score-name { font-size: .82rem; color: var(--text-muted); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .score-bar-wrap { width: 80px; background: #F3F4F6; border-radius: 4px; height: 6px; overflow: hidden; }
+    .score-bar { height: 6px; border-radius: 4px; transition: width .8s ease; }
+    .score-num { font-size: .88rem; font-weight: 700; width: 28px; text-align: right; }
+    .score-num.hi { color: var(--score-hi); }
+    .score-num.md { color: var(--score-md); }
+    .score-num.lo { color: var(--score-lo); }
+    .bar-hi  { background: var(--score-hi); }
+    .bar-md  { background: var(--score-md); }
+    .bar-lo  { background: var(--score-lo); }
+    .widget-footer { padding: 10px 18px; border-top: 1px solid var(--border); font-size: .75rem; color: #9CA3AF; display: flex; align-items: center; justify-content: space-between; }
+    .ok-badge { background: #DCFCE7; color: #16A34A; font-size: .7rem; font-weight: 600; font-family: var(--mono); padding: 2px 7px; border-radius: 4px; }
 
-@media (max-width: 980px) {
-  .hero-grid, .score-grid, .api-grid { grid-template-columns: 1fr; }
-  .tools-grid { grid-template-columns: 1fr; }
-}
-@media (max-width: 720px) {
-  .container { padding: 0 16px; }
-  .hero { padding-top: 84px; }
-  .strip-grid { grid-template-columns: 1fr; }
-  .pillar span { width: 130px; }
-}
+    .strip { background: var(--bg-dark); }
+    .strip-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: rgba(255,255,255,.07); }
+    .strip-item { padding: 36px 28px; background: var(--bg-dark); transition: background .2s; }
+    .strip-item:hover { background: var(--bg-dark2); }
+    .strip-icon { width: 40px; height: 40px; background: rgba(0,201,167,.12); border-radius: 10px; display: flex; align-items: center; justify-content: center; margin-bottom: 16px; }
+    .strip-icon :deep(svg) { width: 20px; height: 20px; color: var(--accent); }
+    .strip-item h3 { color: #fff; margin-bottom: 8px; font-size: 1rem; }
+    .strip-item p  { color: rgba(255,255,255,.55); font-size: .88rem; }
+
+    .score-section { background: var(--card); }
+    .score-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: start; }
+    .score-pillars { margin: 24px 0; display: flex; flex-direction: column; gap: 12px; }
+    .pillar { display: flex; align-items: center; gap: 14px; }
+    .pillar-label { width: 160px; font-size: .88rem; font-weight: 500; flex-shrink: 0; }
+    .pillar-bar-track { flex: 1; background: #F3F4F6; border-radius: 6px; height: 8px; overflow: hidden; }
+    .pillar-bar { height: 8px; border-radius: 6px; transition: width 1.2s cubic-bezier(.4,0,.2,1); background: var(--accent); }
+    .pillar-pct { width: 36px; text-align: right; font-size: .85rem; font-weight: 600; color: var(--text-muted); }
+
+    .score-card { background: var(--bg); border-radius: var(--r); padding: 28px; border: 1px solid var(--border); position: sticky; top: 80px; }
+    .gauge-wrap { text-align: center; margin-bottom: 24px; }
+    .gauge-svg { overflow: visible; }
+    .gauge-text { font-size: 2.4rem; font-weight: 700; fill: var(--text); font-family: var(--font); }
+    .score-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 4px; }
+    .meta-item { background: var(--card); border-radius: var(--r-sm); padding: 12px; border: 1px solid var(--border); }
+    .meta-label { font-size: .73rem; color: var(--text-muted); font-weight: 500; margin-bottom: 3px; }
+    .meta-val   { font-size: .95rem; font-weight: 700; color: var(--text); }
+    .comp-table { margin-top: 40px; }
+    .comp-table table { width: 100%; border-collapse: collapse; }
+    .comp-table th { font-size: .75rem; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); padding: 8px 0; border-bottom: 1px solid var(--border); text-align: left; }
+    .comp-table th:not(:first-child) { text-align: right; }
+    .comp-table td { padding: 11px 0; border-bottom: 1px solid var(--border); font-size: .88rem; }
+    .comp-table td:not(:first-child) { text-align: right; font-weight: 600; }
+    .comp-table tr:last-child td { border-bottom: none; }
+    .ticker-tag { font-family: var(--mono); font-size: .78rem; font-weight: 600; }
+    .score-chip { display: inline-block; padding: 2px 8px; border-radius: 5px; font-size: .82rem; font-weight: 700; }
+
+    .overlap-section { background: var(--bg-dark); }
+    .overlap-section h2 { color: #fff; }
+    .overlap-intro { max-width: 640px; margin: 0 auto 48px; text-align: center; }
+    .overlap-intro p { color: rgba(255,255,255,.65); font-size: 1.05rem; }
+    .overlap-selectors { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 28px; }
+    .etf-toggle { padding: 7px 16px; border-radius: 8px; border: 1.5px solid rgba(255,255,255,.15); background: transparent; color: rgba(255,255,255,.6); font-size: .85rem; font-weight: 500; cursor: pointer; transition: all .15s; font-family: var(--font); }
+    .etf-toggle:hover { border-color: rgba(255,255,255,.4); color: #fff; }
+    .etf-toggle.active { background: var(--accent); border-color: var(--accent); color: var(--bg-dark); font-weight: 700; }
+    .matrix-wrap { overflow-x: auto; border-radius: var(--r); }
+    .matrix-table { border-collapse: collapse; min-width: 380px; }
+    .matrix-table th, .matrix-table td { width: 90px; height: 52px; text-align: center; font-size: .85rem; font-weight: 600; border-radius: 0; }
+    .matrix-table th { color: rgba(255,255,255,.5); font-family: var(--mono); font-size: .8rem; background: transparent; }
+    .matrix-table th.row-label { color: rgba(255,255,255,.5); text-align: right; padding-right: 14px; font-family: var(--mono); width: 70px; }
+    .matrix-cell { border-radius: 6px; }
+    .cell-self  { background: rgba(255,255,255,.06); color: rgba(255,255,255,.3); }
+    .cell-hi    { background: rgba(239,68,68,.2); color: #FCA5A5; }
+    .cell-md    { background: rgba(245,158,11,.18); color: #FCD34D; }
+    .cell-lo    { background: rgba(34,197,94,.15); color: #86EFAC; }
+    .overlap-legend { display: flex; gap: 24px; margin-top: 20px; flex-wrap: wrap; }
+    .legend-item { display: flex; align-items: center; gap: 8px; font-size: .82rem; color: rgba(255,255,255,.55); }
+    .legend-dot { width: 12px; height: 12px; border-radius: 3px; }
+    .overlap-insight { background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.1); border-radius: var(--r); padding: 20px 24px; margin-top: 28px; }
+    .overlap-insight p { color: rgba(255,255,255,.7); font-size: .92rem; }
+    .overlap-insight strong { color: #fff; }
+
+    .tools-section { background: var(--bg); }
+    .tools-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+    .tool-card { background: var(--card); border-radius: var(--r); border: 1px solid var(--border); padding: 36px; box-shadow: var(--shadow); transition: box-shadow .2s, transform .2s; }
+    .tool-card:hover { box-shadow: var(--shadow-lg); transform: translateY(-2px); }
+    .tool-icon { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; margin-bottom: 20px; font-size: 1.4rem; }
+    .icon-blue   { background: rgba(15,76,129,.1); }
+    .icon-accent { background: rgba(0,201,167,.1); }
+    .tool-card h3 { font-size: 1.2rem; margin-bottom: 10px; }
+    .tool-card p  { margin-bottom: 20px; font-size: .92rem; }
+    .tool-demo { background: var(--bg); border-radius: var(--r-sm); padding: 14px 16px; margin-bottom: 22px; font-size: .82rem; }
+    .demo-row { display: flex; align-items: center; gap: 8px; padding: 4px 0; }
+    .demo-row .etf { font-family: var(--mono); font-weight: 600; font-size: .8rem; background: #E5E7EB; padding: 2px 7px; border-radius: 4px; }
+    .demo-arrow { color: var(--text-muted); font-size: .8rem; }
+    .demo-result { color: var(--accent-dk); font-weight: 600; }
+    .savings { color: var(--score-hi); font-weight: 600; font-size: .8rem; }
+
+    .palette-section { background: var(--card); border-top: 1px solid var(--border); }
+    .palette-header { margin-bottom: 40px; }
+    .scores-scroll { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; }
+    .score-type-card { background: var(--bg); border: 1px solid var(--border); border-radius: var(--r); padding: 24px; transition: border-color .2s; }
+    .score-type-card:hover { border-color: var(--primary); }
+    .score-type-card.active { border-color: var(--accent); background: rgba(0,201,167,.04); }
+    .score-type-icon { margin-bottom: 14px; color: var(--primary); }
+    .score-type-icon svg { width: 26px; height: 26px; display: block; }
+    .score-type-card.active .score-type-icon { color: var(--accent-dk); }
+    .score-type-card h3 { font-size: .95rem; margin-bottom: 6px; }
+    .score-type-card p { font-size: .8rem; margin-bottom: 14px; }
+
+    .api-section { background: var(--bg-dark); }
+    .api-section h2 { color: #fff; }
+    .api-grid { display: grid; grid-template-columns: 1fr 1.4fr; gap: 64px; align-items: start; }
+    .api-points { margin: 24px 0 32px; display: flex; flex-direction: column; gap: 14px; }
+    .api-point { display: flex; gap: 14px; align-items: flex-start; }
+    .api-point-dot { width: 20px; height: 20px; flex-shrink: 0; background: rgba(0,201,167,.15); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-top: 2px; }
+    .api-point-dot::after { content: ''; width: 6px; height: 6px; background: var(--accent); border-radius: 50%; }
+    .api-point p { color: rgba(255,255,255,.65); font-size: .9rem; margin: 0; }
+    .api-point strong { color: #fff; }
+
+    .code-block-wrap { background: #0D1117; border-radius: var(--r); border: 1px solid rgba(255,255,255,.08); overflow: hidden; }
+    .code-tabs { display: flex; border-bottom: 1px solid rgba(255,255,255,.08); }
+    .code-tab { padding: 10px 18px; font-size: .8rem; font-weight: 600; font-family: var(--mono); color: rgba(255,255,255,.4); cursor: pointer; border-bottom: 2px solid transparent; transition: all .15s; background: transparent; }
+    .code-tab:hover { color: rgba(255,255,255,.7); }
+    .code-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .code-content { display: none; padding: 24px; }
+    .code-content.active { display: block; }
+    pre { font-family: var(--mono); font-size: .82rem; line-height: 1.8; color: #E2E8F0; overflow-x: auto; }
+    .kw  { color: #7C3AED; }
+    .fn  { color: #3B82F6; }
+    .st  { color: #10B981; }
+    .cm  { color: #6B7280; }
+    .nm  { color: #F59E0B; }
+
+    .footer { background: #0A0F1A; padding: 48px 0 32px; }
+    .footer-inner { display: flex; flex-direction: column; gap: 32px; }
+    .footer-top { display: flex; gap: 64px; align-items: flex-start; }
+    .footer-brand { flex-shrink: 0; }
+    .footer-logo { font-size: 1.25rem; font-weight: 700; color: #fff; letter-spacing: -.03em; margin-bottom: 8px; }
+    .footer-logo span { color: var(--accent); }
+    .footer-brand p { color: rgba(255,255,255,.4); font-size: .82rem; max-width: 220px; }
+    .footer-links { display: flex; gap: 40px; flex-wrap: wrap; flex: 1; }
+    .footer-col h4 { font-size: .8rem; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: rgba(255,255,255,.35); margin-bottom: 14px; }
+    .footer-col ul { display: flex; flex-direction: column; gap: 10px; }
+    .footer-col a { color: rgba(255,255,255,.55); font-size: .85rem; transition: color .15s; }
+    .footer-col a:hover { color: #fff; }
+    .footer-bottom { border-top: 1px solid rgba(255,255,255,.07); padding-top: 24px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .footer-bottom p { font-size: .78rem; color: rgba(255,255,255,.3); }
+    .footer-bottom a { color: rgba(255,255,255,.4); font-size: .78rem; }
+    .footer-bottom a:hover { color: rgba(255,255,255,.7); }
+
+    .section-label { font-size: .78rem; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: var(--accent); margin-bottom: 12px; }
+    .section-label.light { color: rgba(0,201,167,.8); }
+
+    .text-center { text-align: center; }
+    .mt-2  { margin-top: 8px; }
+    .mt-3  { margin-top: 12px; }
+    .mt-4  { margin-top: 16px; }
+    .mt-6  { margin-top: 24px; }
+    .mt-8  { margin-top: 32px; }
+    .mb-6  { margin-bottom: 24px; }
+
+    @media (max-width: 900px) {
+      .hero-grid, .score-grid, .api-grid { grid-template-columns: 1fr; gap: 40px; }
+      .tools-grid { grid-template-columns: 1fr; }
+      .strip-grid { grid-template-columns: repeat(2, 1fr); }
+      .scores-scroll { grid-template-columns: repeat(3, 1fr); }
+      .hero { padding: 100px 0 60px; }
+      .footer-top { flex-direction: column; gap: 32px; }
+      .footer-links { gap: 28px; }
+    }
+    @media (max-width: 640px) {
+      .strip-grid { grid-template-columns: 1fr; }
+      .scores-scroll { grid-template-columns: repeat(2, 1fr); }
+      .score-meta { grid-template-columns: 1fr 1fr; }
+      .nav-links, .nav-cta { display: none; }
+      .hamburger { display: flex; margin-left: auto; }
+      h1 { font-size: 2rem; }
+    }
+
+    .nav-drawer { position: fixed; inset: 0; z-index: 99; display: none; }
+    .nav-drawer.open { display: flex; }
+    .drawer-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,.4); }
+    .drawer-panel { position: absolute; top: 0; right: 0; bottom: 0; width: 280px; background: #fff; padding: 80px 28px 28px; display: flex; flex-direction: column; gap: 8px; box-shadow: -4px 0 32px rgba(0,0,0,.15); }
+    .drawer-panel a { padding: 12px 8px; font-size: 1rem; font-weight: 500; color: var(--text); border-bottom: 1px solid var(--border); }
+    .drawer-panel .btn { margin-top: 16px; justify-content: center; }
+
+    .animate-on-scroll { opacity: 0; transform: translateY(24px); transition: opacity .6s ease, transform .6s ease; }
+    .animate-on-scroll.visible { opacity: 1; transform: none; }
 </style>
