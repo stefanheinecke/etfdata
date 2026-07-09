@@ -2,13 +2,14 @@
   <section class="concept-shell">
     <iframe
       class="concept-frame"
-      src="/goetf_concept.html"
+      :srcdoc="conceptHtml"
       title="GoETF Frontpage"
     ></iframe>
   </section>
 </template>
 
 <script setup>
+import conceptHtml from '../../goetf_concept.html?raw'
 </script>
 
 <style scoped>
