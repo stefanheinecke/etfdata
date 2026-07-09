@@ -30,7 +30,7 @@
     </div>
 
     <!-- Main -->
-    <main class="main">
+    <main class="main" :class="{ 'main-home': currentPage === 'home' }">
       <Home v-if="currentPage === 'home'" @navigate="currentPage = $event" />
       <ETFList v-else-if="currentPage === 'etfs'" />
       <ETFDetail v-else-if="currentPage === 'etf-detail'" />
@@ -357,6 +357,9 @@ onUnmounted(() => {
 .main {
   flex: 1;
   padding-top: 60px;
+}
+.main.main-home {
+  padding-top: 0;
 }
 .footer { background: #0a0f1a; padding: 48px 0 32px; }
 .container { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
