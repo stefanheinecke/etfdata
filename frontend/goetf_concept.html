@@ -1032,6 +1032,11 @@ const gaugeObserver = new IntersectionObserver((entries) => {
 
 const scoreCard = document.querySelector('.score-card');
 if (scoreCard) gaugeObserver.observe(scoreCard);
+
+/* ── Open Internal Links In Top Window ─────────────────── */
+document.querySelectorAll('a[href^="/"]').forEach(a => {
+  a.setAttribute('target', '_top');
+});
 </script>
 </body>
 </html>

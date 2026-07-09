@@ -111,7 +111,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, provide } from 'vue'
+import { ref, onMounted, onUnmounted, provide } from 'vue'
 import { healthService, adminService } from './services/api.js'
 
 const adminActive = ref(!!sessionStorage.getItem('admin_secret'))
@@ -195,7 +195,49 @@ function toggleTheme() {
   document.documentElement.setAttribute('data-theme', theme.value)
 }
 
+function applyPathRoute(pathname = window.location.pathname) {
+  const path = (pathname || '/').toLowerCase()
+  if (path === '/' || path === '/index.html') {
+    currentPage.value = 'home'
+    return
+  }
+  if (path === '/etfs') {
+    currentPage.value = 'etfs'
+    return
+  }
+  if (path === '/scores') {
+    currentPage.value = 'analytics'
+    analyticsInitTab.value = 'goetf'
+    return
+  }
+  if (path === '/portfolio' || path === '/portfolio/simplifier' || path === '/portfolio/enhancer') {
+    currentPage.value = 'analytics'
+    analyticsInitTab.value = 'exposure'
+    return
+  }
+  if (path === '/api' || path === '/api/explorer') {
+    currentPage.value = 'docs'
+    return
+  }
+  if (path === '/methodology') {
+    currentPage.value = 'methodology'
+    return
+  }
+  if (path === '/api-key') {
+    currentPage.value = 'home'
+    showApiKeyModal.value = true
+    return
+  }
+  currentPage.value = 'home'
+}
+
+function onPopState() {
+  applyPathRoute(window.location.pathname)
+}
+
 onMounted(async () => {
+  applyPathRoute(window.location.pathname)
+  window.addEventListener('popstate', onPopState)
   document.documentElement.setAttribute('data-theme', theme.value)
   try {
     await healthService.checkHealth()
@@ -205,6 +247,10 @@ onMounted(async () => {
     apiStatus.value = 'offline'
     apiStatusText.value = 'API Offline'
   }
+})
+
+onUnmounted(() => {
+  window.removeEventListener('popstate', onPopState)
 })
 </script>
 
