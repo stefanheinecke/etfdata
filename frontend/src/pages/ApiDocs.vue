@@ -6,10 +6,9 @@
           <h1 class="page-title">API Reference</h1>
           <p class="page-subtitle">Complete documentation for all GoETF.ch API endpoints.</p>
         </div>
-        <button v-if="!hasApiKey" class="btn btn-primary" style="flex-shrink:0;margin-top:.25rem" @click="showApiKeyModal = true">
+        <button class="btn btn-primary" style="flex-shrink:0;margin-top:.25rem" @click="showApiKeyModal = true">
           Get Free API Key
         </button>
-        <span v-else class="api-online-docs">API Online</span>
       </div>
     </div>
 
@@ -523,19 +522,6 @@ watch(activeId, (id) => {
 }
 [data-theme="dark"] .key-banner { background: #041a33; border-color: #0d3b72; color: #93d5f0; }
 .btn-sm { padding: .35rem .85rem; font-size: .8rem; }
-.api-online-docs {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: .48rem .75rem;
-  margin-top: .25rem;
-  border-radius: 999px;
-  font-size: .82rem;
-  font-weight: 600;
-  color: #0a3a66;
-  background: rgba(0, 201, 167, .14);
-  border: 1px solid rgba(0, 201, 167, .3);
-}
 .docs-layout { display: grid; grid-template-columns: 250px 1fr; gap: 2.2rem; align-items: start; }
 @media(max-width:700px) { .docs-layout { grid-template-columns: 1fr; } }
 .docs-nav { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1rem; position: sticky; top: 78px; }

@@ -26,8 +26,7 @@
         <a href="#" @click.prevent="goToPage('analytics', 'exposure')">Portfolio</a>
         <a href="#" @click.prevent="goToPage('docs')">API</a>
         <a href="#" @click.prevent="goToPage('methodology')">Methodology</a>
-        <a v-if="!hasApiKey" href="#" class="btn btn-primary" @click.prevent="openApiKeyModal('request'); mobileMenuOpen = false">Get API Key</a>
-        <div v-else class="drawer-api-online">API Online</div>
+        <a href="#" class="btn btn-primary" @click.prevent="openApiKeyModal('request'); mobileMenuOpen = false">Get API Key</a>
       </div>
     </div>
 
@@ -67,7 +66,7 @@
                 <h4>Developers</h4>
                 <ul>
                   <li><a href="#" @click.prevent="goToPage('docs')">API Docs</a></li>
-                  <li><a v-if="!hasApiKey" href="#" @click.prevent="openApiKeyModal('request')">Get API Key</a><span v-else class="api-online-footer">API Online</span></li>
+                  <li><a href="#" @click.prevent="openApiKeyModal('request')">Get API Key</a></li>
                   <li><a href="#" @click.prevent="goToPage('docs')">Live Explorer</a></li>
                 </ul>
               </div>
@@ -382,17 +381,6 @@ onUnmounted(() => {
   text-decoration: none;
 }
 .drawer-panel .btn { margin-top: 16px; justify-content: center; }
-.drawer-api-online {
-  margin-top: 16px;
-  padding: 10px 12px;
-  border-radius: 8px;
-  font-size: .9rem;
-  font-weight: 600;
-  text-align: center;
-  color: #0a3a66;
-  background: rgba(0, 201, 167, .14);
-  border: 1px solid rgba(0, 201, 167, .3);
-}
 
 .main {
   flex: 1;
@@ -414,11 +402,6 @@ onUnmounted(() => {
 .footer-col ul { display: flex; flex-direction: column; gap: 10px; list-style: none; }
 .footer-col a { color: rgba(255,255,255,.55); font-size: .85rem; transition: color .15s; text-decoration: none; }
 .footer-col a:hover { color: #fff; }
-.api-online-footer {
-  color: rgba(255,255,255,.8);
-  font-size: .85rem;
-  font-weight: 600;
-}
 .footer-bottom {
   border-top: 1px solid rgba(255,255,255,.07);
   padding-top: 24px;
