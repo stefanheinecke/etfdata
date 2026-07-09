@@ -2,13 +2,13 @@
   <div :data-theme="theme">
     <nav v-if="currentPage !== 'home'" class="navbar" :class="{ scrolled: navScrolled }">
       <div class="nav-inner">
-        <a href="#" class="logo" @click.prevent="currentPage = 'home'">Go<span>ETF</span></a>
+        <a href="#" class="logo" @click.prevent="goToPage('home')">Go<span>ETF</span></a>
         <ul class="nav-links">
-          <li><a href="#" :class="{ active: currentPage === 'etfs' || currentPage === 'etf-detail' }" @click.prevent="currentPage = 'etfs'">ETF Explorer</a></li>
-          <li><a href="#" :class="{ active: currentPage === 'analytics' }" @click.prevent="navigateTo('analytics', 'goetf')">Scores</a></li>
-          <li><a href="#" @click.prevent="navigateTo('analytics', 'exposure')">Portfolio</a></li>
-          <li><a href="#" :class="{ active: currentPage === 'docs' }" @click.prevent="currentPage = 'docs'">API</a></li>
-          <li><a href="#" :class="{ active: currentPage === 'methodology' }" @click.prevent="currentPage = 'methodology'">Methodology</a></li>
+          <li><a href="#" :class="{ active: currentPage === 'etfs' || currentPage === 'etf-detail' }" @click.prevent="goToPage('etfs')">ETF Explorer</a></li>
+          <li><a href="#" :class="{ active: currentPage === 'analytics' }" @click.prevent="goToPage('analytics', 'goetf')">Scores</a></li>
+          <li><a href="#" @click.prevent="goToPage('analytics', 'exposure')">Portfolio</a></li>
+          <li><a href="#" :class="{ active: currentPage === 'docs' }" @click.prevent="goToPage('docs')">API</a></li>
+          <li><a href="#" :class="{ active: currentPage === 'methodology' }" @click.prevent="goToPage('methodology')">Methodology</a></li>
         </ul>
         <a href="#" class="btn btn-outline nav-cta" @click.prevent="openApiKeyModal('request')">Get API Key</a>
         <button class="hamburger" @click="mobileMenuOpen = true" aria-label="Open menu">
@@ -20,11 +20,11 @@
     <div v-if="currentPage !== 'home'" class="nav-drawer" :class="{ open: mobileMenuOpen }">
       <div class="drawer-backdrop" @click="mobileMenuOpen = false"></div>
       <div class="drawer-panel">
-        <a href="#" @click.prevent="currentPage = 'etfs'; mobileMenuOpen = false">ETF Explorer</a>
-        <a href="#" @click.prevent="navigateTo('analytics', 'goetf'); mobileMenuOpen = false">Scores</a>
-        <a href="#" @click.prevent="navigateTo('analytics', 'exposure'); mobileMenuOpen = false">Portfolio</a>
-        <a href="#" @click.prevent="currentPage = 'docs'; mobileMenuOpen = false">API</a>
-        <a href="#" @click.prevent="currentPage = 'methodology'; mobileMenuOpen = false">Methodology</a>
+        <a href="#" @click.prevent="goToPage('etfs')">ETF Explorer</a>
+        <a href="#" @click.prevent="goToPage('analytics', 'goetf')">Scores</a>
+        <a href="#" @click.prevent="goToPage('analytics', 'exposure')">Portfolio</a>
+        <a href="#" @click.prevent="goToPage('docs')">API</a>
+        <a href="#" @click.prevent="goToPage('methodology')">Methodology</a>
         <a href="#" class="btn btn-primary" @click.prevent="openApiKeyModal('request'); mobileMenuOpen = false">Get API Key</a>
       </div>
     </div>
@@ -182,6 +182,13 @@ provide('navigateToETF', (etf) => { selectedETF.value = etf; currentPage.value =
 const analyticsInitTab = ref(null)
 provide('analyticsInitTab', analyticsInitTab)
 provide('navigateTo', (page, tab) => { currentPage.value = page; if (tab) analyticsInitTab.value = tab })
+
+function goToPage(page, tab = null) {
+  currentPage.value = page
+  if (tab) analyticsInitTab.value = tab
+  mobileMenuOpen.value = false
+  window.scrollTo({ top: 0, behavior: 'auto' })
+}
 
 // Reflect key changes from the modal's "Use this key" button
 window.addEventListener('storage', (e) => {
