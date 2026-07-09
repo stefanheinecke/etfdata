@@ -1,46 +1,33 @@
 <template>
   <div :data-theme="theme">
-    <!-- Navbar -->
-    <nav v-if="currentPage !== 'home'" class="navbar">
+    <nav v-if="currentPage !== 'home'" class="navbar" :class="{ scrolled: navScrolled }">
       <div class="nav-inner">
-        <div class="nav-brand" @click="currentPage = 'home'">
-          <img src="/goetf_logo.png" class="brand-logo" alt="GoETF" />
-          <span class="brand-name">GoETF</span>
-        </div>
+        <a href="#" class="logo" @click.prevent="currentPage = 'home'">Go<span>ETF</span></a>
         <ul class="nav-links">
-          <li v-for="item in navItems" :key="item.id">
-            <button :class="['nav-btn', { active: currentPage === item.id || (item.id === 'etfs' && currentPage === 'etf-detail') }]" @click="currentPage = item.id">
-              {{ item.label }}
-            </button>
-          </li>
+          <li><a href="#" :class="{ active: currentPage === 'etfs' || currentPage === 'etf-detail' }" @click.prevent="currentPage = 'etfs'">ETF Explorer</a></li>
+          <li><a href="#" :class="{ active: currentPage === 'analytics' }" @click.prevent="navigateTo('analytics', 'goetf')">Scores</a></li>
+          <li><a href="#" @click.prevent="navigateTo('analytics', 'exposure')">Portfolio</a></li>
+          <li><a href="#" :class="{ active: currentPage === 'docs' }" @click.prevent="currentPage = 'docs'">API</a></li>
+          <li><a href="#" :class="{ active: currentPage === 'methodology' }" @click.prevent="currentPage = 'methodology'">Methodology</a></li>
         </ul>
-        <div class="nav-actions">
-          <div :class="['api-status', apiStatus]" :title="apiStatusText">
-            <span class="status-dot"></span>{{ apiStatusText }}
-          </div>
-          <button class="theme-toggle" @click="toggleTheme" :title="theme === 'dark' ? 'Light mode' : 'Dark mode'">
-            {{ theme === 'dark' ? '☀️' : '🌙' }}
-          </button>
-          <button v-if="!hasApiKey" class="btn-get-key" @click="openApiKeyModal('request')">🔑 Request &amp; Enter Key</button>
-          <button v-if="adminActive" class="nav-btn admin-btn" @click="currentPage = 'admin'">⚙ Admin</button>
-        </div>
-        <button class="hamburger" :class="{open: mobileMenuOpen}" @click="mobileMenuOpen = !mobileMenuOpen" aria-label="Menu">
-          <span></span><span></span><span></span>
+        <a href="#" class="btn btn-outline nav-cta" @click.prevent="openApiKeyModal('request')">Get API Key</a>
+        <button class="hamburger" @click="mobileMenuOpen = true" aria-label="Open menu">
+          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
         </button>
       </div>
     </nav>
 
-    <!-- Mobile menu -->
-    <Transition name="slide-down">
-      <div v-if="mobileMenuOpen" class="mobile-menu">
-        <button v-for="item in navItems" :key="item.id"
-          :class="['mobile-menu-item', { active: currentPage === item.id || (item.id === 'etfs' && currentPage === 'etf-detail') }]"
-          @click="currentPage = item.id; mobileMenuOpen = false">{{ item.label }}</button>
-        <button v-if="!hasApiKey" class="mobile-menu-item mobile-menu-getkey" @click="openApiKeyModal('request'); mobileMenuOpen = false">🔑 Request &amp; Enter Key</button>
-        <button v-if="adminActive" class="mobile-menu-item" @click="currentPage = 'admin'; mobileMenuOpen = false">⚙ Admin</button>
-        <button v-else class="mobile-menu-item" @click="showAdminLogin = true; mobileMenuOpen = false">🔒 Admin Login</button>
+    <div v-if="currentPage !== 'home'" class="nav-drawer" :class="{ open: mobileMenuOpen }">
+      <div class="drawer-backdrop" @click="mobileMenuOpen = false"></div>
+      <div class="drawer-panel">
+        <a href="#" @click.prevent="currentPage = 'etfs'; mobileMenuOpen = false">ETF Explorer</a>
+        <a href="#" @click.prevent="navigateTo('analytics', 'goetf'); mobileMenuOpen = false">Scores</a>
+        <a href="#" @click.prevent="navigateTo('analytics', 'exposure'); mobileMenuOpen = false">Portfolio</a>
+        <a href="#" @click.prevent="currentPage = 'docs'; mobileMenuOpen = false">API</a>
+        <a href="#" @click.prevent="currentPage = 'methodology'; mobileMenuOpen = false">Methodology</a>
+        <a href="#" class="btn btn-primary" @click.prevent="openApiKeyModal('request'); mobileMenuOpen = false">Get API Key</a>
       </div>
-    </Transition>
+    </div>
 
     <!-- Main -->
     <main class="main">
@@ -54,29 +41,48 @@
       <Home v-else-if="currentPage === 'admin' && !adminActive" @navigate="currentPage = $event" />
     </main>
 
-    <!-- Disclaimer -->
-    <div v-if="currentPage !== 'home'" class="disclaimer-bar">
-      ⚠ Disclaimer: GoETF is for informational purposes only. Nothing on this platform constitutes financial or investment advice.
-      Past performance is not indicative of future results. Always consult a qualified financial adviser before making investment decisions.
-    </div>
-
     <!-- Footer -->
     <footer v-if="currentPage !== 'home'" class="footer">
-      <div class="footer-inner">
-        <div class="footer-brand">
-          <img src="/goetf_logo.png" class="brand-logo" alt="GoETF" />
-          <strong>GoETF</strong>
+      <div class="container">
+        <div class="footer-inner">
+          <div class="footer-top">
+            <div class="footer-brand">
+              <div class="footer-logo">Go<span>ETF</span></div>
+              <p>ETF analysis for investors and developers. Not investment advice.</p>
+            </div>
+            <div class="footer-links">
+              <div class="footer-col">
+                <h4>Product</h4>
+                <ul>
+                  <li><a href="#" @click.prevent="currentPage = 'etfs'">ETF Explorer</a></li>
+                  <li><a href="#" @click.prevent="navigateTo('analytics', 'goetf')">Scores</a></li>
+                  <li><a href="#" @click.prevent="navigateTo('analytics', 'exposure')">Portfolio</a></li>
+                  <li><a href="#" @click.prevent="currentPage = 'methodology'">Methodology</a></li>
+                </ul>
+              </div>
+              <div class="footer-col">
+                <h4>Developers</h4>
+                <ul>
+                  <li><a href="#" @click.prevent="currentPage = 'docs'">API Docs</a></li>
+                  <li><a href="#" @click.prevent="openApiKeyModal('request')">Get API Key</a></li>
+                  <li><a href="#" @click.prevent="currentPage = 'docs'">Live Explorer</a></li>
+                </ul>
+              </div>
+              <div class="footer-col">
+                <h4>Legal</h4>
+                <ul>
+                  <li><a href="#" @click.prevent>Imprint</a></li>
+                  <li><a href="#" @click.prevent>Disclaimer</a></li>
+                  <li><a href="#" @click.prevent>Privacy</a></li>
+                </ul>
+              </div>
+            </div>
+          </div>
+          <div class="footer-bottom">
+            <p>© 2026 GoETF.ch · Not investment advice · All data for informational purposes only.</p>
+            <a href="mailto:info@goetf.ch">info@goetf.ch</a>
+          </div>
         </div>
-        <div class="footer-links">
-          <button @click="currentPage = 'home'">Home</button>
-          <button @click="currentPage = 'etfs'">ETFs</button>
-          <button @click="currentPage = 'analytics'">Analytics</button>
-          <button @click="currentPage = 'methodology'">Methodology</button>
-          <button @click="currentPage = 'docs'">API Docs</button>
-          <button v-if="adminActive" @click="currentPage = 'admin'">Admin</button>
-          <button v-else @click="showAdminLogin = true" class="admin-lock-btn" title="Admin login">🔒</button>
-        </div>
-        <p class="footer-copy">© {{ new Date().getFullYear() }} GoETF.ch. Not investment advice.</p>
       </div>
     </footer>
     <!-- Get API Key Modal -->
@@ -154,7 +160,8 @@ import Admin from './pages/Admin.vue'
 import GetApiKeyModal from './components/GetApiKeyModal.vue'
 
 const currentPage = ref('home')
-const theme = ref(localStorage.getItem('theme') || 'light')
+const theme = ref('light')
+const navScrolled = ref(false)
 const apiStatus = ref('checking')
 const apiStatusText = ref('Checking...')
 const showApiKeyModal = ref(false)
@@ -181,18 +188,8 @@ window.addEventListener('storage', (e) => {
   if (e.key === 'api_key') hasApiKey.value = !!e.newValue
 })
 
-const navItems = [
-  { id: 'home', label: 'Home' },
-  { id: 'etfs', label: 'ETFs' },
-  { id: 'analytics', label: 'Analytics' },
-  { id: 'methodology', label: 'Methodology' },
-  { id: 'docs', label: 'API Docs' },
-]
-
-function toggleTheme() {
-  theme.value = theme.value === 'dark' ? 'light' : 'dark'
-  localStorage.setItem('theme', theme.value)
-  document.documentElement.setAttribute('data-theme', theme.value)
+function onScroll() {
+  navScrolled.value = window.scrollY > 20
 }
 
 function applyPathRoute(pathname = window.location.pathname) {
@@ -238,7 +235,8 @@ function onPopState() {
 onMounted(async () => {
   applyPathRoute(window.location.pathname)
   window.addEventListener('popstate', onPopState)
-  document.documentElement.setAttribute('data-theme', theme.value)
+  window.addEventListener('scroll', onScroll, { passive: true })
+  document.documentElement.setAttribute('data-theme', 'light')
   try {
     await healthService.checkHealth()
     apiStatus.value = 'online'
@@ -251,109 +249,133 @@ onMounted(async () => {
 
 onUnmounted(() => {
   window.removeEventListener('popstate', onPopState)
+  window.removeEventListener('scroll', onScroll)
 })
 </script>
 
 <style>
-/* Global resets already in index.html */
 .navbar {
-  position: sticky; top: 0; z-index: 100;
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
-  box-shadow: var(--shadow);
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  background: rgba(248,249,251,.85);
   backdrop-filter: blur(12px);
+  border-bottom: 1px solid transparent;
+  transition: border-color .2s, background .2s;
+}
+.navbar.scrolled {
+  border-color: var(--border);
+  background: rgba(248,249,251,.97);
 }
 .nav-inner {
-  max-width: 1280px; margin: 0 auto;
-  padding: 0 1.5rem;
-  display: flex; align-items: center; gap: 1rem;
-  height: 64px;
-}
-.nav-brand {
-  display: flex; align-items: center; gap: .5rem;
-  cursor: pointer; text-decoration: none;
-  flex-shrink: 0;
-}
-.brand-logo { height: 28px; width: auto; object-fit: contain; flex-shrink: 0; }
-.brand-name { font-size: 1.2rem; font-weight: 700; color: var(--text); letter-spacing: -.02em; }
-.nav-links {
-  display: flex; list-style: none; gap: .25rem;
+  max-width: 1200px;
   margin: 0 auto;
+  padding: 0 24px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  gap: 32px;
 }
-.nav-actions { display: flex; align-items: center; gap: .75rem; flex-shrink: 0; }
-.btn-get-key {
-  padding: .4rem 1rem; border-radius: 8px; font-size: .875rem; font-weight: 700;
-  background: linear-gradient(135deg, #1585c8, #0b6aa5);
-  color: #fff; border: none; cursor: pointer;
-  box-shadow: 0 2px 8px rgba(11,106,165,.4);
-  transition: opacity .15s, transform .1s;
+.logo {
+  font-size: 1.2rem;
+  font-weight: 700;
+  font-family: var(--font);
+  color: #0f4c81;
+  letter-spacing: -.03em;
+  margin-right: 8px;
+  text-decoration: none;
+}
+.logo span { color: #00c9a7; }
+.nav-links { display: flex; gap: 4px; flex: 1; list-style: none; }
+.nav-links a {
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: .88rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  transition: all .15s;
+  text-decoration: none;
+}
+.nav-links a:hover { color: #0f4c81; background: rgba(15,76,129,.06); }
+.nav-links a.active { color: #0f4c81; }
+.nav-cta { margin-left: auto; }
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 24px;
+  border-radius: 8px;
+  font-size: .9rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: all .18s ease;
   white-space: nowrap;
 }
-.btn-get-key:hover { opacity: .9; transform: translateY(-1px); }
-.nav-btn {
-  background: none; border: none; cursor: pointer;
-  padding: .4rem .85rem; border-radius: 8px;
-  font-size: .875rem; font-weight: 500; color: var(--text-muted);
-  transition: all .15s; display: flex; align-items: center; gap: .35rem;
-  font-family: inherit;
+.btn-primary { background: #0f4c81; color: #fff; }
+.btn-primary:hover { background: #1a6ab8; transform: translateY(-1px); box-shadow: 0 4px 16px rgba(15,76,129,.25); }
+.btn-outline { background: transparent; color: #0f4c81; border: 1.5px solid #0f4c81; }
+.btn-outline:hover { background: #0f4c81; color: #fff; transform: translateY(-1px); }
+.hamburger { display: none; background: none; border: none; cursor: pointer; padding: 6px; color: var(--text); }
+.hamburger svg { width: 22px; height: 22px; }
+
+.nav-drawer { position: fixed; inset: 0; z-index: 99; display: none; }
+.nav-drawer.open { display: flex; }
+.drawer-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,.4); }
+.drawer-panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 280px;
+  background: #fff;
+  padding: 80px 28px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: -4px 0 32px rgba(0,0,0,.15);
 }
-.nav-btn:hover { background: var(--bg-3); color: var(--green-600); }
-.nav-btn.active { background: var(--green-100); color: var(--green-700); font-weight: 600; }
-.admin-btn { border: 1px solid var(--border); color: var(--text-2); }
-.admin-btn:hover { border-color: var(--green-400); color: var(--green-700); }
-.theme-toggle {
-  background: none; border: 1px solid var(--border); cursor: pointer;
-  width: 36px; height: 36px; border-radius: 8px; font-size: 1rem;
-  display: flex; align-items: center; justify-content: center;
-  transition: all .15s;
+.drawer-panel a {
+  padding: 12px 8px;
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--text);
+  border-bottom: 1px solid var(--border);
+  text-decoration: none;
 }
-.theme-toggle:hover { border-color: var(--green-400); background: var(--bg-3); }
-.api-status {
-  display: flex; align-items: center; gap: .4rem;
-  font-size: .75rem; font-weight: 500; padding: .3rem .7rem;
-  border-radius: 20px; border: 1px solid var(--border);
+.drawer-panel .btn { margin-top: 16px; justify-content: center; }
+
+.main {
+  flex: 1;
+  padding-top: 60px;
 }
-.api-status.online { color: var(--green-600); border-color: var(--green-200); background: var(--green-50); }
-.api-status.offline { color: #dc2626; border-color: #fecaca; background: #fef2f2; }
-.api-status.checking { color: var(--text-muted); }
-.status-dot {
-  width: 7px; height: 7px; border-radius: 50%; background: currentColor;
-  animation: pulse 2s infinite;
+.footer { background: #0a0f1a; padding: 48px 0 32px; }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+.footer-inner { display: flex; flex-direction: column; gap: 32px; }
+.footer-top { display: flex; gap: 64px; align-items: flex-start; }
+.footer-brand { flex-shrink: 0; }
+.footer-logo { font-size: 1.25rem; font-weight: 700; font-family: var(--font); color: #fff; letter-spacing: -.03em; margin-bottom: 8px; }
+.footer-logo span { color: #00c9a7; }
+.footer-brand p { color: rgba(255,255,255,.4); font-size: .82rem; max-width: 220px; }
+.footer-links { display: flex; gap: 40px; flex-wrap: wrap; flex: 1; }
+.footer-col h4 { font-size: .8rem; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: rgba(255,255,255,.35); margin-bottom: 14px; }
+.footer-col ul { display: flex; flex-direction: column; gap: 10px; list-style: none; }
+.footer-col a { color: rgba(255,255,255,.55); font-size: .85rem; transition: color .15s; text-decoration: none; }
+.footer-col a:hover { color: #fff; }
+.footer-bottom {
+  border-top: 1px solid rgba(255,255,255,.07);
+  padding-top: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
-@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
-.main { flex: 1; }
-.disclaimer-bar {
-  background: #fefce8; border-top: 1px solid #fde68a; border-bottom: 1px solid #fde68a;
-  color: #92400e; font-size: .8rem; padding: .6rem 1.5rem; text-align: center;
-}
-[data-theme="dark"] .disclaimer-bar {
-  background: #1c1a00; border-color: #3d3500; color: #fde68a;
-}
-.footer {
-  background: var(--surface); border-top: 1px solid var(--border);
-  padding: 2rem 1.5rem;
-}
-.footer-inner {
-  max-width: 1280px; margin: 0 auto;
-  display: flex; align-items: center; justify-content: space-between;
-  gap: 1rem; flex-wrap: wrap;
-}
-.footer-brand { display: flex; align-items: center; gap: .4rem; font-size: 1rem; color: var(--text); }
-.footer-links { display: flex; gap: .5rem; flex-wrap: wrap; }
-.footer-links button {
-  background: none; border: none; cursor: pointer; color: var(--text-muted);
-  font-size: .875rem; padding: .25rem .5rem; border-radius: 6px;
-  transition: color .15s; font-family: inherit;
-}
-.footer-links button:hover { color: var(--green-600); }
-.footer-copy { font-size: .8rem; color: var(--text-muted); }
-/* Admin lock icon button in footer */
-.admin-lock-btn {
-  background: none; border: none; cursor: pointer;
-  font-size: .85rem; opacity: .25; padding: 0 .25rem;
-  transition: opacity .2s;
-}
-.admin-lock-btn:hover { opacity: .6; }
+.footer-bottom p { font-size: .78rem; color: rgba(255,255,255,.3); }
+.footer-bottom a { color: rgba(255,255,255,.4); font-size: .78rem; text-decoration: none; }
+.footer-bottom a:hover { color: rgba(255,255,255,.7); }
+
 /* Admin login modal */
 .modal-backdrop {
   position: fixed; inset: 0; z-index: 1000;
@@ -384,35 +406,33 @@ onUnmounted(() => {
 .admin-login-submit:not(:disabled):hover { opacity: .9; }
 
 /* Shared page styles */
-.page { max-width: 1280px; margin: 0 auto; padding: 2rem 1.5rem; }
-.page-header { margin-bottom: 2rem; }
-.page-title { font-size: 1.75rem; font-weight: 700; color: var(--text); letter-spacing: -.03em; }
-.page-subtitle { font-size: 1rem; color: var(--text-muted); margin-top: .35rem; }
+.page { max-width: 1200px; margin: 0 auto; padding: 2rem 24px; }
+.page-header { margin-bottom: 2.2rem; }
+.page-title {
+  font-size: clamp(1.6rem, 3vw, 2.2rem);
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -.02em;
+  line-height: 1.2;
+}
+.page-subtitle {
+  font-size: .98rem;
+  color: var(--text-muted);
+  margin-top: .35rem;
+  line-height: 1.65;
+  max-width: 760px;
+}
 .card {
   background: var(--surface); border: 1px solid var(--border);
-  border-radius: var(--radius); box-shadow: var(--shadow);
+  border-radius: 12px; box-shadow: var(--shadow);
   padding: 1.5rem;
 }
 .card-title { font-size: 1rem; font-weight: 600; color: var(--text); margin-bottom: 1rem; }
-.btn {
-  display: inline-flex; align-items: center; gap: .4rem;
-  padding: .5rem 1.1rem; border-radius: 8px; border: none;
-  font-size: .875rem; font-weight: 500; cursor: pointer;
-  transition: all .15s; font-family: inherit;
-}
-.btn-primary {
-  background: var(--green-500); color: #fff;
-}
-.btn-primary:hover { background: var(--green-600); }
-.btn-primary:disabled { background: var(--green-200); cursor: not-allowed; }
-.btn-outline {
-  background: none; border: 1px solid var(--border); color: var(--text-2);
-}
-.btn-outline:hover { border-color: var(--green-400); color: var(--green-700); background: var(--bg-3); }
+.btn-primary:disabled { opacity: .6; cursor: not-allowed; }
 .badge {
   display: inline-block; padding: .2rem .55rem; border-radius: 20px;
   font-size: .75rem; font-weight: 500;
-  background: var(--green-100); color: var(--green-700);
+  background: rgba(15,76,129,.1); color: #0f4c81;
 }
 .input {
   width: 100%; padding: .55rem .85rem; border-radius: 8px;
@@ -420,7 +440,7 @@ onUnmounted(() => {
   color: var(--text); font-size: .875rem; font-family: inherit;
   transition: border .15s;
 }
-.input:focus { outline: none; border-color: var(--green-400); box-shadow: 0 0 0 3px rgba(74,222,128,.15); }
+.input:focus { outline: none; border-color: #1a6ab8; box-shadow: 0 0 0 3px rgba(26,106,184,.15); }
 .label { display: block; font-size: .8rem; font-weight: 500; color: var(--text-2); margin-bottom: .35rem; }
 .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px,1fr)); gap: 1.25rem; }
 .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px,1fr)); gap: 1.25rem; }
@@ -443,27 +463,27 @@ onUnmounted(() => {
 .loading { display: flex; align-items: center; gap: .5rem; color: var(--text-muted); padding: 2rem 0; }
 .spinner {
   width: 20px; height: 20px; border: 2px solid var(--border);
-  border-top-color: var(--green-500); border-radius: 50%;
+  border-top-color: #0f4c81; border-radius: 50%;
   animation: spin .7s linear infinite; flex-shrink: 0;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 .table-wrap { overflow-x: auto; border-radius: var(--radius-sm); border: 1px solid var(--border); }
-table { width: 100%; border-collapse: collapse; font-size: .875rem; }
+table { width: 100%; border-collapse: collapse; font-size: .84rem; }
 thead th {
   background: var(--bg-3); color: var(--text-2); font-weight: 600;
-  padding: .75rem 1rem; text-align: left; border-bottom: 1px solid var(--border);
-  font-size: .8rem; text-transform: uppercase; letter-spacing: .04em;
+  padding: .72rem .95rem; text-align: left; border-bottom: 1px solid var(--border);
+  font-size: .74rem; text-transform: uppercase; letter-spacing: .06em;
 }
 tbody tr { border-bottom: 1px solid var(--border); transition: background .1s; }
 tbody tr:last-child { border-bottom: none; }
 tbody tr:hover { background: var(--bg-3); }
-tbody td { padding: .75rem 1rem; color: var(--text-2); }
+tbody td { padding: .72rem .95rem; color: var(--text-2); }
 code {
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
   background: var(--bg-3); border: 1px solid var(--border);
-  padding: .15rem .4rem; border-radius: 4px; font-size: .85em; color: var(--green-700);
+  padding: .15rem .4rem; border-radius: 4px; font-size: .85em; color: #0f4c81;
 }
-[data-theme="dark"] code { color: var(--green-400); }
+[data-theme="dark"] code { color: #9be7d8; }
 pre {
   background: var(--bg-3); border: 1px solid var(--border);
   border-radius: var(--radius-sm); padding: 1.25rem;
@@ -472,52 +492,15 @@ pre {
   color: var(--text-2);
 }
 
-/* ── Mobile hamburger ── */
-.hamburger {
-  display: none; flex-direction: column; align-items: center; justify-content: center;
-  gap: 5px; background: none; border: 1px solid var(--border);
-  cursor: pointer; padding: 0; width: 36px; height: 36px; border-radius: 8px;
-  flex-shrink: 0; transition: border-color .15s;
-}
-.hamburger:hover { border-color: var(--green-400); }
-.hamburger span { display: block; width: 18px; height: 2px; background: var(--text); border-radius: 1px; transition: all .25s; }
-.hamburger.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
-.hamburger.open span:nth-child(2) { opacity: 0; transform: scaleX(0); }
-.hamburger.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
-
-/* Mobile menu panel */
-.mobile-menu {
-  position: fixed; top: 64px; left: 0; right: 0; z-index: 99;
-  background: var(--surface); border-bottom: 1px solid var(--border);
-  box-shadow: var(--shadow); padding: .5rem .75rem .75rem;
-  display: flex; flex-direction: column; gap: .15rem;
-}
-.mobile-menu-item {
-  display: block; width: 100%; text-align: left; background: none; border: none;
-  cursor: pointer; padding: .75rem 1rem; border-radius: 8px;
-  font-size: .95rem; font-weight: 500; color: var(--text-muted); font-family: inherit;
-  transition: all .15s;
-}
-.mobile-menu-item:hover { background: var(--bg-3); color: var(--text); }
-.mobile-menu-item.active { background: var(--green-100); color: var(--green-700); font-weight: 600; }
-[data-theme="dark"] .mobile-menu-item.active { background: #041a33; color: #7ec8e3; }
-.mobile-menu-getkey { color: #667eea; font-weight: 700; }
-.slide-down-enter-active, .slide-down-leave-active { transition: all .2s ease; }
-.slide-down-enter-from, .slide-down-leave-to { opacity: 0; transform: translateY(-10px); }
-
 /* ── Responsive breakpoints ── */
 @media (max-width: 640px) {
   .hamburger { display: flex; }
-  .nav-links { display: none; }
-  .api-status { display: none; }
-  .btn-get-key { display: none; }
-  .admin-btn { display: none; }
-  .nav-inner { padding: 0 1rem; gap: .5rem; }
-  .page { padding: 1.25rem 1rem; }
-  .footer { padding: 1.25rem 1rem; }
-  .footer-inner { flex-direction: column; align-items: flex-start; gap: .75rem; }
+  .nav-links, .nav-cta { display: none; }
+  .nav-inner { padding: 0 16px; gap: .5rem; }
+  .page { padding: 1.25rem 16px; }
   .admin-login-modal { width: calc(100% - 2rem); padding: 1.5rem; }
-  .disclaimer-bar { padding: .6rem 1rem; font-size: .75rem; }
+  .footer-top { flex-direction: column; gap: 24px; }
+  .footer-links { gap: 24px; }
   .page-title { font-size: 1.4rem; }
   pre { font-size: .75rem; padding: 1rem; }
 }

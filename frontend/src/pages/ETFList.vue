@@ -199,20 +199,20 @@ onMounted(loadETFs)
 .sort-dir-btn{padding:.45rem .65rem;font-size:1rem;line-height:1;flex-shrink:0}
 .etf-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1rem}
 .etf-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1.25rem;cursor:pointer;transition:all .2s;box-shadow:var(--shadow)}
-.etf-card:hover{border-color:var(--green-400);box-shadow:var(--shadow-md);transform:translateY(-2px)}
+.etf-card:hover{border-color:#1a6ab8;box-shadow:var(--shadow-md);transform:translateY(-2px)}
 .etf-card-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem}
-.etf-ticker{font-size:1rem;font-weight:700;color:var(--green-600)}
+.etf-ticker{font-size:1rem;font-weight:700;color:#0f4c81}
 .etf-ter{font-size:.75rem;color:var(--text-muted);font-weight:500}
 .etf-name{font-size:.95rem;font-weight:600;color:var(--text);margin-bottom:.25rem;line-height:1.3}
 .etf-isin{font-size:.75rem;color:var(--text-muted);font-family:monospace;margin-bottom:.75rem}
 .etf-meta{display:flex;gap:.75rem;font-size:.8rem;color:var(--text-muted);flex-wrap:wrap}
 .etf-replication{margin-top:.5rem;font-size:.75rem;color:var(--text-muted)}
-.badge-acc{background:#c3e5ff;color:#0b6aa5;border-radius:4px;padding:1px 6px;font-size:.7rem;font-weight:600}
-.badge-dist{background:#dbeafe;color:#1e40af;border-radius:4px;padding:1px 6px;font-size:.7rem;font-weight:600}
-.cta-banner{display:flex;align-items:center;justify-content:space-between;gap:1rem;background:linear-gradient(135deg,#667eea15,#764ba215);border:1.5px solid #667eea55;border-radius:12px;padding:1rem 1.25rem;margin-bottom:1.5rem;flex-wrap:wrap}
+.badge-acc{background:rgba(0,201,167,.12);color:#009f86;border-radius:4px;padding:1px 6px;font-size:.7rem;font-weight:600}
+.badge-dist{background:rgba(15,76,129,.1);color:#0f4c81;border-radius:4px;padding:1px 6px;font-size:.7rem;font-weight:600}
+.cta-banner{display:flex;align-items:center;justify-content:space-between;gap:1rem;background:var(--surface);border:1.5px solid var(--border);border-radius:12px;padding:1rem 1.25rem;margin-bottom:1.5rem;flex-wrap:wrap;box-shadow:var(--shadow)}
 .cta-text{display:flex;flex-direction:column;gap:.2rem;font-size:.9rem}
 .cta-text strong{color:var(--text)}
 .cta-text span{color:var(--text-muted)}
-.cta-btn{padding:.55rem 1.2rem;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;border:none;border-radius:8px;font-weight:700;font-size:.875rem;cursor:pointer;white-space:nowrap;flex-shrink:0}
-.cta-btn:hover{opacity:.9}
+.cta-btn{padding:.55rem 1.2rem;background:#0f4c81;color:#fff;border:none;border-radius:8px;font-weight:700;font-size:.875rem;cursor:pointer;white-space:nowrap;flex-shrink:0}
+.cta-btn:hover{background:#1a6ab8}
 </style>

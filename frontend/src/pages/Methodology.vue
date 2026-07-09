@@ -194,9 +194,18 @@
 </script>
 
 <style scoped>
-.meth-page { max-width: 900px; margin: 0 auto; }
-.meth-section { margin-bottom: 2.5rem; }
-.meth-section-head { display: flex; align-items: flex-start; gap: 1rem; margin-bottom: 1.25rem; }
+.page {
+  --green-50: rgba(15, 76, 129, 0.07);
+  --green-100: rgba(15, 76, 129, 0.1);
+  --green-200: rgba(15, 76, 129, 0.2);
+  --green-400: #2f85c8;
+  --green-500: #0f4c81;
+  --green-600: #1a6ab8;
+  --green-700: #0a3a66;
+}
+.meth-page { max-width: 960px; margin: 0 auto; }
+.meth-section { margin-bottom: 2.75rem; }
+.meth-section-head { display: flex; align-items: flex-start; gap: 1rem; margin-bottom: 1.35rem; }
 .meth-badge {
   display: flex; align-items: center; justify-content: center;
   min-width: 48px; height: 48px; border-radius: 10px;
@@ -204,10 +213,10 @@
   font-size: .85rem; font-weight: 800; flex-shrink: 0;
 }
 [data-theme="dark"] .meth-badge { background: #082d5e; color: #7ec8e3; }
-.meth-badge-port { background: #e0f2fe; color: #0369a1; }
+.meth-badge-port { background: rgba(0, 201, 167, .14); color: #008a74; }
 [data-theme="dark"] .meth-badge-port { background: #0c2340; color: #38bdf8; }
-.meth-title { font-size: 1.25rem; font-weight: 700; color: var(--text); margin: 0 0 .2rem; }
-.meth-sub { font-size: .875rem; color: var(--text-muted); margin: 0; line-height: 1.55; }
+.meth-title { font-size: clamp(1.35rem, 2.2vw, 1.75rem); font-weight: 700; color: var(--text); margin: 0 0 .2rem; letter-spacing: -.02em; }
+.meth-sub { font-size: .92rem; color: var(--text-muted); margin: 0; line-height: 1.65; }
 .meth-card { margin-bottom: 1rem; }
 .meth-steps { padding-left: 1.25rem; margin: 0 0 1rem; display: flex; flex-direction: column; gap: .5rem; }
 .meth-steps li { font-size: .875rem; color: var(--text); line-height: 1.5; }
@@ -223,14 +232,14 @@
 .meth-formula-sm { margin-top: .75rem; }
 .meth-formula-lg .meth-formula-box { padding: 1rem 1.25rem; }
 .meth-formula-lg code { font-size: 1rem; }
-.meth-table { width: 100%; border-collapse: collapse; font-size: .82rem; }
+.meth-table { width: 100%; border-collapse: collapse; font-size: .84rem; }
 .meth-table thead tr { background: var(--bg-3); }
-.meth-table th { padding: .6rem 1rem; text-align: left; border-bottom: 1px solid var(--border); font-size: .75rem; color: var(--text-muted); font-weight: 600; }
-.meth-table td { padding: .65rem 1rem; border-bottom: 1px solid var(--border); color: var(--text); vertical-align: top; line-height: 1.5; }
+.meth-table th { padding: .68rem .95rem; text-align: left; border-bottom: 1px solid var(--border); font-size: .74rem; color: var(--text-muted); font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+.meth-table td { padding: .72rem .95rem; border-bottom: 1px solid var(--border); color: var(--text); vertical-align: top; line-height: 1.55; }
 .meth-table tbody tr:hover { background: var(--bg-3); }
 .meth-weight { font-weight: 700; color: var(--text); white-space: nowrap; }
 .meth-dir { font-weight: 600; font-size: .78rem; white-space: nowrap; }
-.meth-up { color: #0b6aa5; }
+.meth-up { color: #1a6ab8; }
 .meth-down { color: #ef4444; }
 [data-theme="dark"] .meth-up { color: #93d5f0; }
 [data-theme="dark"] .meth-down { color: #f87171; }
@@ -243,7 +252,7 @@
 .meth-comp-range { font-size: .75rem; font-weight: 700; color: var(--green-700); white-space: nowrap; }
 [data-theme="dark"] .meth-comp-range { color: #93d5f0; }
 .meth-range-neg { color: #ef4444 !important; }
-.meth-range-pos { color: #0b6aa5 !important; }
+.meth-range-pos { color: #1a6ab8 !important; }
 [data-theme="dark"] .meth-range-neg { color: #f87171 !important; }
 [data-theme="dark"] .meth-range-pos { color: #93d5f0 !important; }
 .meth-comp-desc { font-size: .82rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 0; flex: 1; }

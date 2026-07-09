@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div class="detail-page">
     <!-- Breadcrumb -->
     <div class="crumb-bar">
       <div class="page crumb-inner">
@@ -419,6 +419,16 @@ watch(() => etf.value?.id, () => {
 </script>
 
 <style scoped>
+.detail-page {
+  --green-50: rgba(15, 76, 129, 0.07);
+  --green-100: rgba(15, 76, 129, 0.1);
+  --green-200: rgba(15, 76, 129, 0.2);
+  --green-400: #2f85c8;
+  --green-500: #0f4c81;
+  --green-600: #1a6ab8;
+  --green-700: #0a3a66;
+}
+
 /* Breadcrumb */
 .crumb-bar { background: var(--surface); border-bottom: 1px solid var(--border); padding: .55rem 0; }
 .crumb-inner { display: flex; align-items: center; gap: .5rem; font-size: .8rem; }
@@ -432,7 +442,7 @@ watch(() => etf.value?.id, () => {
 .crumb-cur { color: var(--text); font-weight: 500; }
 
 /* Header band */
-.header-band { background: var(--surface); border-bottom: 1px solid var(--border); padding: 1.4rem 0 1.25rem; }
+.header-band { background: var(--surface); border-bottom: 1px solid var(--border); padding: 1.5rem 0 1.3rem; }
 .header-inner { display: flex; justify-content: space-between; align-items: flex-start; gap: 2rem; flex-wrap: wrap; }
 .ticker-row { display: flex; align-items: center; gap: .55rem; margin-bottom: .3rem; }
 .ticker { font-size: 1.6rem; font-weight: 800; color: var(--text); letter-spacing: -.04em; font-family: monospace; }
@@ -444,7 +454,7 @@ watch(() => etf.value?.id, () => {
 .tag-dist { background: #dbeafe; border-color: #93c5fd; color: #1e40af; }
 [data-theme="dark"] .tag-acc { background: #064e3b; border-color: #065f46; color: #6ee7b7; }
 [data-theme="dark"] .tag-dist { background: #1e3a8a; border-color: #1d4ed8; color: #93c5fd; }
-.etf-full-name { font-size: .95rem; font-weight: 600; color: var(--text); margin-bottom: .2rem; line-height: 1.35; }
+.etf-full-name { font-size: .98rem; font-weight: 600; color: var(--text); margin-bottom: .2rem; line-height: 1.45; }
 .isin-code { font-family: monospace; font-size: .75rem; color: var(--text-muted); }
 .header-kpis { display: flex; gap: 1.75rem; flex-wrap: wrap; align-items: flex-start; }
 .hkpi { display: flex; flex-direction: column; gap: .1rem; }
@@ -461,10 +471,10 @@ watch(() => etf.value?.id, () => {
   font-family: inherit; transition: all .15s; white-space: nowrap;
 }
 .dtab:hover { color: var(--text); }
-.dtab.active { color: var(--green-600); border-bottom-color: var(--green-500); font-weight: 600; }
+.dtab.active { color: #0f4c81; border-bottom-color: #0f4c81; font-weight: 600; }
 
 /* Body */
-.detail-body { padding-top: 1.5rem; padding-bottom: 3rem; }
+.detail-body { padding-top: 1.7rem; padding-bottom: 3rem; }
 
 /* Overview */
 .two-col { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; }
@@ -478,13 +488,13 @@ watch(() => etf.value?.id, () => {
 
 /* Holdings */
 .tbl-meta { font-size: .72rem; color: var(--text-muted); margin-bottom: .6rem; }
-.data-tbl { width: 100%; border-collapse: collapse; font-size: .78rem; }
+.data-tbl { width: 100%; border-collapse: collapse; font-size: .8rem; }
 .data-tbl th {
-  text-align: left; font-size: .65rem; font-weight: 700; text-transform: uppercase;
-  letter-spacing: .07em; color: var(--text-muted); padding: .45rem .75rem;
+  text-align: left; font-size: .66rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .08em; color: var(--text-muted); padding: .52rem .75rem;
   border-bottom: 2px solid var(--border); white-space: nowrap;
 }
-.data-tbl td { padding: .42rem .75rem; border-bottom: 1px solid var(--border); color: var(--text); vertical-align: middle; }
+.data-tbl td { padding: .52rem .75rem; border-bottom: 1px solid var(--border); color: var(--text); vertical-align: middle; }
 .data-tbl tbody tr:hover { background: var(--bg-2); }
 .row-num { color: var(--text-muted); font-size: .7rem; font-variant-numeric: tabular-nums; text-align: right; }
 .mono { font-family: monospace; font-size: .72rem; color: var(--text-muted); }
@@ -504,7 +514,7 @@ watch(() => etf.value?.id, () => {
 .alloc-track { flex: 1; height: 5px; background: var(--border); border-radius: 3px; overflow: hidden; }
 .alloc-fill { height: 100%; background: var(--green-500); border-radius: 3px; transition: width .3s; }
 .alloc-pct { width: 38px; text-align: right; font-size: .76rem; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
-.show-more-btn { margin-top: .4rem; background: none; border: none; cursor: pointer; font-size: .76rem; color: var(--green-600); font-family: inherit; font-weight: 500; padding: 0; }
+.show-more-btn { margin-top: .4rem; background: none; border: none; cursor: pointer; font-size: .76rem; color: #0f4c81; font-family: inherit; font-weight: 500; padding: 0; }
 .show-more-btn:hover { text-decoration: underline; }
 
 /* Performance */

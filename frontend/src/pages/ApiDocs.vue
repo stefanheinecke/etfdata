@@ -506,6 +506,16 @@ watch(activeId, (id) => {
 </script>
 
 <style scoped>
+.page {
+  --green-50: rgba(15, 76, 129, 0.07);
+  --green-100: rgba(15, 76, 129, 0.1);
+  --green-200: rgba(15, 76, 129, 0.2);
+  --green-400: #2f85c8;
+  --green-500: #0f4c81;
+  --green-600: #1a6ab8;
+  --green-700: #0a3a66;
+}
+.page-header{margin-bottom:2.25rem}
 .key-banner {
   display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;
   background: var(--green-50); border: 1px solid var(--green-200); border-radius: var(--radius);
@@ -513,32 +523,32 @@ watch(activeId, (id) => {
 }
 [data-theme="dark"] .key-banner { background: #041a33; border-color: #0d3b72; color: #93d5f0; }
 .btn-sm { padding: .35rem .85rem; font-size: .8rem; }
-.docs-layout { display: grid; grid-template-columns: 240px 1fr; gap: 2rem; align-items: start; }
+.docs-layout { display: grid; grid-template-columns: 250px 1fr; gap: 2.2rem; align-items: start; }
 @media(max-width:700px) { .docs-layout { grid-template-columns: 1fr; } }
-.docs-nav { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem; position: sticky; top: 80px; }
+.docs-nav { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1rem; position: sticky; top: 78px; }
 .docs-nav-section { margin-bottom: 1.25rem; }
 .docs-nav-label { font-size: .7rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .08em; padding: 0 .5rem; margin-bottom: .35rem; }
-.docs-nav-item { display: flex; align-items: center; gap: .5rem; width: 100%; background: none; border: none; cursor: pointer; padding: .4rem .5rem; border-radius: 6px; font-size: .8rem; color: var(--text-2); text-align: left; transition: all .15s; font-family: inherit; }
+.docs-nav-item { display: flex; align-items: center; gap: .5rem; width: 100%; background: none; border: none; cursor: pointer; padding: .42rem .55rem; border-radius: 6px; font-size: .8rem; color: var(--text-2); text-align: left; transition: all .15s; font-family: inherit; }
 .docs-nav-item:hover { background: var(--bg-3); color: var(--text); }
-.docs-nav-item.active { background: var(--green-100); color: var(--green-700); font-weight: 600; }
+.docs-nav-item.active { background: rgba(15, 76, 129, .1); color: #0f4c81; font-weight: 600; }
 .docs-content { min-width: 0; }
 .ep-header { display: flex; align-items: center; gap: .75rem; margin-bottom: .75rem; }
 .ep-path { font-size: 1rem; }
-.ep-title { font-size: 1.3rem; font-weight: 700; color: var(--text); margin-bottom: .5rem; }
-.ep-desc { color: var(--text-muted); font-size: .9rem; margin-bottom: 1.5rem; line-height: 1.6; }
+.ep-title { font-size: clamp(1.35rem, 2.3vw, 1.75rem); font-weight: 700; color: var(--text); margin-bottom: .5rem; letter-spacing: -.02em; }
+.ep-desc { color: var(--text-muted); font-size: .93rem; margin-bottom: 1.75rem; line-height: 1.65; }
 .doc-section { margin-bottom: 1.5rem; }
 .doc-section-title { font-size: .85rem; font-weight: 600; color: var(--text); text-transform: uppercase; letter-spacing: .05em; margin-bottom: .75rem; padding-bottom: .5rem; border-bottom: 1px solid var(--border); }
 .doc-section-body { font-size: .875rem; color: var(--text-muted); margin-bottom: .75rem; }
 .method-badge { display: inline-block; padding: .1rem .45rem; border-radius: 4px; font-size: .7rem; font-weight: 700; letter-spacing: .03em; }
 .method-badge-lg { display: inline-block; padding: .3rem .7rem; border-radius: 6px; font-size: .85rem; font-weight: 700; letter-spacing: .03em; }
-.method-get { background: #dbeafe; color: #1d4ed8; }
-.method-post { background: #c3e5ff; color: #0b6aa5; }
+.method-get { background: rgba(15, 76, 129, .14); color: #0f4c81; }
+.method-post { background: rgba(0, 201, 167, .14); color: #008a74; }
 .method-delete { background: #fee2e2; color: #dc2626; }
 [data-theme="dark"] .method-get { background: #1e3a8a; color: #93c5fd; }
 [data-theme="dark"] .method-post { background: #0d3b72; color: #93d5f0; }
 .code-tabs { display: flex; gap: .25rem; }
 .code-tab { background: none; border: 1px solid var(--border); cursor: pointer; padding: .3rem .75rem; border-radius: 6px; font-size: .8rem; font-weight: 500; color: var(--text-muted); transition: all .15s; font-family: inherit; }
-.code-tab.active { background: var(--green-500); border-color: var(--green-500); color: #fff; }
+.code-tab.active { background: #0f4c81; border-color: #0f4c81; color: #fff; }
 
 /* Try it out */
 .try-btn { width: fit-content; margin-bottom: .75rem; }
