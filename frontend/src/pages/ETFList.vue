@@ -4,7 +4,7 @@
       <h1 class="page-title">ETF Explorer</h1>
       <p class="page-subtitle">Browse all tracked ETFs, inspect holdings, allocations and performance data.</p>
     </div>
-    <div v-if="!apiKey" class="cta-banner">
+    <div v-if="!hasApiKey" class="cta-banner">
       <div class="cta-text">
         <strong>You need an API key to load ETF data.</strong>
         <span>It's free and takes 10 seconds.</span>
@@ -105,6 +105,7 @@ import { ref, computed, onMounted, inject } from 'vue'
 
 const showApiKeyModal = inject('showApiKeyModal')
 const navigateToETF = inject('navigateToETF')
+const hasApiKey = inject('hasApiKey', ref(!!localStorage.getItem('api_key')))
 import { etfService } from '../services/api.js'
 
 const allETFs = ref([])

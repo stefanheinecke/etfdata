@@ -5,12 +5,13 @@
         <a href="#" class="logo" @click.prevent="goToPage('home')">Go<span>ETF</span></a>
         <ul class="nav-links">
           <li><a href="#" :class="{ active: currentPage === 'etfs' || currentPage === 'etf-detail' }" @click.prevent="goToPage('etfs')">ETF Explorer</a></li>
-          <li><a href="#" :class="{ active: currentPage === 'analytics' }" @click.prevent="goToPage('analytics', 'goetf')">Scores</a></li>
+          <li><a href="#" :class="{ active: currentPage === 'scores' }" @click.prevent="goToPage('scores')">Scores</a></li>
           <li><a href="#" @click.prevent="goToPage('analytics', 'exposure')">Portfolio</a></li>
           <li><a href="#" :class="{ active: currentPage === 'docs' }" @click.prevent="goToPage('docs')">API</a></li>
           <li><a href="#" :class="{ active: currentPage === 'methodology' }" @click.prevent="goToPage('methodology')">Methodology</a></li>
         </ul>
-        <a href="#" class="btn btn-outline nav-cta" @click.prevent="openApiKeyModal('request')">Get API Key</a>
+        <a v-if="!hasApiKey" href="#" class="btn btn-outline nav-cta" @click.prevent="openApiKeyModal('request')">Get API Key</a>
+        <span v-else class="api-online-pill"><span class="status-dot"></span>API Online</span>
         <button class="hamburger" @click="mobileMenuOpen = true" aria-label="Open menu">
           <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
         </button>
@@ -21,19 +22,21 @@
       <div class="drawer-backdrop" @click="mobileMenuOpen = false"></div>
       <div class="drawer-panel">
         <a href="#" @click.prevent="goToPage('etfs')">ETF Explorer</a>
-        <a href="#" @click.prevent="goToPage('analytics', 'goetf')">Scores</a>
+        <a href="#" @click.prevent="goToPage('scores')">Scores</a>
         <a href="#" @click.prevent="goToPage('analytics', 'exposure')">Portfolio</a>
         <a href="#" @click.prevent="goToPage('docs')">API</a>
         <a href="#" @click.prevent="goToPage('methodology')">Methodology</a>
-        <a href="#" class="btn btn-primary" @click.prevent="openApiKeyModal('request'); mobileMenuOpen = false">Get API Key</a>
+        <a v-if="!hasApiKey" href="#" class="btn btn-primary" @click.prevent="openApiKeyModal('request'); mobileMenuOpen = false">Get API Key</a>
+        <div v-else class="drawer-api-online">API Online</div>
       </div>
     </div>
 
     <!-- Main -->
     <main class="main" :class="{ 'main-home': currentPage === 'home' }">
-      <Home v-if="currentPage === 'home'" @navigate="currentPage = $event" />
+      <Home v-if="currentPage === 'home'" :key="homeRenderKey" @navigate="currentPage = $event" />
       <ETFList v-else-if="currentPage === 'etfs'" />
       <ETFDetail v-else-if="currentPage === 'etf-detail'" />
+      <Scores v-else-if="currentPage === 'scores'" />
       <Analytics v-else-if="currentPage === 'analytics'" />
       <Methodology v-else-if="currentPage === 'methodology'" />
       <ApiDocs v-else-if="currentPage === 'docs'" />
@@ -54,18 +57,18 @@
               <div class="footer-col">
                 <h4>Product</h4>
                 <ul>
-                  <li><a href="#" @click.prevent="currentPage = 'etfs'">ETF Explorer</a></li>
-                  <li><a href="#" @click.prevent="navigateTo('analytics', 'goetf')">Scores</a></li>
-                  <li><a href="#" @click.prevent="navigateTo('analytics', 'exposure')">Portfolio</a></li>
-                  <li><a href="#" @click.prevent="currentPage = 'methodology'">Methodology</a></li>
+                  <li><a href="#" @click.prevent="goToPage('etfs')">ETF Explorer</a></li>
+                  <li><a href="#" @click.prevent="goToPage('scores')">Scores</a></li>
+                  <li><a href="#" @click.prevent="goToPage('analytics', 'exposure')">Portfolio</a></li>
+                  <li><a href="#" @click.prevent="goToPage('methodology')">Methodology</a></li>
                 </ul>
               </div>
               <div class="footer-col">
                 <h4>Developers</h4>
                 <ul>
-                  <li><a href="#" @click.prevent="currentPage = 'docs'">API Docs</a></li>
-                  <li><a href="#" @click.prevent="openApiKeyModal('request')">Get API Key</a></li>
-                  <li><a href="#" @click.prevent="currentPage = 'docs'">Live Explorer</a></li>
+                  <li><a href="#" @click.prevent="goToPage('docs')">API Docs</a></li>
+                  <li><a v-if="!hasApiKey" href="#" @click.prevent="openApiKeyModal('request')">Get API Key</a><span v-else class="api-online-footer">API Online</span></li>
+                  <li><a href="#" @click.prevent="goToPage('docs')">Live Explorer</a></li>
                 </ul>
               </div>
               <div class="footer-col">
@@ -86,7 +89,7 @@
       </div>
     </footer>
     <!-- Get API Key Modal -->
-    <GetApiKeyModal :show="showApiKeyModal" :initialTab="apiKeyModalTab" @close="showApiKeyModal = false" @key-saved="hasApiKey = true" />
+    <GetApiKeyModal :show="showApiKeyModal" :initialTab="apiKeyModalTab" @close="showApiKeyModal = false" @key-saved="onApiKeySaved" />
 
     <!-- Admin Login Modal -->
     <Teleport to="body">
@@ -153,6 +156,7 @@ async function doAdminLogin() {
 import Home from './pages/Home.vue'
 import ETFList from './pages/ETFList.vue'
 import ETFDetail from './pages/ETFDetail.vue'
+import Scores from './pages/Scores.vue'
 import Analytics from './pages/Analytics.vue'
 import ApiDocs from './pages/ApiDocs.vue'
 import Methodology from './pages/Methodology.vue'
@@ -168,6 +172,7 @@ const showApiKeyModal = ref(false)
 const apiKeyModalTab = ref('request')
 const mobileMenuOpen = ref(false)
 const hasApiKey = ref(!!localStorage.getItem('api_key'))
+const homeRenderKey = ref(0)
 
 function openApiKeyModal(tab = 'request') {
   apiKeyModalTab.value = tab
@@ -175,19 +180,25 @@ function openApiKeyModal(tab = 'request') {
 }
 
 provide('showApiKeyModal', showApiKeyModal)
+provide('hasApiKey', hasApiKey)
 
 const selectedETF = ref(null)
 provide('selectedETF', selectedETF)
 provide('navigateToETF', (etf) => { selectedETF.value = etf; currentPage.value = 'etf-detail' })
 const analyticsInitTab = ref(null)
 provide('analyticsInitTab', analyticsInitTab)
-provide('navigateTo', (page, tab) => { currentPage.value = page; if (tab) analyticsInitTab.value = tab })
+provide('navigateTo', (page, tab) => { goToPage(page, tab) })
 
 function goToPage(page, tab = null) {
   currentPage.value = page
   if (tab) analyticsInitTab.value = tab
   mobileMenuOpen.value = false
   window.scrollTo({ top: 0, behavior: 'auto' })
+}
+
+function onApiKeySaved() {
+  hasApiKey.value = true
+  homeRenderKey.value += 1
 }
 
 // Reflect key changes from the modal's "Use this key" button
@@ -210,8 +221,7 @@ function applyPathRoute(pathname = window.location.pathname) {
     return
   }
   if (path === '/scores') {
-    currentPage.value = 'analytics'
-    analyticsInitTab.value = 'goetf'
+    currentPage.value = 'scores'
     return
   }
   if (path === '/portfolio' || path === '/portfolio/simplifier' || path === '/portfolio/enhancer') {
@@ -308,6 +318,25 @@ onUnmounted(() => {
 .nav-links a:hover { color: #0f4c81; background: rgba(15,76,129,.06); }
 .nav-links a.active { color: #0f4c81; }
 .nav-cta { margin-left: auto; }
+.api-online-pill {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  font-size: .8rem;
+  font-weight: 600;
+  color: #0a3a66;
+  background: rgba(0, 201, 167, .14);
+  border: 1px solid rgba(0, 201, 167, .3);
+}
+.status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #16a34a;
+}
 .btn {
   display: inline-flex;
   align-items: center;
@@ -353,6 +382,17 @@ onUnmounted(() => {
   text-decoration: none;
 }
 .drawer-panel .btn { margin-top: 16px; justify-content: center; }
+.drawer-api-online {
+  margin-top: 16px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: .9rem;
+  font-weight: 600;
+  text-align: center;
+  color: #0a3a66;
+  background: rgba(0, 201, 167, .14);
+  border: 1px solid rgba(0, 201, 167, .3);
+}
 
 .main {
   flex: 1;
@@ -374,6 +414,11 @@ onUnmounted(() => {
 .footer-col ul { display: flex; flex-direction: column; gap: 10px; list-style: none; }
 .footer-col a { color: rgba(255,255,255,.55); font-size: .85rem; transition: color .15s; text-decoration: none; }
 .footer-col a:hover { color: #fff; }
+.api-online-footer {
+  color: rgba(255,255,255,.8);
+  font-size: .85rem;
+  font-weight: 600;
+}
 .footer-bottom {
   border-top: 1px solid rgba(255,255,255,.07);
   padding-top: 24px;
@@ -506,6 +551,7 @@ pre {
 @media (max-width: 640px) {
   .hamburger { display: flex; }
   .nav-links, .nav-cta { display: none; }
+  .api-online-pill { display: none; }
   .nav-inner { padding: 0 16px; gap: .5rem; }
   .page { padding: 1.25rem 16px; }
   .admin-login-modal { width: calc(100% - 2rem); padding: 1.5rem; }

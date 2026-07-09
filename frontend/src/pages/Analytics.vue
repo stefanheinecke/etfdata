@@ -1,7 +1,7 @@
 ﻿<template>
   <div class="page">
     <div class="page-header">
-      <h1 class="page-title">Analytics</h1>
+      <h1 class="page-title">Portfolio Analytics</h1>
       <p class="page-subtitle">Portfolio exposure breakdown and per-ETF risk metrics in one call.</p>
     </div>
     <div v-if="!hasApiKey" class="cta-banner">
@@ -231,97 +231,6 @@
       </div>
     </div>
 
-    <!-- GOETF SCORE -->
-    <div v-if="activeTab==='goetf'">
-      <div class="card" style="margin-bottom:1.5rem;display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
-        <div>
-          <h2 class="card-title" style="margin:0">GoETF Score</h2>
-          <p style="font-size:.8rem;color:var(--text-muted);margin:.2rem 0 0">Composite 1-10 score based on 8 risk &amp; diversification metrics, percentile-ranked across all ETFs</p>
-          <button class="meth-link" @click="navigateTo('methodology')">ℹ How is this calculated?</button>
-        </div>
-        <label style="font-size:.8rem;color:var(--text-muted);margin-left:auto">Risk-free rate</label>
-        <input class="input" type="number" v-model.number="goetfRfRate" min="0" max="20" step="0.5"
-          style="width:72px;padding:.3rem .5rem;font-size:.875rem" />
-        <span style="font-size:.8rem;color:var(--text-muted)">% p.a.</span>
-        <button class="btn btn-outline" style="font-size:.875rem" @click="runGoetfScores" :disabled="goetfLoading">
-          {{ goetfLoading ? 'Loading…' : '↻ Recalculate' }}
-        </button>
-      </div>
-      <div v-if="goetfError" class="error-box" style="margin-bottom:1rem">{{ goetfError }}</div>
-      <div v-if="goetfResult" class="card" style="padding:0;overflow:hidden">
-        <div style="padding:.75rem 1.25rem;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
-          <h3 class="card-title" style="margin:0">{{ goetfResult.length }} ETF{{ goetfResult.length !== 1 ? 's' : '' }}</h3>
-          <span style="font-size:.75rem;color:var(--text-muted)">Rf = {{ goetfRfRate }}% &nbsp;·&nbsp; Click column header to sort</span>
-        </div>
-        <div class="table-wrap">
-          <table class="risk-table">
-            <thead>
-              <tr>
-                <th class="sortable-th" @click="toggleGoetfSort('goetf_score')">
-                  <span class="col-label" :data-tip="`Absolute quality score (1–10) based on fixed reference ranges for each metric — not a ranking against other ETFs. A score of 7+ means genuinely good by general standards; it does not change when new ETFs are added to the universe.\n\n✅ Good quality: ≥ 7\n🟡 Average: 5–7\n🔴 Below standard: ≤ 4`">Score <span class="col-i">i</span></span>
-                  <span class="sort-arrow">{{ goetfSortKey==='goetf_score' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span>
-                </th>
-                <th class="sortable-th" @click="toggleGoetfSort('ticker')">Ticker <span class="sort-arrow">{{ goetfSortKey==='ticker' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span></th>
-                <th>Name</th>
-                <th class="sortable-th" @click="toggleGoetfSort('sortino')">
-                  <span class="col-label" :data-tip="`How much return you get relative to losses. Only bad days count against you — good days are not penalised. Higher is better.\n\n✅ Good: > 1.0\n🟡 OK: 0.5–1.0\n🔴 Poor: < 0.3`">Sortino <span class="col-i">i</span></span>
-                  <span class="sort-arrow">{{ goetfSortKey==='sortino' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span>
-                </th>
-                <th class="sortable-th" @click="toggleGoetfSort('calmar')">
-                  <span class="col-label" :data-tip="`How much annual return you earned vs. the worst crash the ETF ever had. High value = steady gains with shallow losses. Higher is better.\n\n✅ Good: > 0.5\n🟡 OK: 0.2–0.5\n🔴 Poor: < 0.1`">Calmar <span class="col-i">i</span></span>
-                  <span class="sort-arrow">{{ goetfSortKey==='calmar' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span>
-                </th>
-                <th class="sortable-th" @click="toggleGoetfSort('cvar')">
-                  <span class="col-label" :data-tip="`How bad things get on the worst 5% of days, scaled to a yearly number. Think: expected loss in a really bad year. Less negative = better.\n\n✅ Low risk: > −20%\n🟡 Moderate: −20% to −40%\n🔴 High risk: < −40%`">CVaR 95% <span class="col-i">i</span></span>
-                  <span class="sort-arrow">{{ goetfSortKey==='cvar' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span>
-                </th>
-                <th class="sortable-th" @click="toggleGoetfSort('hit_ratio')">
-                  <span class="col-label" :data-tip="`How often the ETF ends a day in positive territory. More green days = more consistent growth. Higher is better.\n\n✅ Consistent: > 55%\n🟡 Average: 50–55%\n🔴 Erratic: < 48%`">Hit Ratio <span class="col-i">i</span></span>
-                  <span class="sort-arrow">{{ goetfSortKey==='hit_ratio' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span>
-                </th>
-                <th class="sortable-th" @click="toggleGoetfSort('hhi')">
-                  <span class="col-label" :data-tip="`Measures how concentrated the ETF is in its top holdings. 10,000 = everything in one stock. Lower = more spread out.\n\n✅ Diversified: < 200\n🟡 Moderate: 200–800\n🔴 Concentrated: > 1,000`">HHI <span class="col-i">i</span></span>
-                  <span class="sort-arrow">{{ goetfSortKey==='hhi' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span>
-                </th>
-                <th class="sortable-th" @click="toggleGoetfSort('effective_n')">
-                  <span class="col-label" :data-tip="`The 'real' number of meaningful holdings. Even 500 stocks can act like 20 if a few giants dominate. Higher = more balanced.\n\n✅ Diversified: > 100\n🟡 Moderate: 20–100\n🔴 Concentrated: < 10`">Eff. N <span class="col-i">i</span></span>
-                  <span class="sort-arrow">{{ goetfSortKey==='effective_n' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span>
-                </th>
-                <th class="sortable-th" @click="toggleGoetfSort('geo_div')">
-                  <span class="col-label" :data-tip="`How evenly the ETF is spread across countries. 100% = perfectly global, 0% = single country. Higher = less geographic risk.\n\n✅ Global: > 60%\n🟡 Regional: 20–60%\n🔴 Single-country: < 20%`">Geo Div <span class="col-i">i</span></span>
-                  <span class="sort-arrow">{{ goetfSortKey==='geo_div' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span>
-                </th>
-                <th class="sortable-th" @click="toggleGoetfSort('max_underwater')">
-                  <span class="col-label" :data-tip="`How long investors had to wait to break even after the ETF's worst crash. Shorter = more resilient. Lower is better.\n\n✅ Fast recovery: < 250 days\n🟡 Moderate: 250–500 days\n🔴 Slow: > 500 days`">Max UW <span class="col-i">i</span></span>
-                  <span class="sort-arrow">{{ goetfSortKey==='max_underwater' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="row in goetfSorted" :key="row.etf_id">
-                <td>
-                  <span v-if="row.goetf_score != null" class="score-badge" :class="scoreBadgeClass(row.goetf_score)">{{ row.goetf_score.toFixed(1) }}</span>
-                  <span v-else class="score-badge score-na">N/A</span>
-                </td>
-                <td><strong style="color:var(--green-600)">{{ row.ticker }}</strong></td>
-                <td style="font-size:.8rem;color:var(--text-muted);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ row.name }}</td>
-                <td :class="sortinoClass(row.sortino)">{{ row.sortino != null ? row.sortino.toFixed(2) : '—' }}</td>
-                <td :class="calmarClass(row.calmar)">{{ row.calmar != null ? row.calmar.toFixed(2) : '—' }}</td>
-                <td :class="cvarClass(row.cvar)">{{ row.cvar != null ? row.cvar.toFixed(1) + '%' : '—' }}</td>
-                <td :class="hitClass(row.hit_ratio)">{{ row.hit_ratio != null ? (row.hit_ratio * 100).toFixed(1) + '%' : '—' }}</td>
-                <td :class="hhiClass(row.hhi)">{{ row.hhi != null ? row.hhi.toFixed(0) : '—' }}</td>
-                <td :class="effNClass(row.effective_n)">{{ row.effective_n != null ? row.effective_n.toFixed(0) : '—' }}</td>
-                <td :class="geodivClass(row.geo_div)">{{ row.geo_div != null ? (row.geo_div * 100).toFixed(1) + '%' : '—' }}</td>
-                <td :class="uwClass(row.max_underwater)">{{ row.max_underwater != null ? row.max_underwater + 'd' : '—' }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <div style="padding:.5rem 1.25rem;border-top:1px solid var(--border);font-size:.7rem;color:var(--text-muted)">
-          Hover any <strong>ⓘ</strong> column header for metric details &nbsp;·&nbsp; Score = absolute quality score against fixed benchmarks — independent of how many ETFs are tracked &nbsp;·&nbsp; Not investment advice.
-        </div>
-      </div>
-    </div>
   </div>
 </template>
 
@@ -332,14 +241,12 @@ import { etfService, analyticsService, scoreService } from '../services/api.js'
 const showApiKeyModal = inject('showApiKeyModal')
 const analyticsInitTab = inject('analyticsInitTab', ref(null))
 const navigateTo = inject('navigateTo')
-const hasApiKey = ref(!!localStorage.getItem('api_key'))
-window.addEventListener('storage', (e) => { if (e.key === 'api_key') hasApiKey.value = !!e.newValue })
+const hasApiKey = inject('hasApiKey', ref(!!localStorage.getItem('api_key')))
 
 const activeTab = ref('exposure')
 const tabs = [
   {id:'exposure',label:'Portfolio Exposure',icon:'🌍'},
   {id:'risk',label:'Risk Metrics',icon:'📊'},
-  {id:'goetf',label:'GoETF Score',icon:'⭐'},
 ]
 const allEtfs = ref([])
 const etfsLoading = ref(false)
@@ -406,49 +313,8 @@ async function runExposure() {
 // Risk-free rate (used for portfolio Sharpe in summary)
 const riskFreeRate = ref(4.0)     // % per year
 
-// GoETF Score tab
-const goetfRfRate = ref(4.0)
-const goetfLoading = ref(false)
-const goetfResult = ref(null)
-const goetfError = ref('')
-const goetfSortKey = ref('goetf_score')
-const goetfSortDir = ref('desc')
-
-const goetfSorted = computed(() => {
-  if (!goetfResult.value) return []
-  return [...goetfResult.value].sort((a, b) => {
-    let va = a[goetfSortKey.value], vb = b[goetfSortKey.value]
-    if (va === null || va === undefined) va = goetfSortDir.value === 'asc' ? Infinity : -Infinity
-    if (vb === null || vb === undefined) vb = goetfSortDir.value === 'asc' ? Infinity : -Infinity
-    if (typeof va === 'string') return goetfSortDir.value === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va)
-    return goetfSortDir.value === 'asc' ? va - vb : vb - va
-  })
-})
-
-function toggleGoetfSort(key) {
-  if (goetfSortKey.value === key) goetfSortDir.value = goetfSortDir.value === 'asc' ? 'desc' : 'asc'
-  else { goetfSortKey.value = key; goetfSortDir.value = 'desc' }
-}
-
-async function runGoetfScores() {
-  goetfLoading.value = true; goetfError.value = ''; goetfResult.value = null
-  try {
-    const r = await scoreService.getEtfScores([], goetfRfRate.value / 100)
-    goetfResult.value = r.data
-  } catch (e) {
-    goetfError.value = e.response?.data?.detail || e.message
-  } finally { goetfLoading.value = false }
-}
-
 const scoreBadgeClass = (s) => s >= 7 ? 'score-high' : s >= 5 ? 'score-mid' : s >= 3.5 ? 'score-low' : 'score-poor'
-const sortinoClass = (v) => v == null ? '' : v >= 1.0 ? 'cell-green' : v >= 0.5 ? 'cell-yellow' : 'cell-red'
-const calmarClass  = (v) => v == null ? '' : v >= 0.5 ? 'cell-green' : v >= 0.2 ? 'cell-yellow' : 'cell-red'
-const cvarClass    = (v) => v == null ? '' : v > -20  ? 'cell-green' : v > -40  ? 'cell-yellow' : 'cell-red'
-const hitClass     = (v) => v == null ? '' : v >= 0.55 ? 'cell-green' : v >= 0.48 ? 'cell-yellow' : 'cell-red'
 const hhiClass     = (v) => v == null ? '' : v < 200  ? 'cell-green' : v < 1000 ? 'cell-yellow' : 'cell-red'
-const effNClass    = (v) => v == null ? '' : v >= 100 ? 'cell-green' : v >= 20  ? 'cell-yellow' : 'cell-red'
-const geodivClass  = (v) => v == null ? '' : v >= 0.6 ? 'cell-green' : v >= 0.2 ? 'cell-yellow' : 'cell-red'
-const uwClass      = (v) => v == null ? '' : v < 250  ? 'cell-green' : v < 500  ? 'cell-yellow' : 'cell-red'
 
 // Risk Metrics tab
 const riskSelectedEtfs = ref([])
@@ -498,8 +364,10 @@ const ddClass   = v  => v === null ? '' : v > -10 ? 'cell-green' : v > -20 ? 'ce
 onMounted(() => {
   loadETFs()
   runRiskMetrics()
-  runGoetfScores()
-  if (analyticsInitTab.value) { activeTab.value = analyticsInitTab.value; analyticsInitTab.value = null }
+  if (analyticsInitTab.value && ['exposure', 'risk'].includes(analyticsInitTab.value)) {
+    activeTab.value = analyticsInitTab.value
+    analyticsInitTab.value = null
+  }
 })
 </script>
 
@@ -557,48 +425,10 @@ onMounted(() => {
 .score-mid{background:#fef9c3;color:#854d0e}
 .score-low{background:#ffedd5;color:#9a3412}
 .score-poor{background:#fee2e2;color:#b91c1c}
-.score-na{background:var(--bg-3);color:var(--text-muted)}
 [data-theme="dark"] .score-high{background:#052e16;color:#86efac}
 [data-theme="dark"] .score-mid{background:#2d1b00;color:#fde68a}
 [data-theme="dark"] .score-low{background:#3d1a00;color:#fdba74}
 [data-theme="dark"] .score-poor{background:#3d0000;color:#fca5a5}
 .tip-box{display:flex;gap:.75rem;align-items:flex-start;background:var(--bg-3);border:1px solid var(--border);border-radius:10px;padding:.85rem 1rem;margin-top:.5rem}
 .tip-icon{font-size:1.2rem;flex-shrink:0}
-
-/* ── Column header tooltips ───────────────────────────────────── */
-.col-label{
-  display:inline-flex;align-items:center;gap:.2rem;
-  cursor:help;
-  text-decoration:underline;
-  text-decoration-style:dotted;
-  text-underline-offset:3px;
-  text-decoration-color:var(--text-muted,#aaa);
-  position:relative;
-  font-weight:600;
-}
-.col-label:hover{color:var(--primary,#1585c8)}
-.col-i{
-  display:inline-flex;align-items:center;justify-content:center;
-  width:13px;height:13px;border-radius:50%;
-  font-size:.6rem;font-weight:700;font-style:italic;
-  background:var(--bg-3,#e8edf2);color:var(--text-muted,#888);
-  flex-shrink:0;line-height:1;
-}
-.col-label::after{
-  content:attr(data-tip);
-  position:absolute;top:calc(100% + 8px);left:0;
-  min-width:210px;max-width:250px;
-  background:#1e293b;color:#f1f5f9;
-  font-size:.73rem;font-weight:400;line-height:1.6;
-  padding:.65rem .85rem;border-radius:8px;
-  white-space:pre-line;
-  text-align:left;
-  box-shadow:0 4px 20px rgba(0,0,0,.4);
-  pointer-events:none;opacity:0;transition:opacity .15s;
-  z-index:300;
-  text-decoration:none;
-  font-style:normal;
-}
-.col-label:hover::after{opacity:1}
-thead th:nth-last-child(-n+3) .col-label::after{left:auto;right:0}
 </style>

@@ -306,6 +306,7 @@
     .drawer-panel { position: absolute; top: 0; right: 0; bottom: 0; width: 280px; background: #fff; padding: 80px 28px 28px; display: flex; flex-direction: column; gap: 8px; box-shadow: -4px 0 32px rgba(0,0,0,.15); }
     .drawer-panel a { padding: 12px 8px; font-size: 1rem; font-weight: 500; color: var(--text); border-bottom: 1px solid var(--border); }
     .drawer-panel .btn { margin-top: 16px; justify-content: center; }
+    .api-online-cta { display: inline-flex; align-items: center; justify-content: center; gap: 6px; background: rgba(0,201,167,.14) !important; color: var(--primary) !important; border: 1px solid rgba(0,201,167,.35) !important; font-weight: 700; }
 
     /* Scroll animation */
     .animate-on-scroll { opacity: 0; transform: translateY(24px); transition: opacity .6s ease, transform .6s ease; }
@@ -1002,6 +1003,23 @@ const observer = new IntersectionObserver((entries) => {
 }, { threshold: 0.12 });
 
 document.querySelectorAll('.animate-on-scroll').forEach(el => observer.observe(el));
+
+/* ── API Key UI State ───────────────────────────────────── */
+function applyApiKeyUiState() {
+  const hasApiKey = !!localStorage.getItem('api_key');
+  if (!hasApiKey) return;
+
+  document.querySelectorAll('a[href="/api-key"]').forEach(a => {
+    a.textContent = 'API Online';
+    a.setAttribute('href', '/api');
+    if (a.classList.contains('btn')) {
+      a.classList.remove('btn-outline', 'btn-primary', 'btn-accent', 'btn-ghost-light');
+      a.classList.add('api-online-cta');
+    }
+  });
+}
+
+applyApiKeyUiState();
 
 /* ── Score Gauge Animation ───────────────────────────────── */
 const gaugeArc = document.getElementById('gaugeArc');
