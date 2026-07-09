@@ -6,7 +6,7 @@
           <h1 class="page-title">API Reference</h1>
           <p class="page-subtitle">Complete documentation for all GoETF.ch API endpoints.</p>
         </div>
-        <button class="btn btn-primary" style="flex-shrink:0;margin-top:.25rem" @click="showApiKeyModal = true">
+        <button v-if="!hasApiKey" class="btn btn-primary" style="flex-shrink:0;margin-top:.25rem" @click="showApiKeyModal = true">
           Get Free API Key
         </button>
       </div>

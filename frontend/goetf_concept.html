@@ -1017,6 +1017,16 @@ function applyApiKeyUiState() {
   topCta.setAttribute('aria-disabled', 'true');
   topCta.classList.remove('btn-outline', 'btn-primary', 'btn-accent', 'btn-ghost-light');
   topCta.classList.add('api-online-cta');
+
+  document.querySelectorAll('a[href="/api-key"]').forEach((a) => {
+    if (a === topCta) return;
+    const listItem = a.closest('li');
+    if (listItem) {
+      listItem.style.display = 'none';
+    } else {
+      a.style.display = 'none';
+    }
+  });
 }
 
 applyApiKeyUiState();

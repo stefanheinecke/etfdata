@@ -26,7 +26,7 @@
         <a href="#" @click.prevent="goToPage('analytics', 'exposure')">Portfolio</a>
         <a href="#" @click.prevent="goToPage('docs')">API</a>
         <a href="#" @click.prevent="goToPage('methodology')">Methodology</a>
-        <a href="#" class="btn btn-primary" @click.prevent="openApiKeyModal('request'); mobileMenuOpen = false">Get API Key</a>
+        <a v-if="!hasApiKey" href="#" class="btn btn-primary" @click.prevent="openApiKeyModal('request'); mobileMenuOpen = false">Get API Key</a>
       </div>
     </div>
 
@@ -66,7 +66,7 @@
                 <h4>Developers</h4>
                 <ul>
                   <li><a href="#" @click.prevent="goToPage('docs')">API Docs</a></li>
-                  <li><a href="#" @click.prevent="openApiKeyModal('request')">Get API Key</a></li>
+                  <li v-if="!hasApiKey"><a href="#" @click.prevent="openApiKeyModal('request')">Get API Key</a></li>
                   <li><a href="#" @click.prevent="goToPage('docs')">Live Explorer</a></li>
                 </ul>
               </div>
