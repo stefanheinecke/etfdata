@@ -202,7 +202,7 @@ const groups = [
     label: 'Scores',
     endpoints: [
       { id: 'score-etfs', method: 'GET', short: '/scores/etfs', path: '/scores/etfs',
-        title: 'GoETF Score: Individual ETFs', desc: 'Returns the GoETF Score (1-10) for all ETFs or a ticker-filtered subset. Each score is a weighted percentile rank across 8 metrics: Sortino ratio (20%), Calmar ratio (15%), CVaR 95% (15%), HHI (10%), Effective N (10%), Geographic Diversity (10%), Hit Ratio (10%), Max Time Under Water (10%)',
+        title: 'GoETF Score: Individual ETFs', desc: 'Returns the GoETF Score (1-10) for all ETFs or a ticker-filtered subset. Each score is a weighted absolute quality score using fixed worst-to-best benchmark ranges across 8 metrics: Sortino ratio (20%), Calmar ratio (15%), CVaR 95% (15%), HHI (10%), Effective N (10%), Geographic Diversity (10%), Hit Ratio (10%), Max Time Under Water (10%). Metric values are capped at their benchmark limits, so scores are independent of ETF universe size.',
         params: [
           {name:'tickers',in:'query',type:'string',required:false,desc:'Comma-separated tickers (e.g. SWDA,CSSPX). Omit to score all ETFs.'},
           {name:'rf_rate',in:'query',type:'float',required:false,desc:'Annual risk-free rate as decimal (default 0.04 = 4%)'},

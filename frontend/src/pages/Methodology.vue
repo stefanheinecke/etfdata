@@ -11,7 +11,7 @@
         <span class="meth-badge">1-10</span>
         <div>
           <h2 class="meth-title">GoETF Score: Individual ETF</h2>
-          <p class="meth-sub">A composite rating that measures an ETF's risk-adjusted return quality and portfolio diversification, relative to all other ETFs in the GoETF universe.</p>
+          <p class="meth-sub">A composite rating that measures an ETF's risk-adjusted return quality and portfolio diversification against fixed quality benchmarks.</p>
         </div>
       </div>
 
@@ -20,11 +20,12 @@
         <h3 class="card-title">How it works</h3>
         <ol class="meth-steps">
           <li><strong>Compute raw metrics</strong>: 8 metrics are calculated for each ETF from its price history, holdings, and country allocations.</li>
-          <li><strong>Percentile rank</strong>: each metric is ranked percentile-wise across all ETFs in the universe (0 = worst, 1 = best). The direction (higher/lower is better) is taken into account.</li>
-          <li><strong>Weighted score</strong>: percentile ranks are combined using fixed weights. The resulting 0-1 value is scaled to 1-10.</li>
+          <li><strong>Benchmark normalization</strong>: each metric is mapped to a 0-1 quality score using a fixed worst-to-best reference range. The direction (higher/lower is better) is taken into account, and values outside the range are capped.</li>
+          <li><strong>Weighted score</strong>: normalized metric scores are combined using fixed weights. The resulting 0-1 value is scaled to 1-10.</li>
         </ol>
         <div class="meth-formula-box">
-          <code>raw = Σ (weight<sub>i</sub> × percentile_rank<sub>i</sub>)</code>
+          <code>metric_score<sub>i</sub> = clamp((value<sub>i</sub> − worst<sub>i</sub>) ÷ (best<sub>i</sub> − worst<sub>i</sub>), 0, 1)</code>
+          <code>raw = Σ (weight<sub>i</sub> × metric_score<sub>i</sub>)</code>
           <code>GoETF Score = 1 + raw × 9</code>
         </div>
       </div>
@@ -106,7 +107,7 @@
           </table>
         </div>
         <div style="padding:.6rem 1.25rem;font-size:.72rem;color:var(--text-muted);border-top:1px solid var(--border)">
-          Risk-free rate is configurable (default 4% p.a. ≈ Swiss SARON). All price-history metrics use daily log-returns from available close price data.
+          Risk-free rate is configurable (default 4% p.a. ≈ Swiss SARON). All price-history metrics use daily log-returns from available close price data. Fixed benchmark ranges make scores stable when the ETF universe changes.
         </div>
       </div>
     </div>
@@ -141,8 +142,9 @@
             <h3 class="meth-comp-title">Overlap Penalty</h3>
             <span class="meth-comp-range meth-range-neg">0 to −2</span>
           </div>
-          <p class="meth-comp-desc">For every pair of ETFs, the weight overlap is computed as Σ min(w<sub>a</sub>, w<sub>b</sub>) across shared holdings (0-100%). The weighted average pairwise overlap drives the penalty: 100% identical overlap costs 2 score points.</p>
+          <p class="meth-comp-desc">For every pair of ETFs, GoETF adds the smaller weight of each shared holding. The resulting weight overlap is then averaged across pairs, giving greater influence to pairs with larger portfolio allocations.</p>
           <div class="meth-formula-box meth-formula-sm">
+            <code>pair_overlap = Σ min(weight<sub>a</sub>, weight<sub>b</sub>)</code>
             <code>penalty = (avg_weight_overlap_% ÷ 100) × 2</code>
           </div>
         </div>
@@ -156,6 +158,46 @@
           <p class="meth-comp-desc">If the combined portfolio achieves greater geographic diversity (lower country HHI) than the weighted average of its individual ETFs, the improvement is added as a bonus.</p>
           <div class="meth-formula-box meth-formula-sm">
             <code>bonus = max(0, portfolio_geo_div − avg_individual_geo_div)</code>
+          </div>
+        </div>
+      </div>
+
+      <!-- Overlap example -->
+      <div class="card meth-card meth-example-card">
+        <h3 class="card-title">Overlap calculation example</h3>
+        <p class="meth-example-intro">Only shared holdings contribute to overlap. For each shared security, the smaller ETF weight is counted once. Holdings that appear in only one ETF contribute 0%.</p>
+        <div class="meth-example-grid">
+          <div>
+            <div class="table-wrap">
+              <table class="meth-table meth-example-table">
+                <thead>
+                  <tr>
+                    <th>Shared holding</th>
+                    <th>ETF A</th>
+                    <th>ETF B</th>
+                    <th>Contribution</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr><td>Apple</td><td>8%</td><td>5%</td><td>min(8%, 5%) = 5%</td></tr>
+                  <tr><td>Microsoft</td><td>6%</td><td>9%</td><td>min(6%, 9%) = 6%</td></tr>
+                  <tr><td>Nvidia</td><td>4%</td><td>4%</td><td>min(4%, 4%) = 4%</td></tr>
+                  <tr><td colspan="3"><strong>Pair overlap</strong></td><td><strong>15%</strong></td></tr>
+                </tbody>
+              </table>
+            </div>
+            <p class="meth-example-note">The separate <code>overlap_percent</code> value shown by the analytics endpoint counts common securities by number. The portfolio penalty uses the weight-based figure above.</p>
+          </div>
+          <div class="meth-example-copy">
+            <p><strong>With three ETFs</strong></p>
+            <p>Assume allocations of A = 50%, B = 30%, and C = 20%, with pair overlaps of A/B = 20%, A/C = 10%, and B/C = 40%.</p>
+            <div class="meth-formula-box meth-formula-sm">
+              <code>pair weight = (allocation<sub>a</sub> + allocation<sub>b</sub>) ÷ 2</code>
+              <code>A/B: 40% · A/C: 35% · B/C: 25%</code>
+              <code>avg = (20×40 + 10×35 + 40×25) ÷ 100 = 21.5%</code>
+              <code>penalty = (21.5 ÷ 100) × 2 = 0.43 points</code>
+            </div>
+            <p>The average overlap is therefore <strong>21.5%</strong>, producing a <strong>0.43-point deduction</strong>. With only two ETFs, there is one pair, so the average equals that pair's overlap.</p>
           </div>
         </div>
       </div>
@@ -184,7 +226,7 @@
     <!-- Disclaimer -->
     <div class="card" style="background:var(--bg-3);border-color:var(--border)">
       <p style="font-size:.8rem;color:var(--text-muted);margin:0;line-height:1.7">
-        <strong>Note:</strong> GoETF Scores are quantitative summaries derived from historical data. They are provided for informational purposes only and do not constitute investment advice or an invitation to buy or sell any ETF. Past performance and historical statistics are not indicative of future results. Score values depend on the available data history and the composition of the current GoETF ETF universe.
+        <strong>Note:</strong> GoETF Scores are quantitative summaries derived from historical data and fixed reference benchmarks. They are provided for informational purposes only and do not constitute investment advice or an invitation to buy or sell any ETF. Past performance and historical statistics are not indicative of future results. Score values depend on the available data history, the risk-free rate, and the benchmark ranges defined by GoETF.
       </p>
     </div>
   </div>
@@ -259,9 +301,22 @@
 .meth-final-card { border-color: var(--green-400) !important; }
 .meth-tip-row { display: flex; gap: .75rem; font-size: .82rem; color: var(--text); align-items: baseline; }
 .meth-tip-key { font-weight: 600; min-width: 80px; color: var(--text-muted); flex-shrink: 0; }
+.meth-example-card { background: var(--bg-2, var(--surface)); }
+.meth-example-intro { font-size: .875rem; color: var(--text-muted); line-height: 1.55; margin: -.35rem 0 1rem; }
+.meth-example-grid { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(260px, .9fr); gap: 1.25rem; align-items: start; }
+.meth-example-table { font-size: .78rem; }
+.meth-example-table th, .meth-example-table td { padding: .55rem .65rem; }
+.meth-example-note { font-size: .72rem; color: var(--text-muted); line-height: 1.5; margin: .65rem 0 0; }
+.meth-example-note code { font-family: monospace; }
+.meth-example-copy { font-size: .82rem; color: var(--text); line-height: 1.55; }
+.meth-example-copy p { margin: 0 0 .65rem; }
+.meth-example-copy .meth-formula-box { margin: .75rem 0; }
+.meth-example-copy .meth-formula-box code { font-size: .76rem; }
 .table-wrap { overflow-x: auto; }
 @media (max-width: 640px) {
   .meth-section-head { flex-direction: column; }
   .meth-table th:nth-child(4), .meth-table td:nth-child(4) { display: none; }
+  .meth-example-grid { grid-template-columns: 1fr; }
+  .meth-example-table th:nth-child(4), .meth-example-table td:nth-child(4) { display: table-cell; }
 }
 </style>

@@ -2,7 +2,7 @@
 GoETF Scoring Service
 Computes individual ETF GoETF Scores (1–10) and Portfolio GoETF Scores.
 
-Individual score = weighted percentile rank across 8 metrics:
+Individual score = weighted absolute quality score across 8 metrics:
   Sortino (20%), Calmar (15%), CVaR (15%), HHI (10%),
   Effective N (10%), Geo Div (10%), Hit Ratio (10%), Max Underwater (10%)
 
