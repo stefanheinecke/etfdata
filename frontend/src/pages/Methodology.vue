@@ -155,8 +155,9 @@
             <h3 class="meth-comp-title">Diversification Bonus</h3>
             <span class="meth-comp-range meth-range-pos">0 to +1</span>
           </div>
-          <p class="meth-comp-desc">If the combined portfolio achieves greater geographic diversity (lower country HHI) than the weighted average of its individual ETFs, the improvement is added as a bonus.</p>
+          <p class="meth-comp-desc">GoETF first combines country exposures using the portfolio allocations. It compares that portfolio diversity with the allocation-weighted average diversity of the individual ETFs. Only an improvement produces a bonus.</p>
           <div class="meth-formula-box meth-formula-sm">
+            <code>geo_div = 1 − (country HHI ÷ 10,000)</code>
             <code>bonus = max(0, portfolio_geo_div − avg_individual_geo_div)</code>
           </div>
         </div>
@@ -200,6 +201,35 @@
             <p>The average overlap is therefore <strong>21.5%</strong>, producing a <strong>0.43-point deduction</strong>. With only two ETFs, there is one pair, so the average equals that pair's overlap.</p>
           </div>
         </div>
+      </div>
+
+      <!-- Diversification bonus example -->
+      <div class="card meth-card meth-example-card">
+        <h3 class="card-title">Diversification bonus example</h3>
+        <p class="meth-example-intro">The bonus measures the improvement created by combining ETFs. It is not based on the number of ETFs; it is based on how evenly the combined portfolio is distributed across countries.</p>
+        <div class="meth-example-grid">
+          <div class="meth-example-copy">
+            <p><strong>Step 1: Combine country exposures</strong></p>
+            <p>Suppose a 60% allocation to ETF A produces 60% US exposure, while a 40% allocation to ETF B produces 100% Japan exposure. The combined portfolio is therefore 36% US and 40% Japan after applying the ETF allocations. The remaining 24% represents other countries.</p>
+            <div class="meth-formula-box meth-formula-sm">
+              <code>US: 60% × 60% = 36%</code>
+              <code>Japan: 40% × 100% = 40%</code>
+              <code>Other countries: 24%</code>
+            </div>
+          </div>
+          <div class="meth-example-copy">
+            <p><strong>Step 2: Compare diversity scores</strong></p>
+            <p>For the 36% US, 40% Japan, and 24% other-country distribution, the country HHI is 3,472. Its geographic diversity is:</p>
+            <div class="meth-formula-box meth-formula-sm">
+              <code>country HHI = (0.36² + 0.40² + 0.24²) × 10,000 = 3,472</code>
+              <code>portfolio_geo_div = 1 − (3,472 ÷ 10,000) = 0.653</code>
+              <code>avg_individual_geo_div = (60% × 0.500) + (40% × 0.400) = 0.460</code>
+              <code>bonus = max(0, 0.653 − 0.460) = +0.193</code>
+            </div>
+            <p>The portfolio is more geographically diverse than its weighted individual baseline, so <strong>0.19 points</strong> are added to the score after rounding.</p>
+          </div>
+        </div>
+        <div class="meth-example-footnote"><strong>No bonus example:</strong> if the combined portfolio diversity were 0.420 instead, the calculation would be <code>max(0, 0.420 − 0.460) = 0</code>. Diversity cannot reduce the score through this component; only the overlap penalty can do that.</div>
       </div>
 
       <!-- Final formula -->
@@ -312,6 +342,8 @@
 .meth-example-copy p { margin: 0 0 .65rem; }
 .meth-example-copy .meth-formula-box { margin: .75rem 0; }
 .meth-example-copy .meth-formula-box code { font-size: .76rem; }
+.meth-example-footnote { margin-top: 1rem; padding-top: .75rem; border-top: 1px solid var(--border); font-size: .78rem; color: var(--text-muted); line-height: 1.55; }
+.meth-example-footnote code { font-family: monospace; }
 .table-wrap { overflow-x: auto; }
 @media (max-width: 640px) {
   .meth-section-head { flex-direction: column; }
