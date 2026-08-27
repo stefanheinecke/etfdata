@@ -210,26 +210,28 @@
         <div class="meth-example-grid">
           <div class="meth-example-copy">
             <p><strong>Step 1: Combine country exposures</strong></p>
-            <p>Suppose a 60% allocation to ETF A produces 60% US exposure, while a 40% allocation to ETF B produces 100% Japan exposure. The combined portfolio is therefore 36% US and 40% Japan after applying the ETF allocations. The remaining 24% represents other countries.</p>
+            <p>For a simplified example, suppose ETF A is 60% US and 40% other countries, while ETF B is 100% Japan. With a 60% allocation to ETF A and 40% to ETF B, the combined portfolio is 36% US, 24% other countries, and 40% Japan. Here, the 24% is temporarily treated as one bucket only to keep the arithmetic short.</p>
             <div class="meth-formula-box meth-formula-sm">
               <code>US: 60% × 60% = 36%</code>
               <code>Japan: 40% × 100% = 40%</code>
-              <code>Other countries: 24%</code>
+              <code>Other countries: 60% × 40% = 24%</code>
             </div>
           </div>
           <div class="meth-example-copy">
             <p><strong>Step 2: Compare diversity scores</strong></p>
-            <p>For the 36% US, 40% Japan, and 24% other-country distribution, the country HHI is 3,472. Its geographic diversity is:</p>
+            <p>When the 24% bucket is treated as one category, the 36% US, 40% Japan, and 24% other-country distribution has an HHI of 3,472. ETF A's illustrative diversity is 0.480, while ETF B's is 0 because it is concentrated in one country:</p>
             <div class="meth-formula-box meth-formula-sm">
               <code>country HHI = (0.36² + 0.40² + 0.24²) × 10,000 = 3,472</code>
               <code>portfolio_geo_div = 1 − (3,472 ÷ 10,000) = 0.653</code>
-              <code>avg_individual_geo_div = (60% × 0.500) + (40% × 0.400) = 0.460</code>
-              <code>bonus = max(0, 0.653 − 0.460) = +0.193</code>
+              <code>ETF A geo_div = 1 − (0.60² + 0.40²) = 0.480</code>
+              <code>ETF B geo_div = 1 − 1.00² = 0.000</code>
+              <code>avg_individual_geo_div = (60% × 0.480) + (40% × 0.000) = 0.288</code>
+              <code>bonus = max(0, 0.653 − 0.288) = +0.365</code>
             </div>
-            <p>The portfolio is more geographically diverse than its weighted individual baseline, so <strong>0.19 points</strong> are added to the score after rounding.</p>
+            <p>Under this simplified bucket assumption, the portfolio is more geographically diverse than its weighted individual baseline, so <strong>0.37 points</strong> are added to the score after rounding.</p>
           </div>
         </div>
-        <div class="meth-example-footnote"><strong>No bonus example:</strong> if the combined portfolio diversity were 0.420 instead, the calculation would be <code>max(0, 0.420 − 0.460) = 0</code>. Diversity cannot reduce the score through this component; only the overlap penalty can do that.</div>
+        <div class="meth-example-footnote"><strong>Important:</strong> The live calculation does not combine all “other countries” into one bucket. If the 24% were split equally across four actual countries, the HHI would be <code>(0.36² + 0.40² + 4×0.06²) × 10,000 = 3,256</code> and <code>geo_div = 0.674</code>, instead of 0.653. Splitting weights across more countries therefore increases geographic diversity. ETF A's individual diversity would also need to be recalculated from its full country breakdown. <strong>No bonus example:</strong> if the combined portfolio diversity were 0.250 instead, <code>max(0, 0.250 − 0.288) = 0</code>. Diversity cannot reduce the score through this component; only the overlap penalty can do that.</div>
       </div>
 
       <!-- Final formula -->
