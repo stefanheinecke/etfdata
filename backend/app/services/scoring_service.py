@@ -364,7 +364,20 @@ def compute_portfolio_score(
     final_score = max(1.0, min(10.0, base - overlap_penalty + allocation_bonus))
 
     # 4. Insight
-    tip = _compute_tip(db, active, total_w, rf_annual, all_scores, score_map, geo_map, ticker_map, final_score)
+    tip = _compute_tip(
+        db,
+        active,
+        total_w,
+        rf_annual,
+        all_scores,
+        score_map,
+        geo_map,
+        ticker_map,
+        final_score,
+        base,
+        overlap_penalty,
+        allocation_bonus,
+    )
 
     # Build individual scores list
     active_ids = {p["etf_id"] for p in active}
@@ -408,6 +421,9 @@ def _compute_tip(
     geo_map: Dict[str, float],
     ticker_map: Dict[str, str],
     current_score: float,
+    current_base: float,
+    current_overlap_penalty: float,
+    current_allocation_bonus: float,
 ) -> Optional[Dict]:
     """
     Test each ETF against each alternative from the universe.
@@ -465,14 +481,23 @@ def _compute_tip(
                 cand_avg_ov = 0.0
             cand_penalty = (cand_avg_ov / 100) * 2.0
 
-            # Simplified allocation bonus: compare candidate avg geo_div vs current
+            # Calculate the candidate's geographic bonus from combined country exposure.
             cand_avg_geo = sum(
                 (p["weight"] / cand_total_w) * geo_map.get(p["etf_id"], 0.5) for p in candidate
             )
-            curr_avg_geo = sum(
-                (p["weight"] / total_w) * geo_map.get(p["etf_id"], 0.5) for p in active
-            )
-            cand_bonus = max(0.0, cand_avg_geo - curr_avg_geo)
+            candidate_portfolio = [
+                {"etf_id": UUID(p["etf_id"]), "weight": p["weight"] / cand_total_w * 100}
+                for p in candidate
+            ]
+            exposure = AnalyticsService.calculate_portfolio_exposure(db, candidate_portfolio)
+            country_vals = list(exposure.get("countries", {}).values())
+            cand_bonus = 0.0
+            if country_vals:
+                total_c = sum(country_vals)
+                if total_c > 0:
+                    norm_c = [value / total_c for value in country_vals]
+                    candidate_geo_div = 1.0 - sum(value * value for value in norm_c)
+                    cand_bonus = max(0.0, candidate_geo_div - cand_avg_geo)
 
             cand_score = max(1.0, min(10.0, cand_base - cand_penalty + cand_bonus))
 
@@ -480,6 +505,9 @@ def _compute_tip(
                 best_score = cand_score
                 old_ticker = ticker_map.get(item["etf_id"], item["etf_id"])
                 new_ticker = alt["ticker"]
+                individual_delta = cand_base - current_base
+                overlap_delta = current_overlap_penalty - cand_penalty
+                diversification_delta = cand_bonus - current_allocation_bonus
                 best_tip = {
                     "replace_etf_id": item["etf_id"],
                     "replace_ticker": old_ticker,
@@ -487,9 +515,12 @@ def _compute_tip(
                     "with_ticker": new_ticker,
                     "new_score": round(best_score, 1),
                     "improvement": round(best_score - current_score, 1),
+                    "individual_score_delta": round(individual_delta, 2),
+                    "overlap_impact": round(overlap_delta, 2),
+                    "diversification_impact": round(diversification_delta, 2),
                     "reason": (
-                        f"{new_ticker} has lower holdings overlap than {old_ticker} "
-                        f"and improves portfolio diversification."
+                        f"The suggested replacement is evaluated by its net effect on "
+                        f"individual quality, overlap, and geographic diversification."
                     ),
                 }
 

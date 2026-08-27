@@ -83,12 +83,15 @@
         <div v-if="portfolioScoreResult.tip" class="tip-box">
           <span class="tip-icon">💡</span>
           <div>
-            <strong style="color:var(--green-600)">{{ portfolioScoreResult.tip.with_ticker }}</strong>
-            has lower holdings overlap than <strong style="color:var(--green-600)">{{ portfolioScoreResult.tip.replace_ticker }}</strong>.
-            Using <strong style="color:var(--green-600)">{{ portfolioScoreResult.tip.with_ticker }}</strong>
-            instead would increase your portfolio score to <strong>{{ portfolioScoreResult.tip.new_score }}</strong>
-            (<span style="color:#0b6aa5">+{{ portfolioScoreResult.tip.improvement }}</span>).
-            <div style="font-size:.8rem;color:var(--text-muted);margin-top:.2rem">{{ portfolioScoreResult.tip.reason }}</div>
+            Replacing <strong style="color:var(--green-600)">{{ portfolioScoreResult.tip.replace_ticker }}</strong>
+            with <strong style="color:var(--green-600)">{{ portfolioScoreResult.tip.with_ticker }}</strong>
+            would increase the portfolio score to <strong>{{ portfolioScoreResult.tip.new_score }}</strong>
+            (<span class="tip-impact-positive">+{{ portfolioScoreResult.tip.improvement.toFixed(1) }}</span>):
+            <div class="tip-breakdown">
+              <div><span>Individual ETF score</span><strong :class="portfolioScoreResult.tip.individual_score_delta >= 0 ? 'tip-impact-positive' : 'tip-impact-negative'">{{ portfolioScoreResult.tip.individual_score_delta >= 0 ? '+' : '' }}{{ portfolioScoreResult.tip.individual_score_delta.toFixed(2) }}</strong></div>
+              <div><span>Overlap penalty impact</span><strong :class="portfolioScoreResult.tip.overlap_impact >= 0 ? 'tip-impact-positive' : 'tip-impact-negative'">{{ portfolioScoreResult.tip.overlap_impact >= 0 ? '+' : '' }}{{ portfolioScoreResult.tip.overlap_impact.toFixed(2) }}</strong></div>
+              <div><span>Geographic diversification impact</span><strong :class="portfolioScoreResult.tip.diversification_impact >= 0 ? 'tip-impact-positive' : 'tip-impact-negative'">{{ portfolioScoreResult.tip.diversification_impact >= 0 ? '+' : '' }}{{ portfolioScoreResult.tip.diversification_impact.toFixed(2) }}</strong></div>
+            </div>
           </div>
         </div>
         <div v-else-if="portfolioScoreResult.tip === null" style="font-size:.8rem;color:var(--text-muted)">No higher-scoring alternative cleared the +0.1 threshold.</div>
@@ -431,4 +434,9 @@ onMounted(() => {
 [data-theme="dark"] .score-poor{background:#3d0000;color:#fca5a5}
 .tip-box{display:flex;gap:.75rem;align-items:flex-start;background:var(--bg-3);border:1px solid var(--border);border-radius:10px;padding:.85rem 1rem;margin-top:.5rem}
 .tip-icon{font-size:1.2rem;flex-shrink:0}
+.tip-breakdown{display:flex;flex-direction:column;gap:.25rem;margin-top:.55rem;font-size:.8rem;color:var(--text-muted)}
+.tip-breakdown div{display:flex;justify-content:space-between;gap:1.5rem}
+.tip-breakdown strong{font-variant-numeric:tabular-nums}
+.tip-impact-positive{color:#16a34a}
+.tip-impact-negative{color:#ef4444}
 </style>
