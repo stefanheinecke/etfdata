@@ -57,8 +57,13 @@
           <tbody>
             <tr v-for="row in goetfSorted" :key="row.etf_id" class="score-row" tabindex="0" @click="openETF(row)" @keydown.enter="openETF(row)" @keydown.space.prevent="openETF(row)">
               <td>
-                <span v-if="row.goetf_score != null" class="score-badge" :class="scoreBadgeClass(row.goetf_score)" :title="row.missing_components?.length ? `Calculated without: ${row.missing_components.join(', ')}` : 'All seven components available'">{{ row.goetf_score.toFixed(1) }}</span>
-                <span v-else class="score-badge score-na">N/A</span>
+                <div class="score-cell">
+                  <template v-if="row.goetf_score != null">
+                    <span class="score-badge" :class="scoreBadgeClass(row.goetf_score)" :title="row.missing_components?.length ? `Calculated without: ${row.missing_components.join(', ')}` : 'All seven components available'">{{ row.goetf_score.toFixed(1) }}</span>
+                    <button class="score-info-btn" type="button" :aria-label="`Show ${row.ticker} Quality Score calculation`" @click.stop="showScoreDetail(row)" @keydown.stop>i</button>
+                  </template>
+                  <span v-else class="score-badge score-na">N/A</span>
+                </div>
               </td>
               <td><strong style="color:var(--green-600)">{{ row.ticker }}</strong></td>
               <td style="font-size:.8rem;color:var(--text-muted);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ row.name }}</td>
@@ -76,6 +81,31 @@
       <div style="padding:.5rem 1.25rem;border-top:1px solid var(--border);font-size:.7rem;color:var(--text-muted)">
         Seven available components are equally weighted. Scores require at least one year of price history; unavailable holdings, allocation, or TER components are disclosed in the score tooltip and excluded from the average.
       </div>
+    </div>
+    <div v-if="scoreDetail" class="score-detail-backdrop" @click.self="closeScoreDetail">
+      <section class="score-detail" role="dialog" aria-modal="true" :aria-label="`${scoreDetail.ticker} Quality Score calculation`">
+        <div class="score-detail-head">
+          <div>
+            <p>GoETF Quality Score</p>
+            <h2>{{ scoreDetail.ticker }} <span>{{ scoreDetail.goetf_score.toFixed(1) }} / 10</span></h2>
+          </div>
+          <button class="score-detail-close" type="button" aria-label="Close calculation details" @click="closeScoreDetail">×</button>
+        </div>
+        <p class="score-detail-copy">Each available component is converted to a 0-1 quality score against a fixed benchmark. The final score is the equal-weight average, scaled to 1-10.</p>
+        <div class="score-detail-list">
+          <div v-for="component in scoreDetailComponents" :key="component.key" class="score-detail-row">
+            <div><strong>{{ component.label }}</strong><span>{{ component.value }}</span></div>
+            <div class="score-detail-quality"><span>Quality score</span><strong>{{ component.score.toFixed(3) }}</strong></div>
+          </div>
+        </div>
+        <div class="score-detail-formula">
+          <span>Equal-weight average</span>
+          <strong>{{ scoreDetailAverage.toFixed(3) }}</strong>
+          <span>1 + ({{ scoreDetailAverage.toFixed(3) }} × 9)</span>
+          <strong>{{ scoreDetail.goetf_score.toFixed(1) }} / 10</strong>
+        </div>
+        <p v-if="scoreDetail.missing_components?.length" class="score-detail-missing">Not included because data is unavailable: {{ scoreDetail.missing_components.map(componentLabel).join(', ') }}.</p>
+      </section>
     </div>
   </div>
 </template>
@@ -95,6 +125,17 @@ const goetfResult = ref(null)
 const goetfError = ref('')
 const goetfSortKey = ref('goetf_score')
 const goetfSortDir = ref('desc')
+const scoreDetail = ref(null)
+
+const COMPONENT_LABELS = {
+  cagr_pct: 'CAGR',
+  sortino: 'Sortino Ratio',
+  max_drawdown_pct: 'Maximum Drawdown',
+  hhi: 'Holdings HHI',
+  geo_div: 'Country Diversity',
+  sector_div: 'Sector Diversity',
+  ter_pct: 'TER',
+}
 
 const goetfSorted = computed(() => {
   if (!goetfResult.value) return []
@@ -115,6 +156,43 @@ function toggleGoetfSort(key) {
 function openETF(row) {
   navigateToETF({ id: row.etf_id })
 }
+
+function showScoreDetail(row) {
+  scoreDetail.value = row
+}
+
+function closeScoreDetail() {
+  scoreDetail.value = null
+}
+
+function componentLabel(key) {
+  return COMPONENT_LABELS[key] || key
+}
+
+function componentValue(row, key) {
+  const value = row[key]
+  if (value == null) return 'Unavailable'
+  if (key === 'sortino') return value.toFixed(2)
+  if (key === 'hhi') return value.toFixed(0)
+  if (key === 'geo_div' || key === 'sector_div') return `${(value * 100).toFixed(1)}%`
+  if (key === 'ter_pct' || key === 'cagr_pct' || key === 'max_drawdown_pct') return `${value.toFixed(2)}%`
+  return String(value)
+}
+
+const scoreDetailComponents = computed(() => {
+  if (!scoreDetail.value) return []
+  return (scoreDetail.value.available_components || []).map(key => ({
+    key,
+    label: componentLabel(key),
+    value: componentValue(scoreDetail.value, key),
+    score: scoreDetail.value.metric_scores[key],
+  }))
+})
+
+const scoreDetailAverage = computed(() => {
+  const components = scoreDetailComponents.value
+  return components.length ? components.reduce((sum, component) => sum + component.score, 0) / components.length : 0
+})
 
 async function runGoetfScores() {
   goetfLoading.value = true
@@ -163,6 +241,9 @@ onMounted(runGoetfScores)
 .risk-table tbody tr:hover{background:var(--bg-3)}
 .score-row{cursor:pointer}
 .score-row:focus-visible{outline:2px solid #2f85c8;outline-offset:-2px}
+.score-cell{display:flex;align-items:center;gap:.35rem}
+.score-info-btn{width:18px;height:18px;padding:0;border:1px solid var(--border);border-radius:50%;background:var(--surface);color:var(--text-muted);font-family:Georgia,serif;font-size:.72rem;font-weight:700;line-height:1;cursor:pointer}
+.score-info-btn:hover,.score-info-btn:focus-visible{color:#0f4c81;border-color:#2f85c8;outline:none}
 .sortable-th{cursor:pointer;user-select:none;white-space:nowrap}
 .sortable-th:hover{color:#1a6ab8}
 .sort-arrow{margin-left:.25rem;font-size:.7rem}
@@ -182,4 +263,23 @@ onMounted(runGoetfScores)
 .col-i{display:inline-flex;align-items:center;justify-content:center;width:13px;height:13px;border-radius:50%;font-size:.6rem;font-weight:700;font-style:italic;background:var(--bg-3,#e8edf2);color:var(--text-muted,#888);flex-shrink:0;line-height:1}
 .col-label::after{content:attr(data-tip);position:absolute;top:calc(100% + 8px);left:0;min-width:210px;max-width:250px;background:#1e293b;color:#f1f5f9;font-size:.73rem;font-weight:400;line-height:1.6;padding:.65rem .85rem;border-radius:8px;white-space:pre-line;text-align:left;box-shadow:0 4px 20px rgba(0,0,0,.4);pointer-events:none;opacity:0;transition:opacity .15s;z-index:300;text-decoration:none;font-style:normal}
 .col-label:hover::after{opacity:1}
+.score-detail-backdrop{position:fixed;inset:0;z-index:500;display:flex;align-items:center;justify-content:center;padding:1rem;background:rgba(15,23,42,.48)}
+.score-detail{width:min(520px,100%);max-height:min(680px,calc(100vh - 2rem));overflow:auto;background:var(--surface);border:1px solid var(--border);border-radius:8px;box-shadow:0 24px 60px rgba(15,23,42,.28);padding:1.25rem}
+.score-detail-head{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;border-bottom:1px solid var(--border);padding-bottom:1rem}
+.score-detail-head p{margin:0 0 .25rem;font-size:.7rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-muted)}
+.score-detail-head h2{margin:0;font-size:1.25rem;color:var(--text)}
+.score-detail-head h2 span{color:#0f4c81;font-variant-numeric:tabular-nums}
+.score-detail-close{width:28px;height:28px;padding:0;border:0;background:var(--bg-3);border-radius:5px;color:var(--text-muted);font-size:1.35rem;line-height:1;cursor:pointer}
+.score-detail-close:hover{color:var(--text);background:var(--border)}
+.score-detail-copy{font-size:.82rem;line-height:1.55;color:var(--text-muted);margin:1rem 0}
+.score-detail-list{border-top:1px solid var(--border)}
+.score-detail-row{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.65rem 0;border-bottom:1px solid var(--border)}
+.score-detail-row>div:first-child{display:flex;flex-direction:column;gap:.12rem;min-width:0}
+.score-detail-row strong{font-size:.82rem;color:var(--text)}
+.score-detail-row span{font-size:.75rem;color:var(--text-muted)}
+.score-detail-quality{display:flex;align-items:flex-end;flex-direction:column;gap:.12rem;white-space:nowrap}
+.score-detail-formula{display:grid;grid-template-columns:1fr auto;gap:.35rem .75rem;margin-top:1rem;padding:.8rem;background:var(--bg-3);border-radius:6px;font-size:.78rem}
+.score-detail-formula span{color:var(--text-muted)}
+.score-detail-formula strong{color:#0f4c81;font-variant-numeric:tabular-nums}
+.score-detail-missing{margin:1rem 0 0;font-size:.75rem;line-height:1.5;color:var(--text-muted)}
 </style>
