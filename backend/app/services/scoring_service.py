@@ -378,6 +378,9 @@ def compute_portfolio_score(
                     "name": s["name"],
                     "goetf_score": s.get("goetf_score"),
                     "weight_pct": round(p["weight"] / total_w * 100, 1),
+                    "geo_div": s.get("geo_div"),
+                    "sector_div": s.get("sector_div"),
+                    "ter_pct": s.get("ter_pct"),
                 }
             )
 

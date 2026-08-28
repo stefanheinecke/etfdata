@@ -105,10 +105,6 @@
               <div class="stat-value" :class="volClass(portfolioSummary.volatility)">{{ fmtPct(portfolioSummary.volatility) }}</div>
             </div>
             <div class="stat-box">
-              <div class="stat-label">Sharpe Ratio</div>
-              <div class="stat-value" :class="sharpeClass(portfolioSummary.sharpe_ratio)">{{ portfolioSummary.sharpe_ratio !== null ? portfolioSummary.sharpe_ratio.toFixed(2) : '—' }}</div>
-            </div>
-            <div class="stat-box">
               <div class="stat-label">Max Drawdown</div>
               <div class="stat-value" :class="ddClass(portfolioSummary.max_drawdown)">{{ fmtPct(portfolioSummary.max_drawdown) }}</div>
             </div>
@@ -121,12 +117,20 @@
               <div class="stat-value">{{ portfolioSummary.etf_count }}</div>
             </div>
             <div class="stat-box">
-              <div class="stat-label">Price History</div>
-              <div class="stat-value">{{ portfolioSummary.data_points?.toLocaleString() ?? '—' }}</div>
+              <div class="stat-label">Country Diversity</div>
+              <div class="stat-value" :class="diversityClass(portfolioSummary.geo_div)">{{ fmtDiversity(portfolioSummary.geo_div) }}</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-label">Sector Diversity</div>
+              <div class="stat-value" :class="diversityClass(portfolioSummary.sector_div)">{{ fmtDiversity(portfolioSummary.sector_div) }}</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-label">Weighted TER</div>
+              <div class="stat-value" :class="terClass(portfolioSummary.ter_pct)">{{ portfolioSummary.ter_pct != null ? portfolioSummary.ter_pct.toFixed(2) + '%' : '—' }}</div>
             </div>
           </div>
           <p style="font-size:.7rem;color:var(--text-muted);margin-top:.75rem;margin-bottom:0">
-            Based on available price and holdings data &nbsp;·&nbsp; Rf = {{ riskFreeRate }}% &nbsp;·&nbsp; Return, volatility, drawdown, and HHI are weighted estimates, not a backtested portfolio series.
+            Based on available price, holdings, allocation, and cost data &nbsp;·&nbsp; A portfolio Sharpe ratio is not shown because it requires a synchronized portfolio return series and correlations. Return, volatility, drawdown, HHI, and TER are weighted estimates, not a backtested portfolio series.
           </p>
         </div>
 
@@ -145,6 +149,9 @@
                 <th>Sharpe</th>
                 <th>Max Drawdown</th>
                 <th>HHI</th>
+                <th>Country Div.</th>
+                <th>Sector Div.</th>
+                <th>TER</th>
                 <th># Holdings</th>
               </tr>
             </thead>
@@ -156,6 +163,9 @@
                 <td :class="sharpeClass(row.sharpe_ratio)">{{ row.sharpe_ratio !== null ? row.sharpe_ratio : '—' }}</td>
                 <td :class="ddClass(row.max_drawdown)">{{ fmtPct(row.max_drawdown) }}</td>
                 <td :class="hhiClass(row.hhi)">{{ row.hhi !== null ? row.hhi.toFixed(0) : '—' }}</td>
+                <td :class="diversityClass(individualScore(row.etf_id)?.geo_div)">{{ fmtDiversity(individualScore(row.etf_id)?.geo_div) }}</td>
+                <td :class="diversityClass(individualScore(row.etf_id)?.sector_div)">{{ fmtDiversity(individualScore(row.etf_id)?.sector_div) }}</td>
+                <td :class="terClass(individualScore(row.etf_id)?.ter_pct)">{{ individualScore(row.etf_id)?.ter_pct != null ? individualScore(row.etf_id).ter_pct.toFixed(2) + '%' : '—' }}</td>
                 <td>{{ row.num_holdings?.toLocaleString() }}</td>
               </tr>
             </tbody>
@@ -202,7 +212,7 @@ const portfolioSummary = computed(() => {
   const p = portfolio.value.filter(x => x.etf_id)
   const totalW = p.reduce((s, x) => s + (x.weight || 0), 0)
   if (!totalW) return null
-  let wReturn = 0, wVol = 0, wDD = 0, wHHI = 0
+  let wReturn = 0, wVol = 0, wDD = 0, wHHI = 0, wTer = 0, terWeight = 0
   for (const row of portfolioRiskResult.value) {
     const pw = p.find(x => x.etf_id === row.etf_id)
     const w = pw ? (pw.weight || 0) / totalW : 0
@@ -210,20 +220,23 @@ const portfolioSummary = computed(() => {
     if (row.volatility   !== null) wVol    += w * row.volatility
     if (row.max_drawdown !== null) wDD     += w * row.max_drawdown
     if (row.hhi          !== null) wHHI    += w * row.hhi
+    const etf = allEtfs.value.find(item => item.id === row.etf_id)
+    if (etf?.ter !== null && etf?.ter !== undefined) {
+      wTer += w * Number(etf.ter)
+      terWeight += w
+    }
   }
-  const rfDecimal = riskFreeRate.value / 100
-  const sharpe = wVol > 0 ? ((wReturn - rfDecimal) / wVol).toFixed(2) : null
-  const dataPoints = portfolioRiskResult.value
-    .map(row => row.data_points || 0)
-    .filter(Boolean)
+  const countryDiversity = diversityFromExposure(exposureResult.value?.countries)
+  const sectorDiversity = diversityFromExposure(exposureResult.value?.sectors)
   return {
     ann_return: wReturn,
     volatility: wVol,
-    sharpe_ratio: sharpe !== null ? Number(sharpe) : null,
     max_drawdown: wDD,
     hhi: wHHI,
     etf_count: p.length,
-    data_points: dataPoints.length ? Math.min(...dataPoints) : 0,
+    geo_div: countryDiversity,
+    sector_div: sectorDiversity,
+    ter_pct: terWeight > 0 ? wTer / terWeight : null,
   }
 })
 
@@ -245,6 +258,13 @@ function regionExposures(countries) {
     regions[region] = (regions[region] || 0) + weight
     return regions
   }, {})
+}
+
+function diversityFromExposure(exposure) {
+  const weights = Object.values(exposure || {}).map(Number)
+  const total = weights.reduce((sum, weight) => sum + weight, 0)
+  if (!total) return null
+  return 1 - weights.reduce((sum, weight) => sum + (weight / total) ** 2, 0)
 }
 
 function buildExposureGroup(key, label, values, formatter = name => name) {
@@ -284,6 +304,10 @@ function portfolioDonutData(group) {
   }
 }
 
+function individualScore(etfId) {
+  return portfolioScoreResult.value?.individual_scores?.find(score => score.etf_id === etfId)
+}
+
 async function loadETFs() {
   etfsLoading.value=true
   try { const r=await etfService.getETFs(0,50); allEtfs.value=r.data } catch(e){console.error(e)} finally{etfsLoading.value=false}
@@ -306,7 +330,7 @@ async function runExposure() {
   } catch(e){exposureError.value=e.response?.data?.detail||e.message} finally{exposureLoading.value=false}
 }
 
-// Risk-free rate (used for portfolio Sharpe in summary)
+// Risk-free rate used for constituent ETF risk metrics and the portfolio Quality Score.
 const riskFreeRate = ref(4.0)     // % per year
 
 const scoreBadgeClass = (s) => s >= 7 ? 'score-high' : s >= 5 ? 'score-mid' : s >= 3.5 ? 'score-low' : 'score-poor'
@@ -317,6 +341,9 @@ const signClass = v  => v === null ? '' : v >= 0 ? 'cell-green' : 'cell-red'
 const volClass  = v  => v === null ? '' : v < 12 ? 'cell-green' : v < 22 ? 'cell-yellow' : 'cell-red'
 const sharpeClass = v => v === null ? '' : v >= 1 ? 'cell-green' : v >= 0 ? 'cell-yellow' : 'cell-red'
 const ddClass   = v  => v === null ? '' : v > -10 ? 'cell-green' : v > -20 ? 'cell-yellow' : 'cell-red'
+const diversityClass = v => v == null ? '' : v >= 0.6 ? 'cell-green' : v >= 0.35 ? 'cell-yellow' : 'cell-red'
+const terClass = v => v == null ? '' : v <= 0.25 ? 'cell-green' : v <= 0.75 ? 'cell-yellow' : 'cell-red'
+const fmtDiversity = v => v == null ? '—' : `${(v * 100).toFixed(1)}%`
 
 onMounted(() => {
   loadETFs()
