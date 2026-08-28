@@ -55,7 +55,7 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="row in goetfSorted" :key="row.etf_id">
+            <tr v-for="row in goetfSorted" :key="row.etf_id" class="score-row" tabindex="0" @click="openETF(row)" @keydown.enter="openETF(row)" @keydown.space.prevent="openETF(row)">
               <td>
                 <span v-if="row.goetf_score != null" class="score-badge" :class="scoreBadgeClass(row.goetf_score)" :title="row.missing_components?.length ? `Calculated without: ${row.missing_components.join(', ')}` : 'All seven components available'">{{ row.goetf_score.toFixed(1) }}</span>
                 <span v-else class="score-badge score-na">N/A</span>
@@ -87,6 +87,7 @@ import { scoreService } from '../services/api.js'
 const showApiKeyModal = inject('showApiKeyModal')
 const hasApiKey = inject('hasApiKey', ref(!!localStorage.getItem('api_key')))
 const navigateTo = inject('navigateTo')
+const navigateToETF = inject('navigateToETF')
 
 const goetfRfRate = ref(4.0)
 const goetfLoading = ref(false)
@@ -109,6 +110,10 @@ const goetfSorted = computed(() => {
 function toggleGoetfSort(key) {
   if (goetfSortKey.value === key) goetfSortDir.value = goetfSortDir.value === 'asc' ? 'desc' : 'asc'
   else { goetfSortKey.value = key; goetfSortDir.value = 'desc' }
+}
+
+function openETF(row) {
+  navigateToETF({ id: row.etf_id })
 }
 
 async function runGoetfScores() {
@@ -156,6 +161,8 @@ onMounted(runGoetfScores)
 .risk-table thead tr{background:var(--bg-3)}
 .risk-table th,.risk-table td{padding:.58rem .75rem;text-align:left;border-bottom:1px solid var(--border)}
 .risk-table tbody tr:hover{background:var(--bg-3)}
+.score-row{cursor:pointer}
+.score-row:focus-visible{outline:2px solid #2f85c8;outline-offset:-2px}
 .sortable-th{cursor:pointer;user-select:none;white-space:nowrap}
 .sortable-th:hover{color:#1a6ab8}
 .sort-arrow{margin-left:.25rem;font-size:.7rem}
