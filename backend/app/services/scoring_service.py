@@ -2,14 +2,14 @@
 GoETF Scoring Service
 Computes individual ETF GoETF Scores (1–10) and Portfolio GoETF Scores.
 
-Individual score = weighted absolute quality score across 8 metrics:
-  Sortino (20%), Calmar (15%), CVaR (15%), HHI (10%),
-  Effective N (10%), Geo Div (10%), Hit Ratio (10%), Max Underwater (10%)
+Individual score = equally weighted absolute quality score across 7 metrics:
+    CAGR, Sortino, Maximum Drawdown, Holdings HHI,
+    Country Diversity, Sector Diversity, and TER
 
 Portfolio score = weighted avg base − overlap penalty + allocation bonus
 """
 import math
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict
 from uuid import UUID
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -18,28 +18,17 @@ from app.schemas import ETF, Performance, Holding, Allocation
 # ---------------------------------------------------------------------------
 # Scoring configuration
 # ---------------------------------------------------------------------------
-SCORE_WEIGHTS = {
-    "sortino": 0.20,
-    "calmar": 0.15,
-    "cvar": 0.15,
-    "hhi": 0.10,
-    "effective_n": 0.10,
-    "geo_div": 0.10,
-    "hit_ratio": 0.10,
-    "max_underwater": 0.10,
-}
+SCORE_COMPONENTS = (
+    "cagr_pct",
+    "sortino",
+    "max_drawdown_pct",
+    "hhi",
+    "geo_div",
+    "sector_div",
+    "ter_pct",
+)
 
-# True = higher value is better; False = lower value is better
-HIGHER_IS_BETTER = {
-    "sortino": True,
-    "calmar": True,
-    "cvar": True,       # CVaR expressed as annualised return (negative = loss); less negative = better
-    "hhi": False,
-    "effective_n": True,
-    "geo_div": True,
-    "hit_ratio": True,
-    "max_underwater": False,
-}
+MIN_PRICE_OBSERVATIONS = 253  # At least 252 daily returns (approximately one trading year).
 
 # Absolute reference ranges (worst, best) for each metric.
 # Score = clamp((value − worst) / (best − worst), 0, 1)
@@ -48,14 +37,13 @@ SCORE_RANGES = {
     # metric: (worst, best) — score = clamp((value − worst) / (best − worst), 0, 1)
     # For "lower is better" metrics worst > best, so the formula naturally inverts.
     # "best" values represent genuinely excellent but achievable equity ETF performance.
-    "sortino":        (-0.5,   1.5),   # ratio; worst = −0.5, best = 1.5
-    "calmar":         (-0.2,   0.7),   # ratio; worst = −0.2, best = 0.7
-    "cvar":           (-80.0, -15.0),  # %; worst = −80%, best = −15%
-    "hit_ratio":      ( 0.40,  0.60),  # fraction; worst = 40%, best = 60%
-    "hhi":            (5000,   50),    # lower is better; worst = 5000, best = 50
-    "effective_n":    (   1,  200),    # higher is better; worst = 1, best = 200
-    "geo_div":        ( 0.0,   0.80),  # fraction; worst = 0, best = 0.80
-    "max_underwater": (2500,   50),    # days; lower is better; worst = 2500, best = 50
+    "cagr_pct":           (-20.0, 20.0),  # %; worst = -20%, best = 20%
+    "sortino":             (-0.5,   1.5), # ratio; worst = -0.5, best = 1.5
+    "max_drawdown_pct":    (-60.0, -5.0), # %; worst = -60%, best = -5%
+    "hhi":                 (5000,   50),  # lower is better; worst = 5000, best = 50
+    "geo_div":             ( 0.0, 0.80),  # fraction; worst = 0, best = 0.80
+    "sector_div":          ( 0.0, 0.80),  # fraction; worst = 0, best = 0.80
+    "ter_pct":             ( 2.0, 0.05),  # lower is better; worst = 2.00%, best = 0.05%
 }
 
 
@@ -64,8 +52,8 @@ SCORE_RANGES = {
 # ---------------------------------------------------------------------------
 def _compute_raw_metrics(db: Session, etf: ETF, rf_annual: float) -> Optional[Dict]:
     """
-    Compute all 8 raw metrics for a single ETF from existing DB tables.
-    Returns None if there is insufficient price history (< 30 data points).
+    Compute the 7 GoETF Quality Score metrics from existing DB tables.
+    Returns None if there is insufficient price history for a one-year score.
     """
     perf = (
         db.query(Performance)
@@ -75,7 +63,7 @@ def _compute_raw_metrics(db: Session, etf: ETF, rf_annual: float) -> Optional[Di
     )
     prices = [float(p.close_price) for p in perf if p.close_price is not None]
 
-    if len(prices) < 30:
+    if len(prices) < MIN_PRICE_OBSERVATIONS:
         return None
 
     rf_daily = rf_annual / 252
@@ -84,7 +72,7 @@ def _compute_raw_metrics(db: Session, etf: ETF, rf_annual: float) -> Optional[Di
     mean_r = sum(daily_returns) / n
     variance = sum((r - mean_r) ** 2 for r in daily_returns) / max(n - 1, 1)
     daily_vol = math.sqrt(variance)
-    ann_return = mean_r * 252
+    cagr = (prices[-1] / prices[0]) ** (252 / n) - 1
     ann_vol = daily_vol * math.sqrt(252)
 
     # 1. Sortino Ratio
@@ -95,9 +83,9 @@ def _compute_raw_metrics(db: Session, etf: ETF, rf_annual: float) -> Optional[Di
     else:
         down_var = variance
     downside_dev_ann = math.sqrt(down_var) * math.sqrt(252)
-    sortino = (ann_return - rf_annual) / downside_dev_ann if downside_dev_ann > 0 else 0.0
+    sortino = (cagr - rf_annual) / downside_dev_ann if downside_dev_ann > 0 else 0.0
 
-    # 2. Calmar Ratio (annualised return / |max drawdown|)
+    # 2. Maximum Drawdown (peak-to-trough)
     peak = prices[0]
     max_dd = 0.0
     for p in prices[1:]:
@@ -106,36 +94,11 @@ def _compute_raw_metrics(db: Session, etf: ETF, rf_annual: float) -> Optional[Di
         dd = (p - peak) / peak
         if dd < max_dd:
             max_dd = dd
-    calmar = ann_return / abs(max_dd) if max_dd != 0 else 0.0
-
-    # 3. CVaR 95% — mean of worst 5 % of daily log-returns, annualised via sqrt-of-time rule
-    sorted_r = sorted(daily_returns)
-    n_tail = max(1, int(n * 0.05))
-    cvar_daily = sum(sorted_r[:n_tail]) / n_tail  # average worst-day log-return (e.g. -0.026)
-    cvar_ann = cvar_daily * math.sqrt(252)        # scale by √252 (same as volatility)
-
-    # 4. Hit Ratio — fraction of days with positive return
-    hit_ratio = sum(1 for r in daily_returns if r > 0) / n
-
-    # 5. Max Time Under Water (trading days)
-    max_underwater = 0
-    current_uw = 0
-    peak_price = prices[0]
-    for p in prices[1:]:
-        if p >= peak_price:
-            peak_price = p
-            current_uw = 0
-        else:
-            current_uw += 1
-            if current_uw > max_underwater:
-                max_underwater = current_uw
-
-    # ── Holdings: HHI & Effective N ──────────────────────────────────────────
+    # ── Holdings: HHI ────────────────────────────────────────────────────────
     latest_holding_date = (
         db.query(func.max(Holding.date)).filter(Holding.etf_id == etf.id).scalar()
     )
-    hhi = 10000.0
-    effective_n = 1.0
+    hhi = None
     num_holdings = 0
     if latest_holding_date:
         holdings = (
@@ -150,15 +113,14 @@ def _compute_raw_metrics(db: Session, etf: ETF, rf_annual: float) -> Optional[Di
             norm = [x / total_w for x in w]
             sum_sq = sum(x * x for x in norm)
             hhi = sum_sq * 10_000
-            effective_n = 1.0 / sum_sq if sum_sq > 0 else float(len(w))
 
-    # ── Allocations: Geographic Diversification Score ─────────────────────────
+    # ── Allocations: Country and sector diversification ───────────────────────
     latest_alloc_date = (
         db.query(func.max(Allocation.date))
         .filter(Allocation.etf_id == etf.id, Allocation.type == "country")
         .scalar()
     )
-    geo_div = 0.5  # neutral default when no country data
+    geo_div = None
     if latest_alloc_date:
         allocs = (
             db.query(Allocation)
@@ -176,19 +138,40 @@ def _compute_raw_metrics(db: Session, etf: ETF, rf_annual: float) -> Optional[Di
             country_hhi = sum(x * x for x in norm) * 10_000
             geo_div = 1.0 - country_hhi / 10_000
 
+    latest_sector_date = (
+        db.query(func.max(Allocation.date))
+        .filter(Allocation.etf_id == etf.id, Allocation.type == "sector")
+        .scalar()
+    )
+    sector_div = None
+    if latest_sector_date:
+        sector_allocs = (
+            db.query(Allocation)
+            .filter(
+                Allocation.etf_id == etf.id,
+                Allocation.type == "sector",
+                Allocation.date == latest_sector_date,
+            )
+            .all()
+        )
+        sector_weights = [float(a.weight) for a in sector_allocs if a.weight is not None]
+        sector_total = sum(sector_weights)
+        if sector_total > 0:
+            sector_norm = [weight / sector_total for weight in sector_weights]
+            sector_div = 1.0 - sum(weight * weight for weight in sector_norm)
+
+    ter_pct = float(etf.ter) if etf.ter is not None else None
+
     return {
         "sortino": round(sortino, 3),
-        "calmar": round(calmar, 3),
-        "cvar": round(cvar_ann * 100, 2),       # as percentage (e.g. -25.3)
-        "hhi": round(hhi, 1),
-        "effective_n": round(effective_n, 1),
-        "geo_div": round(geo_div, 4),
-        "hit_ratio": round(hit_ratio, 4),
-        "max_underwater": max_underwater,
-        # Extra display fields
-        "ann_return_pct": round(ann_return * 100, 2),
-        "ann_vol_pct": round(ann_vol * 100, 2),
+        "cagr_pct": round(cagr * 100, 2),
         "max_drawdown_pct": round(max_dd * 100, 2),
+        "hhi": round(hhi, 1) if hhi is not None else None,
+        "geo_div": round(geo_div, 4) if geo_div is not None else None,
+        "sector_div": round(sector_div, 4) if sector_div is not None else None,
+        "ter_pct": round(ter_pct, 3) if ter_pct is not None else None,
+        # Extra display fields
+        "ann_vol_pct": round(ann_vol * 100, 2),
         "num_holdings": num_holdings,
         "data_points": n,
     }
@@ -248,11 +231,26 @@ def compute_goetf_scores(
             )
             continue
 
+        available_components = [
+            component for component in SCORE_COMPONENTS
+            if row["metrics"].get(component) is not None
+        ]
         metric_scores = {
-            m: _absolute_score(m, row["metrics"][m])
-            for m in SCORE_WEIGHTS
+            component: _absolute_score(component, row["metrics"][component])
+            for component in available_components
         }
-        raw_score = sum(SCORE_WEIGHTS[m] * metric_scores[m] for m in SCORE_WEIGHTS)
+        raw_score = sum(metric_scores.values()) / len(metric_scores) if metric_scores else None
+        if raw_score is None:
+            results.append(
+                {
+                    "etf_id": row["etf_id"],
+                    "ticker": row["ticker"],
+                    "name": row["name"],
+                    "goetf_score": None,
+                    "insufficient_data": True,
+                }
+            )
+            continue
         goetf_score = round(1.0 + raw_score * 9.0, 1)
 
         results.append(
@@ -263,6 +261,11 @@ def compute_goetf_scores(
                 "goetf_score": goetf_score,
                 **row["metrics"],
                 "metric_scores": {m: round(metric_scores[m], 3) for m in metric_scores},
+                "available_components": available_components,
+                "missing_components": [
+                    component for component in SCORE_COMPONENTS
+                    if component not in available_components
+                ],
             }
         )
 

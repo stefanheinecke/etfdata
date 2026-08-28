@@ -1,8 +1,8 @@
 <template>
   <div class="page">
     <div class="page-header">
-      <h1 class="page-title">GoETF Scores</h1>
-      <p class="page-subtitle">Composite 1-10 score based on 8 risk and diversification metrics across all tracked ETFs.</p>
+      <h1 class="page-title">GoETF Quality Scores</h1>
+      <p class="page-subtitle">Composite 1-10 quality score based on seven equal-weight return, risk, diversification, and cost metrics.</p>
     </div>
 
     <div v-if="!hasApiKey" class="cta-banner">
@@ -15,7 +15,7 @@
 
     <div class="card" style="margin-bottom:1.5rem;display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
       <div>
-        <h2 class="card-title" style="margin:0">GoETF Score</h2>
+        <h2 class="card-title" style="margin:0">GoETF Quality Score</h2>
         <p style="font-size:.8rem;color:var(--text-muted);margin:.2rem 0 0">Absolute quality score against fixed benchmarks, independent of ETF universe size.</p>
         <button class="meth-link" @click="navigateTo('methodology')">How is this calculated?</button>
       </div>
@@ -45,38 +45,36 @@
               </th>
               <th class="sortable-th" @click="toggleGoetfSort('ticker')">Ticker <span class="sort-arrow">{{ goetfSortKey==='ticker' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span></th>
               <th>Name</th>
+              <th class="sortable-th" @click="toggleGoetfSort('cagr_pct')">CAGR <span class="sort-arrow">{{ goetfSortKey==='cagr_pct' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span></th>
               <th class="sortable-th" @click="toggleGoetfSort('sortino')">Sortino <span class="sort-arrow">{{ goetfSortKey==='sortino' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span></th>
-              <th class="sortable-th" @click="toggleGoetfSort('calmar')">Calmar <span class="sort-arrow">{{ goetfSortKey==='calmar' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span></th>
-              <th class="sortable-th" @click="toggleGoetfSort('cvar')">CVaR 95% <span class="sort-arrow">{{ goetfSortKey==='cvar' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span></th>
-              <th class="sortable-th" @click="toggleGoetfSort('hit_ratio')">Hit Ratio <span class="sort-arrow">{{ goetfSortKey==='hit_ratio' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span></th>
+              <th class="sortable-th" @click="toggleGoetfSort('max_drawdown_pct')">Max Drawdown <span class="sort-arrow">{{ goetfSortKey==='max_drawdown_pct' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span></th>
               <th class="sortable-th" @click="toggleGoetfSort('hhi')">HHI <span class="sort-arrow">{{ goetfSortKey==='hhi' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span></th>
-              <th class="sortable-th" @click="toggleGoetfSort('effective_n')">Eff. N <span class="sort-arrow">{{ goetfSortKey==='effective_n' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span></th>
               <th class="sortable-th" @click="toggleGoetfSort('geo_div')">Geo Div <span class="sort-arrow">{{ goetfSortKey==='geo_div' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span></th>
-              <th class="sortable-th" @click="toggleGoetfSort('max_underwater')">Max UW <span class="sort-arrow">{{ goetfSortKey==='max_underwater' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span></th>
+              <th class="sortable-th" @click="toggleGoetfSort('sector_div')">Sector Div <span class="sort-arrow">{{ goetfSortKey==='sector_div' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span></th>
+              <th class="sortable-th" @click="toggleGoetfSort('ter_pct')">TER <span class="sort-arrow">{{ goetfSortKey==='ter_pct' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span></th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="row in goetfSorted" :key="row.etf_id">
               <td>
-                <span v-if="row.goetf_score != null" class="score-badge" :class="scoreBadgeClass(row.goetf_score)">{{ row.goetf_score.toFixed(1) }}</span>
+                <span v-if="row.goetf_score != null" class="score-badge" :class="scoreBadgeClass(row.goetf_score)" :title="row.missing_components?.length ? `Calculated without: ${row.missing_components.join(', ')}` : 'All seven components available'">{{ row.goetf_score.toFixed(1) }}</span>
                 <span v-else class="score-badge score-na">N/A</span>
               </td>
               <td><strong style="color:var(--green-600)">{{ row.ticker }}</strong></td>
               <td style="font-size:.8rem;color:var(--text-muted);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ row.name }}</td>
+              <td :class="signClass(row.cagr_pct)">{{ row.cagr_pct != null ? row.cagr_pct.toFixed(1) + '%' : '—' }}</td>
               <td :class="sortinoClass(row.sortino)">{{ row.sortino != null ? row.sortino.toFixed(2) : '—' }}</td>
-              <td :class="calmarClass(row.calmar)">{{ row.calmar != null ? row.calmar.toFixed(2) : '—' }}</td>
-              <td :class="cvarClass(row.cvar)">{{ row.cvar != null ? row.cvar.toFixed(1) + '%' : '—' }}</td>
-              <td :class="hitClass(row.hit_ratio)">{{ row.hit_ratio != null ? (row.hit_ratio * 100).toFixed(1) + '%' : '—' }}</td>
+              <td :class="ddClass(row.max_drawdown_pct)">{{ row.max_drawdown_pct != null ? row.max_drawdown_pct.toFixed(1) + '%' : '—' }}</td>
               <td :class="hhiClass(row.hhi)">{{ row.hhi != null ? row.hhi.toFixed(0) : '—' }}</td>
-              <td :class="effNClass(row.effective_n)">{{ row.effective_n != null ? row.effective_n.toFixed(0) : '—' }}</td>
               <td :class="geodivClass(row.geo_div)">{{ row.geo_div != null ? (row.geo_div * 100).toFixed(1) + '%' : '—' }}</td>
-              <td :class="uwClass(row.max_underwater)">{{ row.max_underwater != null ? row.max_underwater + 'd' : '—' }}</td>
+              <td :class="geodivClass(row.sector_div)">{{ row.sector_div != null ? (row.sector_div * 100).toFixed(1) + '%' : '—' }}</td>
+              <td :class="terClass(row.ter_pct)">{{ row.ter_pct != null ? row.ter_pct.toFixed(2) + '%' : '—' }}</td>
             </tr>
           </tbody>
         </table>
       </div>
       <div style="padding:.5rem 1.25rem;border-top:1px solid var(--border);font-size:.7rem;color:var(--text-muted)">
-        Score uses fixed benchmark ranges and is not investment advice.
+        Seven available components are equally weighted. Scores require at least one year of price history; unavailable holdings, allocation, or TER components are disclosed in the score tooltip and excluded from the average.
       </div>
     </div>
   </div>
@@ -128,14 +126,12 @@ async function runGoetfScores() {
 }
 
 const scoreBadgeClass = (s) => s >= 7 ? 'score-high' : s >= 5 ? 'score-mid' : s >= 3.5 ? 'score-low' : 'score-poor'
+const signClass = (v) => v == null ? '' : v >= 0 ? 'cell-green' : 'cell-red'
 const sortinoClass = (v) => v == null ? '' : v >= 1.0 ? 'cell-green' : v >= 0.5 ? 'cell-yellow' : 'cell-red'
-const calmarClass  = (v) => v == null ? '' : v >= 0.5 ? 'cell-green' : v >= 0.2 ? 'cell-yellow' : 'cell-red'
-const cvarClass    = (v) => v == null ? '' : v > -20  ? 'cell-green' : v > -40  ? 'cell-yellow' : 'cell-red'
-const hitClass     = (v) => v == null ? '' : v >= 0.55 ? 'cell-green' : v >= 0.48 ? 'cell-yellow' : 'cell-red'
+const ddClass      = (v) => v == null ? '' : v > -10 ? 'cell-green' : v > -20 ? 'cell-yellow' : 'cell-red'
 const hhiClass     = (v) => v == null ? '' : v < 200  ? 'cell-green' : v < 1000 ? 'cell-yellow' : 'cell-red'
-const effNClass    = (v) => v == null ? '' : v >= 100 ? 'cell-green' : v >= 20  ? 'cell-yellow' : 'cell-red'
 const geodivClass  = (v) => v == null ? '' : v >= 0.6 ? 'cell-green' : v >= 0.2 ? 'cell-yellow' : 'cell-red'
-const uwClass      = (v) => v == null ? '' : v < 250  ? 'cell-green' : v < 500  ? 'cell-yellow' : 'cell-red'
+const terClass     = (v) => v == null ? '' : v <= 0.25 ? 'cell-green' : v <= 0.75 ? 'cell-yellow' : 'cell-red'
 
 onMounted(runGoetfScores)
 </script>

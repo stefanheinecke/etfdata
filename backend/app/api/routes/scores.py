@@ -26,7 +26,8 @@ async def get_etf_scores(
 ):
     """
     GoETF Score for all ETFs (or a comma-separated ticker subset).
-    Each ETF receives a 1–10 composite score based on 8 risk/diversification metrics.
+    Each ETF receives a 1-10 quality score based on seven equally weighted
+    return, risk, diversification, and cost components.
     """
     etf_ids = None
 

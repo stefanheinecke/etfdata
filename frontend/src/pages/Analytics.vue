@@ -38,7 +38,7 @@
       <div v-if="portfolioScoreLoading" style="margin-bottom:1.5rem;padding:1rem 1.25rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);font-size:.875rem;color:var(--text-muted)">Computing GoETF Portfolio Score…</div>
       <div v-if="portfolioScoreResult" class="card" style="margin-bottom:1.5rem">
         <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;margin-bottom:1rem">
-          <h3 class="card-title" style="margin:0">GoETF Portfolio Score</h3>
+          <h3 class="card-title" style="margin:0">GoETF Portfolio Quality Score</h3>
           <span class="score-badge score-lg" :class="scoreBadgeClass(portfolioScoreResult.portfolio_score)">
             {{ portfolioScoreResult.portfolio_score?.toFixed(1) }}
           </span>

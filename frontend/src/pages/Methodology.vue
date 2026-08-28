@@ -10,8 +10,8 @@
       <div class="meth-section-head">
         <span class="meth-badge">1-10</span>
         <div>
-          <h2 class="meth-title">GoETF Score: Individual ETF</h2>
-          <p class="meth-sub">A composite rating that measures an ETF's risk-adjusted return quality and portfolio diversification against fixed quality benchmarks.</p>
+          <h2 class="meth-title">GoETF Quality Score: Individual ETF</h2>
+          <p class="meth-sub">A transparent historical return, downside-risk, diversification, and cost summary measured against fixed quality benchmarks.</p>
         </div>
       </div>
 
@@ -19,21 +19,21 @@
       <div class="card meth-card">
         <h3 class="card-title">How it works</h3>
         <ol class="meth-steps">
-          <li><strong>Compute raw metrics</strong>: 8 metrics are calculated for each ETF from its price history, holdings, and country allocations.</li>
+          <li><strong>Compute raw metrics</strong>: 7 metrics are calculated from price history, holdings, country and sector allocations, and the fund's TER.</li>
           <li><strong>Benchmark normalization</strong>: each metric is mapped to a 0-1 quality score using a fixed worst-to-best reference range. The direction (higher/lower is better) is taken into account, and values outside the range are capped.</li>
-          <li><strong>Weighted score</strong>: normalized metric scores are combined using fixed weights. The resulting 0-1 value is scaled to 1-10.</li>
+          <li><strong>Equal-weight score</strong>: all available metric scores receive equal weight. The resulting 0-1 value is scaled to 1-10.</li>
         </ol>
         <div class="meth-formula-box">
           <code>metric_score<sub>i</sub> = clamp((value<sub>i</sub> − worst<sub>i</sub>) ÷ (best<sub>i</sub> − worst<sub>i</sub>), 0, 1)</code>
-          <code>raw = Σ (weight<sub>i</sub> × metric_score<sub>i</sub>)</code>
-          <code>GoETF Score = 1 + raw × 9</code>
+          <code>raw = average(metric_score<sub>i</sub>)</code>
+          <code>GoETF Quality Score = 1 + raw × 9</code>
         </div>
       </div>
 
       <!-- Metrics table -->
       <div class="card meth-card" style="padding:0;overflow:hidden">
         <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--border)">
-          <h3 class="card-title" style="margin:0">The 8 Metrics</h3>
+          <h3 class="card-title" style="margin:0">The 7 Equal-Weight Metrics</h3>
         </div>
         <div class="table-wrap">
           <table class="meth-table">
@@ -48,66 +48,59 @@
             </thead>
             <tbody>
               <tr>
+                <td><strong>CAGR</strong></td>
+                <td class="meth-weight">14.3%</td>
+                <td class="meth-dir meth-up">↑ Higher</td>
+                <td class="meth-src">Price history</td>
+                <td>Compound annual growth rate, calculated from the first and last available close price over the observed trading period.</td>
+              </tr>
+              <tr>
                 <td><strong>Sortino Ratio</strong></td>
-                <td class="meth-weight">20%</td>
+                <td class="meth-weight">14.3%</td>
                 <td class="meth-dir meth-up">↑ Higher</td>
                 <td class="meth-src">Price history</td>
-                <td>Like the Sharpe ratio but only penalises downside volatility below the risk-free rate. Annualised excess return ÷ downside deviation.</td>
+                <td>Annualised excess return divided by downside deviation. Unlike the Sharpe ratio, it penalises only volatility below the risk-free rate.</td>
               </tr>
               <tr>
-                <td><strong>Calmar Ratio</strong></td>
-                <td class="meth-weight">15%</td>
-                <td class="meth-dir meth-up">↑ Higher</td>
+                <td><strong>Maximum Drawdown</strong></td>
+                <td class="meth-weight">14.3%</td>
+                <td class="meth-dir meth-up">↑ Smaller loss</td>
                 <td class="meth-src">Price history</td>
-                <td>Annualised return divided by the absolute max drawdown. Rewards ETFs that recover quickly from losses.</td>
-              </tr>
-              <tr>
-                <td><strong>CVaR 95%</strong></td>
-                <td class="meth-weight">15%</td>
-                <td class="meth-dir meth-up">↑ Less negative</td>
-                <td class="meth-src">Price history</td>
-                <td>Conditional Value at Risk: the average of the worst 5% of daily log-returns (annualised). Measures tail-risk severity.</td>
+                <td>The largest peak-to-trough decline in the observed price history. A less negative drawdown receives a higher quality score.</td>
               </tr>
               <tr>
                 <td><strong>HHI</strong></td>
-                <td class="meth-weight">10%</td>
+                <td class="meth-weight">14.3%</td>
                 <td class="meth-dir meth-down">↓ Lower</td>
                 <td class="meth-src">Holdings</td>
                 <td>Herfindahl-Hirschman Index of holdings concentration: Σw² × 10,000. Ranges from ~0 (highly diversified) to 10,000 (single holding).</td>
               </tr>
               <tr>
-                <td><strong>Effective N</strong></td>
-                <td class="meth-weight">10%</td>
-                <td class="meth-dir meth-up">↑ Higher</td>
-                <td class="meth-src">Holdings</td>
-                <td>1 ÷ Σw². The effective number of equally-weighted positions the ETF is equivalent to. High = more diversified.</td>
-              </tr>
-              <tr>
-                <td><strong>Geo Diversity</strong></td>
-                <td class="meth-weight">10%</td>
+                <td><strong>Country Diversity</strong></td>
+                <td class="meth-weight">14.3%</td>
                 <td class="meth-dir meth-up">↑ Higher</td>
                 <td class="meth-src">Allocations</td>
                 <td>1 − (country HHI ÷ 10,000). Derived from the country allocation breakdown. 0 = single country, ~1 = perfectly spread.</td>
               </tr>
               <tr>
-                <td><strong>Hit Ratio</strong></td>
-                <td class="meth-weight">10%</td>
+                <td><strong>Sector Diversity</strong></td>
+                <td class="meth-weight">14.3%</td>
                 <td class="meth-dir meth-up">↑ Higher</td>
-                <td class="meth-src">Price history</td>
-                <td>Fraction of trading days where the ETF posted a positive return. Captures consistency of positive performance.</td>
+                <td class="meth-src">Allocations</td>
+                <td>1 − (sector HHI ÷ 10,000). A higher value represents a more even spread across economic sectors.</td>
               </tr>
               <tr>
-                <td><strong>Max Underwater</strong></td>
-                <td class="meth-weight">10%</td>
+                <td><strong>TER</strong></td>
+                <td class="meth-weight">14.3%</td>
                 <td class="meth-dir meth-down">↓ Lower</td>
-                <td class="meth-src">Price history</td>
-                <td>Maximum consecutive trading days the ETF spent below its previous all-time high price. Captures recovery speed.</td>
+                <td class="meth-src">Fund metadata</td>
+                <td>Total expense ratio: the recurring annual management cost charged by the fund. Lower cost receives a higher quality score.</td>
               </tr>
             </tbody>
           </table>
         </div>
         <div style="padding:.6rem 1.25rem;font-size:.72rem;color:var(--text-muted);border-top:1px solid var(--border)">
-          Risk-free rate is configurable (default 4% p.a. ≈ Swiss SARON). All price-history metrics use daily log-returns from available close price data. Fixed benchmark ranges make scores stable when the ETF universe changes.
+          Risk-free rate is configurable (default 4% p.a. ≈ Swiss SARON). Scores require at least 252 daily returns. Fixed benchmark ranges make scores stable when the ETF universe changes. If TER, holdings, or allocation data is unavailable, the score uses the remaining available metrics equally and identifies the missing components.
         </div>
       </div>
     </div>
@@ -117,7 +110,7 @@
       <div class="meth-section-head">
         <span class="meth-badge meth-badge-port">1-10</span>
         <div>
-          <h2 class="meth-title">Portfolio GoETF Score</h2>
+          <h2 class="meth-title">Portfolio GoETF Quality Score</h2>
           <p class="meth-sub">A portfolio-level score that rewards low overlap between ETFs and broad geographic diversification, while penalising redundant positions.</p>
         </div>
       </div>
@@ -130,9 +123,9 @@
             <h3 class="meth-comp-title">Base Score</h3>
             <span class="meth-comp-range">1-10</span>
           </div>
-          <p class="meth-comp-desc">Weighted average of the individual GoETF Scores of all ETFs in the portfolio, using their portfolio weights.</p>
+          <p class="meth-comp-desc">Weighted average of the individual GoETF Quality Scores of all ETFs in the portfolio, using their portfolio weights.</p>
           <div class="meth-formula-box meth-formula-sm">
-            <code>base = Σ (w<sub>i</sub> × GoETF_Score<sub>i</sub>)</code>
+            <code>base = Σ (w<sub>i</sub> × Quality_Score<sub>i</sub>)</code>
           </div>
         </div>
         <!-- Overlap Penalty -->
@@ -251,7 +244,7 @@
         <div style="margin-top:.75rem;display:flex;flex-direction:column;gap:.3rem">
           <div class="meth-tip-row"><span class="meth-tip-key">Overlap</span><span>Shared holdings can reveal redundancy, but may also represent an intentional allocation tilt.</span></div>
           <div class="meth-tip-row"><span class="meth-tip-key">Diversification</span><span>Country, sector, and currency exposure show where the portfolio is concentrated.</span></div>
-          <div class="meth-tip-row"><span class="meth-tip-key">Comparison</span><span>Compare two portfolios side by side to assess the composition trade-offs relevant to you.</span></div>
+          <div class="meth-tip-row"><span class="meth-tip-key">Portfolio view</span><span>Use the unified portfolio view for a single ETF or a multi-ETF portfolio to inspect the composition trade-offs relevant to you.</span></div>
         </div>
       </div>
     </div>
