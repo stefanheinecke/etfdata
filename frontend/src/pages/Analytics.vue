@@ -226,21 +226,35 @@
           </div>
         </div>
         <div v-for="group in [{key:'countries',label:'Country Exposure'}, {key:'sectors',label:'Sector Exposure'}, {key:'currencies',label:'Currency Exposure'}]" :key="group.key" class="card compare-exposure-card">
-          <h3 class="card-title">{{ group.label }}</h3>
-          <div class="table-wrap">
-            <table class="risk-table compare-table">
-              <thead><tr><th>Exposure</th><th>Portfolio A</th><th>Portfolio B</th><th>Difference (B − A)</th></tr></thead>
-              <tbody>
-                <tr v-for="row in exposureDifference(group.key)" :key="row.name">
-                  <td>{{ row.name }}</td>
-                  <td>{{ row.a.toFixed(1) }}%</td>
-                  <td>{{ row.b.toFixed(1) }}%</td>
-                  <td :class="row.b - row.a > 0 ? 'cell-green' : row.b - row.a < 0 ? 'cell-red' : ''">{{ row.b - row.a > 0 ? '+' : '' }}{{ (row.b - row.a).toFixed(1) }}%</td>
-                </tr>
-                <tr v-if="!exposureDifference(group.key).length"><td colspan="4" class="compare-empty">No allocation data available.</td></tr>
-              </tbody>
-            </table>
+          <div class="compare-chart-header">
+            <div>
+              <h3 class="card-title">{{ group.label }}</h3>
+              <p>Largest allocation differences between both portfolios</p>
+            </div>
+            <div class="compare-legend" aria-label="Chart legend">
+              <span><i class="legend-a"></i>Portfolio A</span>
+              <span><i class="legend-b"></i>Portfolio B</span>
+            </div>
           </div>
+          <div v-if="exposureDifference(group.key).length" class="compare-chart" role="img" :aria-label="`${group.label} comparison`">
+            <div v-for="row in exposureDifference(group.key)" :key="row.name" class="compare-chart-row">
+              <div class="compare-chart-label" :title="row.name">{{ row.name }}</div>
+              <div class="compare-bars">
+                <div class="compare-bar-line">
+                  <span class="compare-bar-value">{{ row.a.toFixed(1) }}%</span>
+                  <div class="compare-track"><div class="compare-fill compare-fill-a" :style="{ width: `${Math.min(row.a, 100)}%` }"></div></div>
+                </div>
+                <div class="compare-bar-line">
+                  <span class="compare-bar-value">{{ row.b.toFixed(1) }}%</span>
+                  <div class="compare-track"><div class="compare-fill compare-fill-b" :style="{ width: `${Math.min(row.b, 100)}%` }"></div></div>
+                </div>
+              </div>
+              <div class="compare-delta" :class="row.b - row.a > 0 ? 'compare-delta-up' : row.b - row.a < 0 ? 'compare-delta-down' : ''">
+                {{ row.b - row.a > 0 ? '+' : '' }}{{ (row.b - row.a).toFixed(1) }} pts
+              </div>
+            </div>
+          </div>
+          <div v-else class="compare-empty">No allocation data available for this comparison.</div>
         </div>
       </template>
     </div>
@@ -540,8 +554,27 @@ onMounted(() => {
 .compare-metric{display:flex;justify-content:space-between;gap:1rem;padding:.45rem 0;border-top:1px solid var(--border);font-size:.82rem;color:var(--text-muted)}
 .compare-metric strong{color:var(--text);font-variant-numeric:tabular-nums}
 .compare-exposure-card{margin-bottom:1rem;padding:0;overflow:hidden}
-.compare-exposure-card .card-title{padding:1rem 1.25rem;margin:0;border-bottom:1px solid var(--border)}
-.compare-empty{text-align:center;color:var(--text-muted)}
+.compare-chart-header{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:1rem 1.25rem;border-bottom:1px solid var(--border)}
+.compare-chart-header .card-title{margin:0}
+.compare-chart-header p{margin:.25rem 0 0;font-size:.75rem;color:var(--text-muted)}
+.compare-legend{display:flex;gap:.85rem;flex-wrap:wrap;font-size:.75rem;color:var(--text-muted);white-space:nowrap}
+.compare-legend span{display:flex;align-items:center;gap:.35rem}
+.compare-legend i{width:9px;height:9px;border-radius:50%;display:block}
+.legend-a{background:#0f4c81}.legend-b{background:#00a98f}
+.compare-chart{padding:.5rem 1.25rem .75rem}
+.compare-chart-row{display:grid;grid-template-columns:minmax(100px,150px) minmax(250px,1fr) 72px;gap:1rem;align-items:center;padding:.65rem 0;border-bottom:1px solid color-mix(in srgb,var(--border) 60%,transparent)}
+.compare-chart-row:last-child{border-bottom:0}
+.compare-chart-label{font-size:.8rem;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.compare-bars{display:flex;flex-direction:column;gap:.35rem;min-width:0}
+.compare-bar-line{display:grid;grid-template-columns:38px minmax(0,1fr);align-items:center;gap:.45rem}
+.compare-bar-value{font-size:.7rem;text-align:right;color:var(--text-muted);font-variant-numeric:tabular-nums}
+.compare-track{height:8px;border-radius:4px;overflow:hidden;background:repeating-linear-gradient(90deg,var(--bg-3) 0,var(--bg-3) calc(25% - 1px),var(--border) calc(25% - 1px),var(--border) 25%)}
+.compare-fill{height:100%;border-radius:4px;min-width:2px;animation:compare-bar-grow .55s ease-out both;transform-origin:left}
+.compare-fill-a{background:#0f4c81}.compare-fill-b{background:#00a98f}
+.compare-delta{text-align:right;font-size:.75rem;font-weight:700;color:var(--text-muted);font-variant-numeric:tabular-nums}
+.compare-delta-up{color:#008a74}.compare-delta-down{color:#d14343}
+.compare-empty{padding:1.5rem;text-align:center;color:var(--text-muted);font-size:.85rem}
+@keyframes compare-bar-grow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
 .etf-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:1rem}
 .etf-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1.25rem;box-shadow:var(--shadow)}
 .etf-card-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem}
@@ -568,5 +601,8 @@ onMounted(() => {
 @media (max-width:640px){
   .compare-builders,.compare-summary{grid-template-columns:1fr}
   .compare-actions label{margin-left:0}
+  .compare-chart-header{align-items:flex-start;flex-direction:column}
+  .compare-chart-row{grid-template-columns:1fr;gap:.45rem;padding:.85rem 0}
+  .compare-delta{text-align:left;margin-left:43px}
 }
 </style>
