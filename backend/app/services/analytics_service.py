@@ -24,7 +24,12 @@ class AnalyticsService:
                 query = query.filter(Holding.date == latest_date)
 
             holdings = query.all()
-            holdings_data[str(etf_id)] = {h.instrument_isin: float(h.weight) for h in holdings}
+            raw_weights = {h.instrument_isin: float(h.weight) for h in holdings}
+            total_weight = sum(raw_weights.values())
+            holdings_data[str(etf_id)] = {
+                isin: weight / total_weight * 100
+                for isin, weight in raw_weights.items()
+            } if total_weight > 0 else {}
 
         matrix = {}
         common_holdings = []

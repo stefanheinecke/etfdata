@@ -142,7 +142,7 @@
             <h3 class="meth-comp-title">Overlap Penalty</h3>
             <span class="meth-comp-range meth-range-neg">0 to −2</span>
           </div>
-          <p class="meth-comp-desc">For every pair of ETFs, GoETF adds the smaller weight of each shared holding. The resulting weight overlap is then averaged across pairs, giving greater influence to pairs with larger portfolio allocations.</p>
+          <p class="meth-comp-desc">For every pair of ETFs, GoETF normalizes the available holdings of each ETF to 100%, then adds the smaller weight of each shared holding. The resulting weight overlap is averaged across pairs, giving greater influence to pairs with larger portfolio allocations.</p>
           <div class="meth-formula-box meth-formula-sm">
             <code>pair_overlap = Σ min(weight<sub>a</sub>, weight<sub>b</sub>)</code>
             <code>penalty = (avg_weight_overlap_% ÷ 100) × 2</code>
@@ -166,7 +166,7 @@
       <!-- Overlap example -->
       <div class="card meth-card meth-example-card">
         <h3 class="card-title">Overlap calculation example</h3>
-        <p class="meth-example-intro">Only shared holdings contribute to overlap. For each shared security, the smaller ETF weight is counted once. Holdings that appear in only one ETF contribute 0%.</p>
+        <p class="meth-example-intro">Only shared holdings contribute to overlap. Each ETF's available holdings are normalized to 100%; for each shared security, the smaller normalized weight is counted once. Holdings that appear in only one ETF contribute 0%.</p>
         <div class="meth-example-grid">
           <div>
             <div class="table-wrap">
