@@ -237,13 +237,17 @@
             </div>
           </div>
           <div class="compare-donuts">
-            <div class="compare-donut-panel">
-              <div class="compare-donut-title">Portfolio A</div>
-              <div class="compare-donut-chart"><Doughnut :data="comparisonDonutData('a', group.key)" :options="donutOptions" /></div>
+            <div class="compare-donut-panel compare-ring-panel">
+              <div class="compare-donut-title">Inner ring: Portfolio A · Outer ring: Portfolio B</div>
+              <div class="compare-donut-chart"><Doughnut :data="comparisonRingData(group.key)" :options="donutOptions" /></div>
             </div>
-            <div class="compare-donut-panel">
-              <div class="compare-donut-title">Portfolio B</div>
-              <div class="compare-donut-chart"><Doughnut :data="comparisonDonutData('b', group.key)" :options="donutOptions" /></div>
+            <div class="compare-donut-labels" :aria-label="`${group.label} values by portfolio`">
+              <div class="compare-donut-label-head"><span>Exposure</span><span>A</span><span>B</span></div>
+              <div v-for="row in comparisonRingLabels(group.key)" :key="row.name" class="compare-donut-label-row">
+                <span><i :style="{ background: row.color }"></i>{{ row.name }}</span>
+                <strong>{{ row.a.toFixed(1) }}%</strong>
+                <strong>{{ row.b.toFixed(1) }}%</strong>
+              </div>
             </div>
           </div>
           <div v-if="exposureDifference(group.key).length" class="compare-chart" role="img" :aria-label="`${group.label} comparison`">
@@ -456,23 +460,35 @@ const donutPalette = ['#0f4c81', '#00a98f', '#e6a800', '#d14343', '#7b61a8', '#2
 const donutOptions = {
   responsive: true,
   maintainAspectRatio: false,
-  cutout: '64%',
+  cutout: '52%',
   layout: { padding: 2 },
   plugins: {
-    legend: { position: 'right', align: 'center', labels: { boxWidth: 9, boxHeight: 9, padding: 10, font: { size: 11 }, usePointStyle: true, pointStyle: 'circle' } },
-    tooltip: { callbacks: { label: context => ` ${context.label}: ${context.parsed.toFixed(1)}%` } },
+    legend: { display: false },
+    tooltip: { callbacks: { label: context => ` ${context.dataset.label}: ${context.label} ${context.parsed.toFixed(1)}%` } },
   },
 }
 
-function comparisonDonutData(portfolioKey, type) {
-  const exposures = comparisonResult.value?.[portfolioKey]?.exposure[type] || {}
-  const entries = Object.entries(exposures).sort((left, right) => right[1] - left[1])
-  const leading = entries.slice(0, 5)
-  const other = entries.slice(5).reduce((total, [, value]) => total + value, 0)
-  if (other > 0) leading.push(['Other', other])
+function comparisonRingLabels(type) {
+  if (!comparisonResult.value) return []
+  const a = comparisonResult.value.a.exposure[type] || {}
+  const b = comparisonResult.value.b.exposure[type] || {}
+  const names = [...new Set([...Object.keys(a), ...Object.keys(b)])]
+    .sort((left, right) => Math.max(b[right] || 0, a[right] || 0) - Math.max(b[left] || 0, a[left] || 0))
+  const leading = names.slice(0, 5).map((name, index) => ({ name, a: a[name] || 0, b: b[name] || 0, color: donutPalette[index] }))
+  const otherA = names.slice(5).reduce((total, name) => total + (a[name] || 0), 0)
+  const otherB = names.slice(5).reduce((total, name) => total + (b[name] || 0), 0)
+  if (otherA > 0 || otherB > 0) leading.push({ name: 'Other', a: otherA, b: otherB, color: '#aab8c5' })
+  return leading
+}
+
+function comparisonRingData(type) {
+  const entries = comparisonRingLabels(type)
   return {
-    labels: leading.map(([name]) => name),
-    datasets: [{ data: leading.map(([, value]) => value), backgroundColor: leading.map(([name], index) => name === 'Other' ? '#aab8c5' : donutPalette[index % donutPalette.length]), borderColor: '#ffffff', borderWidth: 2, hoverOffset: 5 }],
+    labels: entries.map(entry => entry.name),
+    datasets: [
+      { label: 'Portfolio A', data: entries.map(entry => entry.a), backgroundColor: entries.map(entry => entry.color), borderColor: '#ffffff', borderWidth: 2, hoverOffset: 5 },
+      { label: 'Portfolio B', data: entries.map(entry => entry.b), backgroundColor: entries.map(entry => entry.color), borderColor: '#ffffff', borderWidth: 2, hoverOffset: 5 },
+    ],
   }
 }
 // Risk-free rate (used for portfolio Sharpe in summary)
@@ -594,10 +610,18 @@ onMounted(() => {
 .compare-legend span{display:flex;align-items:center;gap:.35rem}
 .compare-legend i{width:9px;height:9px;border-radius:50%;display:block}
 .legend-a{background:#0f4c81}.legend-b{background:#00a98f}
-.compare-donuts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem;padding:1rem 1.25rem;background:color-mix(in srgb,var(--bg-3) 52%,transparent);border-bottom:1px solid var(--border)}
+.compare-donuts{display:grid;grid-template-columns:minmax(260px,.85fr) minmax(280px,1.15fr);gap:1rem;padding:1rem 1.25rem;background:color-mix(in srgb,var(--bg-3) 52%,transparent);border-bottom:1px solid var(--border)}
 .compare-donut-panel{min-width:0;padding:.75rem;background:var(--surface);border:1px solid var(--border);border-radius:8px}
+.compare-ring-panel{display:flex;flex-direction:column}
 .compare-donut-title{font-size:.75rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em}
-.compare-donut-chart{height:178px;margin-top:.35rem}
+.compare-donut-chart{height:188px;margin-top:.35rem}
+.compare-donut-labels{align-self:stretch;display:flex;flex-direction:column;justify-content:center;min-width:0}
+.compare-donut-label-head,.compare-donut-label-row{display:grid;grid-template-columns:minmax(0,1fr) 52px 52px;gap:.5rem;align-items:center;padding:.45rem .6rem;font-size:.78rem}
+.compare-donut-label-head{padding-top:0;color:var(--text-muted);font-size:.7rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase}
+.compare-donut-label-row{border-top:1px solid var(--border);color:var(--text)}
+.compare-donut-label-row span{display:flex;align-items:center;gap:.45rem;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.compare-donut-label-row i{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.compare-donut-label-row strong{text-align:right;font-variant-numeric:tabular-nums;font-size:.76rem}
 .compare-chart{padding:.5rem 1.25rem .75rem}
 .compare-chart-row{display:grid;grid-template-columns:minmax(100px,150px) minmax(250px,1fr) 72px;gap:1rem;align-items:center;padding:.65rem 0;border-bottom:1px solid color-mix(in srgb,var(--border) 60%,transparent)}
 .compare-chart-row:last-child{border-bottom:0}
