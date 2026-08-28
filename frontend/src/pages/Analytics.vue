@@ -236,24 +236,10 @@
               <span><i class="legend-b"></i>Portfolio B</span>
             </div>
           </div>
-          <div class="compare-donuts">
-            <div class="compare-donut-panel compare-ring-panel">
-              <div class="compare-donut-title">Inner ring: Portfolio A · Outer ring: Portfolio B</div>
-              <div class="compare-donut-chart"><Doughnut :data="comparisonRingData(group.key)" :options="donutOptions" /></div>
-            </div>
-            <div class="compare-donut-labels" :aria-label="`${group.label} values by portfolio`">
-              <div class="compare-donut-label-head"><span>Exposure</span><span>A</span><span>B</span></div>
-              <div v-for="row in comparisonRingLabels(group.key)" :key="row.name" class="compare-donut-label-row">
-                <span><i :style="{ background: row.color }"></i>{{ row.name }}</span>
-                <strong>{{ row.a.toFixed(1) }}%</strong>
-                <strong>{{ row.b.toFixed(1) }}%</strong>
-              </div>
-            </div>
-          </div>
-          <div v-if="exposureDifference(group.key).length" class="compare-chart" role="img" :aria-label="`${group.label} comparison`">
-            <div v-for="row in exposureDifference(group.key)" :key="row.name" class="compare-chart-row">
+          <div v-if="exposureDifference(group.key).length" class="compare-grouped-chart" role="img" :aria-label="`${group.label} grouped bar comparison`">
+            <div v-for="row in exposureDifference(group.key)" :key="row.name" class="compare-grouped-row">
               <div class="compare-chart-label" :title="row.name">{{ row.name }}</div>
-              <div class="compare-bars">
+              <div class="compare-grouped-bars">
                 <div class="compare-bar-line">
                   <span class="compare-bar-value">{{ row.a.toFixed(1) }}%</span>
                   <div class="compare-track"><div class="compare-fill compare-fill-a" :style="{ width: `${Math.min(row.a, 100)}%` }"></div></div>
@@ -328,11 +314,7 @@
 
 <script setup>
 import { ref, computed, onMounted, inject } from 'vue'
-import { Doughnut } from 'vue-chartjs'
-import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js'
 import { etfService, analyticsService, scoreService } from '../services/api.js'
-
-ChartJS.register(ArcElement, Tooltip, Legend)
 
 const showApiKeyModal = inject('showApiKeyModal')
 const analyticsInitTab = inject('analyticsInitTab', ref(null))
@@ -456,41 +438,6 @@ function exposureDifference(type) {
     .slice(0, 6)
 }
 
-const donutPalette = ['#0f4c81', '#00a98f', '#e6a800', '#d14343', '#7b61a8', '#2f85c8', '#7a8b99']
-const donutOptions = {
-  responsive: true,
-  maintainAspectRatio: false,
-  cutout: '52%',
-  layout: { padding: 2 },
-  plugins: {
-    legend: { display: false },
-    tooltip: { callbacks: { label: context => ` ${context.dataset.label}: ${context.label} ${context.parsed.toFixed(1)}%` } },
-  },
-}
-
-function comparisonRingLabels(type) {
-  if (!comparisonResult.value) return []
-  const a = comparisonResult.value.a.exposure[type] || {}
-  const b = comparisonResult.value.b.exposure[type] || {}
-  const names = [...new Set([...Object.keys(a), ...Object.keys(b)])]
-    .sort((left, right) => Math.max(b[right] || 0, a[right] || 0) - Math.max(b[left] || 0, a[left] || 0))
-  const leading = names.slice(0, 5).map((name, index) => ({ name, a: a[name] || 0, b: b[name] || 0, color: donutPalette[index] }))
-  const otherA = names.slice(5).reduce((total, name) => total + (a[name] || 0), 0)
-  const otherB = names.slice(5).reduce((total, name) => total + (b[name] || 0), 0)
-  if (otherA > 0 || otherB > 0) leading.push({ name: 'Other', a: otherA, b: otherB, color: '#aab8c5' })
-  return leading
-}
-
-function comparisonRingData(type) {
-  const entries = comparisonRingLabels(type)
-  return {
-    labels: entries.map(entry => entry.name),
-    datasets: [
-      { label: 'Portfolio A', data: entries.map(entry => entry.a), backgroundColor: entries.map(entry => entry.color), borderColor: '#ffffff', borderWidth: 2, hoverOffset: 5 },
-      { label: 'Portfolio B', data: entries.map(entry => entry.b), backgroundColor: entries.map(entry => entry.color), borderColor: '#ffffff', borderWidth: 2, hoverOffset: 5 },
-    ],
-  }
-}
 // Risk-free rate (used for portfolio Sharpe in summary)
 const riskFreeRate = ref(4.0)     // % per year
 
@@ -610,23 +557,11 @@ onMounted(() => {
 .compare-legend span{display:flex;align-items:center;gap:.35rem}
 .compare-legend i{width:9px;height:9px;border-radius:50%;display:block}
 .legend-a{background:#0f4c81}.legend-b{background:#00a98f}
-.compare-donuts{display:grid;grid-template-columns:minmax(260px,.85fr) minmax(280px,1.15fr);gap:1rem;padding:1rem 1.25rem;background:color-mix(in srgb,var(--bg-3) 52%,transparent);border-bottom:1px solid var(--border)}
-.compare-donut-panel{min-width:0;padding:.75rem;background:var(--surface);border:1px solid var(--border);border-radius:8px}
-.compare-ring-panel{display:flex;flex-direction:column}
-.compare-donut-title{font-size:.75rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em}
-.compare-donut-chart{height:188px;margin-top:.35rem}
-.compare-donut-labels{align-self:stretch;display:flex;flex-direction:column;justify-content:center;min-width:0}
-.compare-donut-label-head,.compare-donut-label-row{display:grid;grid-template-columns:minmax(0,1fr) 52px 52px;gap:.5rem;align-items:center;padding:.45rem .6rem;font-size:.78rem}
-.compare-donut-label-head{padding-top:0;color:var(--text-muted);font-size:.7rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase}
-.compare-donut-label-row{border-top:1px solid var(--border);color:var(--text)}
-.compare-donut-label-row span{display:flex;align-items:center;gap:.45rem;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.compare-donut-label-row i{width:8px;height:8px;border-radius:50%;flex-shrink:0}
-.compare-donut-label-row strong{text-align:right;font-variant-numeric:tabular-nums;font-size:.76rem}
-.compare-chart{padding:.5rem 1.25rem .75rem}
-.compare-chart-row{display:grid;grid-template-columns:minmax(100px,150px) minmax(250px,1fr) 72px;gap:1rem;align-items:center;padding:.65rem 0;border-bottom:1px solid color-mix(in srgb,var(--border) 60%,transparent)}
-.compare-chart-row:last-child{border-bottom:0}
+.compare-grouped-chart{padding:.5rem 1.25rem .75rem}
+.compare-grouped-row{display:grid;grid-template-columns:minmax(110px,150px) minmax(250px,1fr) 72px;gap:1rem;align-items:center;padding:.7rem 0;border-bottom:1px solid color-mix(in srgb,var(--border) 60%,transparent)}
+.compare-grouped-row:last-child{border-bottom:0}
 .compare-chart-label{font-size:.8rem;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.compare-bars{display:flex;flex-direction:column;gap:.35rem;min-width:0}
+.compare-grouped-bars{display:flex;flex-direction:column;gap:.35rem;min-width:0}
 .compare-bar-line{display:grid;grid-template-columns:38px minmax(0,1fr);align-items:center;gap:.45rem}
 .compare-bar-value{font-size:.7rem;text-align:right;color:var(--text-muted);font-variant-numeric:tabular-nums}
 .compare-track{height:8px;border-radius:4px;overflow:hidden;background:repeating-linear-gradient(90deg,var(--bg-3) 0,var(--bg-3) calc(25% - 1px),var(--border) calc(25% - 1px),var(--border) 25%)}
@@ -663,9 +598,7 @@ onMounted(() => {
   .compare-builders,.compare-summary{grid-template-columns:1fr}
   .compare-actions label{margin-left:0}
   .compare-chart-header{align-items:flex-start;flex-direction:column}
-  .compare-donuts{grid-template-columns:1fr}
-  .compare-donut-chart{height:205px}
-  .compare-chart-row{grid-template-columns:1fr;gap:.45rem;padding:.85rem 0}
+  .compare-grouped-row{grid-template-columns:1fr;gap:.45rem;padding:.85rem 0}
   .compare-delta{text-align:left;margin-left:43px}
 }
 </style>
