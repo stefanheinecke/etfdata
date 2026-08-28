@@ -284,7 +284,6 @@ def compute_portfolio_score(
       overlap_penalty = weighted avg pairwise weight_overlap * 2  (max 2 pts)
       allocation_bonus= max(0, portfolio_geo_div − avg_individual_geo_div)  (0–1 pt)
       final         = clamp(base − penalty + bonus, 1, 10)
-    Also computes a single-ETF alternative insight.
     """
     from app.services.analytics_service import AnalyticsService
 
@@ -294,7 +293,7 @@ def compute_portfolio_score(
 
     total_w = sum(p["weight"] for p in active)
 
-    # All ETF scores (universe for insight generation)
+    # Individual ETF scores used to calculate the portfolio base score.
     all_scores = compute_goetf_scores(db, rf_annual)
     score_map = {s["etf_id"]: s.get("goetf_score") or 5.0 for s in all_scores}
     geo_map = {s["etf_id"]: s.get("geo_div", 0.5) for s in all_scores}
@@ -363,22 +362,6 @@ def compute_portfolio_score(
 
     final_score = max(1.0, min(10.0, base - overlap_penalty + allocation_bonus))
 
-    # 4. Insight
-    tip = _compute_tip(
-        db,
-        active,
-        total_w,
-        rf_annual,
-        all_scores,
-        score_map,
-        geo_map,
-        ticker_map,
-        final_score,
-        base,
-        overlap_penalty,
-        allocation_bonus,
-    )
-
     # Build individual scores list
     active_ids = {p["etf_id"] for p in active}
     individual_scores = []
@@ -404,129 +387,4 @@ def compute_portfolio_score(
         "portfolio_geo_div": portfolio_geo_div,
         "pairwise_overlaps": pairwise_overlaps,
         "individual_scores": individual_scores,
-        "tip": tip,
     }
-
-
-# ---------------------------------------------------------------------------
-# Insight computation: evaluate single-ETF alternatives
-# ---------------------------------------------------------------------------
-def _compute_tip(
-    db: Session,
-    active: List[Dict],
-    total_w: float,
-    rf_annual: float,
-    all_scores: List[Dict],
-    score_map: Dict[str, float],
-    geo_map: Dict[str, float],
-    ticker_map: Dict[str, str],
-    current_score: float,
-    current_base: float,
-    current_overlap_penalty: float,
-    current_allocation_bonus: float,
-) -> Optional[Dict]:
-    """
-    Test each ETF against each alternative from the universe.
-    Return the strongest outcome that improves the portfolio score.
-    Only considers outcomes with improvement > 0.1 points.
-    """
-    from app.services.analytics_service import AnalyticsService
-
-    portfolio_ids = {p["etf_id"] for p in active}
-    # Candidates: ETFs not already in portfolio with valid scores
-    alternatives = [
-        s for s in all_scores
-        if s["etf_id"] not in portfolio_ids and s.get("goetf_score") is not None
-    ]
-
-    if not alternatives or len(active) < 2:
-        return None
-
-    best_score = current_score + 0.1  # minimum improvement threshold
-    best_tip = None
-
-    for i, item in enumerate(active):
-        for alt in alternatives:
-            # Build candidate portfolio with this one-at-a-time alternative
-            candidate = [
-                {"etf_id": alt["etf_id"] if j == i else p["etf_id"], "weight": p["weight"]}
-                for j, p in enumerate(active)
-            ]
-            cand_total_w = sum(p["weight"] for p in candidate)
-
-            # Base score
-            cand_base = sum(
-                (p["weight"] / cand_total_w) * score_map.get(p["etf_id"], 5.0)
-                for p in candidate
-            )
-
-            # Pairwise overlaps for candidate
-            cand_ids = [UUID(p["etf_id"]) for p in candidate]
-            cand_w_norms = [p["weight"] / cand_total_w for p in candidate]
-            ov_list = []
-            for a in range(len(cand_ids)):
-                for b in range(a + 1, len(cand_ids)):
-                    ov = AnalyticsService.calculate_overlap(db, [cand_ids[a], cand_ids[b]])
-                    weight_ov = 0.0
-                    if "matrix" in ov:
-                        for v in ov["matrix"].values():
-                            weight_ov = v.get("weight_overlap", 0)
-                    combined_w = (cand_w_norms[a] + cand_w_norms[b]) / 2 * 100
-                    ov_list.append((float(weight_ov), combined_w))
-
-            if ov_list:
-                total_cw = sum(o[1] for o in ov_list)
-                cand_avg_ov = sum(o[0] * o[1] for o in ov_list) / total_cw if total_cw > 0 else 0
-            else:
-                cand_avg_ov = 0.0
-            cand_penalty = (cand_avg_ov / 100) * 2.0
-
-            # Calculate the candidate's geographic bonus from combined country exposure.
-            cand_avg_geo = sum(
-                (p["weight"] / cand_total_w) * geo_map.get(p["etf_id"], 0.5) for p in candidate
-            )
-            candidate_portfolio = [
-                {"etf_id": UUID(p["etf_id"]), "weight": p["weight"] / cand_total_w * 100}
-                for p in candidate
-            ]
-            exposure = AnalyticsService.calculate_portfolio_exposure(db, candidate_portfolio)
-            country_vals = list(exposure.get("countries", {}).values())
-            cand_bonus = 0.0
-            if country_vals:
-                total_c = sum(country_vals)
-                if total_c > 0:
-                    norm_c = [value / total_c for value in country_vals]
-                    candidate_geo_div = 1.0 - sum(value * value for value in norm_c)
-                    cand_bonus = max(0.0, candidate_geo_div - cand_avg_geo)
-
-            cand_score = max(1.0, min(10.0, cand_base - cand_penalty + cand_bonus))
-
-            if cand_score > best_score:
-                best_score = cand_score
-                old_ticker = ticker_map.get(item["etf_id"], item["etf_id"])
-                new_ticker = alt["ticker"]
-                displayed_current_score = round(current_score, 1)
-                displayed_candidate_score = round(best_score, 1)
-                individual_delta = round(cand_base - current_base, 2)
-                overlap_delta = round(current_overlap_penalty - cand_penalty, 2)
-                diversification_delta = round(cand_bonus - current_allocation_bonus, 2)
-                best_tip = {
-                    "replace_etf_id": item["etf_id"],
-                    "replace_ticker": old_ticker,
-                    "with_etf_id": alt["etf_id"],
-                    "with_ticker": new_ticker,
-                    "new_score": displayed_candidate_score,
-                    "current_score": round(current_score, 2),
-                    "candidate_score": round(best_score, 2),
-                    "improvement": round(best_score - current_score, 2),
-                    "individual_score_delta": individual_delta,
-                    "overlap_impact": overlap_delta,
-                    "diversification_impact": diversification_delta,
-                    "component_change": round(individual_delta + overlap_delta + diversification_delta, 2),
-                    "reason": (
-                        f"The suggested replacement is evaluated by its net effect on "
-                        f"individual quality, overlap, and geographic diversification."
-                    ),
-                }
-
-    return best_tip

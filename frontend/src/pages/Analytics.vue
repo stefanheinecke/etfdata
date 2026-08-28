@@ -80,23 +80,6 @@
             <span style="font-size:.85rem;font-weight:600">{{ ov.weight_overlap_pct?.toFixed(1) }}%</span>
           </div>
         </div>
-        <div v-if="portfolioScoreResult.tip" class="tip-box">
-          <span class="tip-icon">💡</span>
-          <div>
-            Replacing <strong style="color:var(--green-600)">{{ portfolioScoreResult.tip.replace_ticker }}</strong>
-            with <strong style="color:var(--green-600)">{{ portfolioScoreResult.tip.with_ticker }}</strong>
-            would increase the portfolio score from <strong>{{ portfolioScoreResult.tip.current_score.toFixed(2) }}</strong>
-            to <strong>{{ portfolioScoreResult.tip.candidate_score.toFixed(2) }}</strong>
-            (<span class="tip-impact-positive">+{{ portfolioScoreResult.tip.improvement.toFixed(2) }}</span>):
-            <div class="tip-breakdown">
-              <div><span>Weighted individual score impact</span><strong :class="portfolioScoreResult.tip.individual_score_delta >= 0 ? 'tip-impact-positive' : 'tip-impact-negative'">{{ portfolioScoreResult.tip.individual_score_delta >= 0 ? '+' : '' }}{{ portfolioScoreResult.tip.individual_score_delta.toFixed(2) }}</strong></div>
-              <div><span>Overlap penalty impact</span><strong :class="portfolioScoreResult.tip.overlap_impact >= 0 ? 'tip-impact-positive' : 'tip-impact-negative'">{{ portfolioScoreResult.tip.overlap_impact >= 0 ? '+' : '' }}{{ portfolioScoreResult.tip.overlap_impact.toFixed(2) }}</strong></div>
-              <div><span>Geographic diversification impact</span><strong :class="portfolioScoreResult.tip.diversification_impact >= 0 ? 'tip-impact-positive' : 'tip-impact-negative'">{{ portfolioScoreResult.tip.diversification_impact >= 0 ? '+' : '' }}{{ portfolioScoreResult.tip.diversification_impact.toFixed(2) }}</strong></div>
-              <div class="tip-breakdown-total"><span>Net component change</span><strong :class="portfolioScoreResult.tip.component_change >= 0 ? 'tip-impact-positive' : 'tip-impact-negative'">{{ portfolioScoreResult.tip.component_change >= 0 ? '+' : '' }}{{ portfolioScoreResult.tip.component_change.toFixed(2) }}</strong></div>
-            </div>
-          </div>
-        </div>
-        <div v-else-if="portfolioScoreResult.tip === null" style="font-size:.8rem;color:var(--text-muted)">No higher-scoring alternative cleared the +0.1 threshold.</div>
         <p style="font-size:.7rem;color:var(--text-muted);margin-top:.75rem;margin-bottom:0">
           Base = weighted avg of individual GoETF Scores &nbsp;·&nbsp; Overlap Penalty: max −2 pts for 100% overlap &nbsp;·&nbsp; Bonus: portfolio country diversification vs individual weighted avg
           &nbsp;<button class="meth-link" @click="navigateTo('methodology')">→ Methodology</button>
@@ -186,6 +169,82 @@
       </div>
       </div>    </div>
 
+    <!-- PORTFOLIO COMPARISON -->
+    <div v-if="activeTab==='compare'">
+      <div class="card" style="margin-bottom:1.5rem">
+        <h2 class="card-title">Compare Portfolios</h2>
+        <p style="font-size:.875rem;color:var(--text-muted);margin-bottom:1rem">Compare the composition and diversification characteristics of two portfolios. Results describe the differences; they do not recommend a portfolio.</p>
+        <div class="compare-builders">
+          <div class="compare-builder">
+            <h3 class="compare-title">Portfolio A</h3>
+            <div v-for="(item,i) in comparisonPortfolioA" :key="`a-${i}`" class="compare-row">
+              <select class="input" v-model="item.etf_id">
+                <option value="">Select ETF...</option>
+                <option v-for="e in allEtfs" :key="e.id" :value="e.id">{{ e.ticker }} - {{ e.name }}</option>
+              </select>
+              <input class="input compare-weight" type="number" v-model.number="item.weight" aria-label="Portfolio A weight" min="0" max="100" />
+              <button class="btn btn-outline compare-remove" @click="comparisonPortfolioA.splice(i,1)" aria-label="Remove ETF from Portfolio A">✕</button>
+            </div>
+            <button class="btn btn-outline compare-add" @click="comparisonPortfolioA.push({etf_id:'',weight:0})">+ Add ETF</button>
+          </div>
+          <div class="compare-builder">
+            <h3 class="compare-title">Portfolio B</h3>
+            <div v-for="(item,i) in comparisonPortfolioB" :key="`b-${i}`" class="compare-row">
+              <select class="input" v-model="item.etf_id">
+                <option value="">Select ETF...</option>
+                <option v-for="e in allEtfs" :key="e.id" :value="e.id">{{ e.ticker }} - {{ e.name }}</option>
+              </select>
+              <input class="input compare-weight" type="number" v-model.number="item.weight" aria-label="Portfolio B weight" min="0" max="100" />
+              <button class="btn btn-outline compare-remove" @click="comparisonPortfolioB.splice(i,1)" aria-label="Remove ETF from Portfolio B">✕</button>
+            </div>
+            <button class="btn btn-outline compare-add" @click="comparisonPortfolioB.push({etf_id:'',weight:0})">+ Add ETF</button>
+          </div>
+        </div>
+        <div class="compare-actions">
+          <button class="btn btn-primary" @click="runComparison" :disabled="comparisonLoading || !activePortfolio(comparisonPortfolioA).length || !activePortfolio(comparisonPortfolioB).length">
+            {{ comparisonLoading ? 'Comparing...' : 'Compare Portfolios' }}
+          </button>
+          <label>Risk-free rate</label>
+          <input class="input" type="number" v-model.number="riskFreeRate" min="0" max="20" step="0.5" />
+          <span>% p.a.</span>
+        </div>
+      </div>
+      <div v-if="comparisonError" class="error-box" style="margin-bottom:1rem">{{ comparisonError }}</div>
+      <template v-if="comparisonResult">
+        <div class="compare-summary">
+          <div class="card compare-summary-card">
+            <h3 class="compare-title">Portfolio A</h3>
+            <div class="compare-metric"><span>GoETF Score</span><strong>{{ comparisonResult.a.score.portfolio_score?.toFixed(1) }}</strong></div>
+            <div class="compare-metric"><span>Avg holdings overlap</span><strong>{{ comparisonResult.a.score.avg_overlap_pct?.toFixed(1) }}%</strong></div>
+            <div class="compare-metric"><span>Country diversity</span><strong>{{ comparisonResult.a.score.portfolio_geo_div?.toFixed(3) ?? '—' }}</strong></div>
+          </div>
+          <div class="card compare-summary-card">
+            <h3 class="compare-title">Portfolio B</h3>
+            <div class="compare-metric"><span>GoETF Score</span><strong>{{ comparisonResult.b.score.portfolio_score?.toFixed(1) }}</strong></div>
+            <div class="compare-metric"><span>Avg holdings overlap</span><strong>{{ comparisonResult.b.score.avg_overlap_pct?.toFixed(1) }}%</strong></div>
+            <div class="compare-metric"><span>Country diversity</span><strong>{{ comparisonResult.b.score.portfolio_geo_div?.toFixed(3) ?? '—' }}</strong></div>
+          </div>
+        </div>
+        <div v-for="group in [{key:'countries',label:'Country Exposure'}, {key:'sectors',label:'Sector Exposure'}, {key:'currencies',label:'Currency Exposure'}]" :key="group.key" class="card compare-exposure-card">
+          <h3 class="card-title">{{ group.label }}</h3>
+          <div class="table-wrap">
+            <table class="risk-table compare-table">
+              <thead><tr><th>Exposure</th><th>Portfolio A</th><th>Portfolio B</th><th>Difference (B − A)</th></tr></thead>
+              <tbody>
+                <tr v-for="row in exposureDifference(group.key)" :key="row.name">
+                  <td>{{ row.name }}</td>
+                  <td>{{ row.a.toFixed(1) }}%</td>
+                  <td>{{ row.b.toFixed(1) }}%</td>
+                  <td :class="row.b - row.a > 0 ? 'cell-green' : row.b - row.a < 0 ? 'cell-red' : ''">{{ row.b - row.a > 0 ? '+' : '' }}{{ (row.b - row.a).toFixed(1) }}%</td>
+                </tr>
+                <tr v-if="!exposureDifference(group.key).length"><td colspan="4" class="compare-empty">No allocation data available.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </template>
+    </div>
+
     <!-- RISK METRICS -->
     <div v-if="activeTab==='risk'">
       <div class="card" style="margin-bottom:1.5rem;display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
@@ -251,6 +310,7 @@ const hasApiKey = inject('hasApiKey', ref(!!localStorage.getItem('api_key')))
 const activeTab = ref('exposure')
 const tabs = [
   {id:'exposure',label:'Portfolio Exposure',icon:'🌍'},
+  {id:'compare',label:'Compare Portfolios',icon:'⇄'},
   {id:'risk',label:'Risk Metrics',icon:'📊'},
 ]
 const allEtfs = ref([])
@@ -264,6 +324,13 @@ const exposureError = ref('')
 const portfolioRiskResult = ref(null)
 const portfolioScoreResult = ref(null)
 const portfolioScoreLoading = ref(false)
+
+// Portfolio comparison
+const comparisonPortfolioA = ref([{etf_id:'',weight:50},{etf_id:'',weight:50}])
+const comparisonPortfolioB = ref([{etf_id:'',weight:50},{etf_id:'',weight:50}])
+const comparisonLoading = ref(false)
+const comparisonError = ref('')
+const comparisonResult = ref(null)
 
 const portfolioSummary = computed(() => {
   if (!portfolioRiskResult.value?.length) return null
@@ -314,6 +381,52 @@ async function runExposure() {
         finally { portfolioScoreLoading.value = false }
     }
   } catch(e){exposureError.value=e.response?.data?.detail||e.message} finally{exposureLoading.value=false}
+}
+
+function activePortfolio(items) {
+  return items.filter(item => item.etf_id && item.weight > 0)
+}
+
+async function analysePortfolio(items) {
+  const portfolioItems = activePortfolio(items)
+  const [exposureResponse, scoreResponse] = await Promise.all([
+    analyticsService.calculateExposure(portfolioItems, null, riskFreeRate.value / 100),
+    scoreService.getPortfolioScore(portfolioItems, riskFreeRate.value / 100),
+  ])
+  return { exposure: exposureResponse.data, score: scoreResponse.data }
+}
+
+async function runComparison() {
+  const portfolioA = activePortfolio(comparisonPortfolioA.value)
+  const portfolioB = activePortfolio(comparisonPortfolioB.value)
+  if (!portfolioA.length || !portfolioB.length) return
+
+  comparisonLoading.value = true
+  comparisonError.value = ''
+  comparisonResult.value = null
+  try {
+    const [a, b] = await Promise.all([analysePortfolio(portfolioA), analysePortfolio(portfolioB)])
+    comparisonResult.value = { a, b }
+  } catch (error) {
+    comparisonError.value = error.response?.data?.detail || error.message
+  } finally {
+    comparisonLoading.value = false
+  }
+}
+
+function exposureEntries(result, type) {
+  if (!result) return []
+  return Object.entries(result.exposure[type] || {}).sort((a, b) => b[1] - a[1]).slice(0, 6)
+}
+
+function exposureDifference(type) {
+  if (!comparisonResult.value) return []
+  const a = comparisonResult.value.a.exposure[type] || {}
+  const b = comparisonResult.value.b.exposure[type] || {}
+  return [...new Set([...Object.keys(a), ...Object.keys(b)])]
+    .map(name => ({ name, a: a[name] || 0, b: b[name] || 0 }))
+    .sort((left, right) => Math.abs(right.a - right.b) - Math.abs(left.a - left.b))
+    .slice(0, 6)
 }
 // Risk-free rate (used for portfolio Sharpe in summary)
 const riskFreeRate = ref(4.0)     // % per year
@@ -411,6 +524,24 @@ onMounted(() => {
 .ana-tab{background:none;border:1px solid var(--border);cursor:pointer;padding:6px 12px;border-radius:6px;font-size:.88rem;font-weight:500;color:var(--text-muted);transition:all .15s;display:flex;align-items:center;gap:.35rem;font-family:inherit}
 .ana-tab:hover{border-color:#2f85c8;color:#0f4c81;background:var(--bg-3)}
 .ana-tab.active{background:#0f4c81;border-color:#0f4c81;color:#fff}
+.compare-builders,.compare-summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem}
+.compare-builder{min-width:0;padding:1rem;background:var(--bg-3);border:1px solid var(--border);border-radius:8px}
+.compare-title{margin:0 0 .75rem;font-size:.95rem;color:var(--text)}
+.compare-row{display:grid;grid-template-columns:minmax(0,1fr) 82px 34px;gap:.5rem;margin-bottom:.5rem;align-items:center}
+.compare-weight{min-width:0}
+.compare-remove{width:34px;height:34px;padding:0;line-height:1}
+.compare-add{margin-top:.25rem;font-size:.8rem}
+.compare-actions{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-top:1rem}
+.compare-actions label{margin-left:auto;font-size:.8rem;color:var(--text-muted)}
+.compare-actions input{width:72px;padding:.3rem .5rem;font-size:.875rem}
+.compare-actions span{font-size:.8rem;color:var(--text-muted)}
+.compare-summary{margin-bottom:1rem}
+.compare-summary-card{padding:1rem}
+.compare-metric{display:flex;justify-content:space-between;gap:1rem;padding:.45rem 0;border-top:1px solid var(--border);font-size:.82rem;color:var(--text-muted)}
+.compare-metric strong{color:var(--text);font-variant-numeric:tabular-nums}
+.compare-exposure-card{margin-bottom:1rem;padding:0;overflow:hidden}
+.compare-exposure-card .card-title{padding:1rem 1.25rem;margin:0;border-bottom:1px solid var(--border)}
+.compare-empty{text-align:center;color:var(--text-muted)}
 .etf-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:1rem}
 .etf-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1.25rem;box-shadow:var(--shadow)}
 .etf-card-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem}
@@ -434,11 +565,8 @@ onMounted(() => {
 [data-theme="dark"] .score-mid{background:#2d1b00;color:#fde68a}
 [data-theme="dark"] .score-low{background:#3d1a00;color:#fdba74}
 [data-theme="dark"] .score-poor{background:#3d0000;color:#fca5a5}
-.tip-box{display:flex;gap:.75rem;align-items:flex-start;background:var(--bg-3);border:1px solid var(--border);border-radius:10px;padding:.85rem 1rem;margin-top:.5rem}
-.tip-icon{font-size:1.2rem;flex-shrink:0}
-.tip-breakdown{display:flex;flex-direction:column;gap:.25rem;margin-top:.55rem;font-size:.8rem;color:var(--text-muted)}
-.tip-breakdown div{display:flex;justify-content:space-between;gap:1.5rem}
-.tip-breakdown strong{font-variant-numeric:tabular-nums}
-.tip-impact-positive{color:#16a34a}
-.tip-impact-negative{color:#ef4444}
+@media (max-width:640px){
+  .compare-builders,.compare-summary{grid-template-columns:1fr}
+  .compare-actions label{margin-left:0}
+}
 </style>

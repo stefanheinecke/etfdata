@@ -244,14 +244,14 @@
         <p style="font-size:.85rem;color:var(--text-muted);margin-top:.75rem;margin-bottom:0">The score is clamped to the range 1-10. A perfectly diversified, non-overlapping portfolio of high-scoring ETFs can reach a score close to 10.</p>
       </div>
 
-      <!-- Portfolio Insight -->
+      <!-- Using portfolio analysis -->
       <div class="card meth-card">
-        <h3 class="card-title">💡 Portfolio Insight</h3>
-        <p style="font-size:.875rem;color:var(--text)">After computing the portfolio score, the engine tests one ETF at a time against each alternative ETF in the tracked universe and estimates the resulting portfolio score. If any tested alternative improves the score by more than 0.1 pts, the strongest outcome is shown.</p>
+        <h3 class="card-title">Using portfolio analysis</h3>
+        <p style="font-size:.875rem;color:var(--text)">GoETF describes portfolio composition and diversification; it does not recommend ETF replacements. Review holdings overlap alongside country, sector, and currency exposure to decide whether a concentration or tilt is intentional for your own objectives.</p>
         <div style="margin-top:.75rem;display:flex;flex-direction:column;gap:.3rem">
-          <div class="meth-tip-row"><span class="meth-tip-key">Scope</span><span>One ETF is changed at a time; all others remain unchanged.</span></div>
-          <div class="meth-tip-row"><span class="meth-tip-key">Threshold</span><span>Minimum improvement of +0.1 pts required to show an insight.</span></div>
-          <div class="meth-tip-row"><span class="meth-tip-key">Universe</span><span>All ETFs tracked in GoETF are considered as candidates.</span></div>
+          <div class="meth-tip-row"><span class="meth-tip-key">Overlap</span><span>Shared holdings can reveal redundancy, but may also represent an intentional allocation tilt.</span></div>
+          <div class="meth-tip-row"><span class="meth-tip-key">Diversification</span><span>Country, sector, and currency exposure show where the portfolio is concentrated.</span></div>
+          <div class="meth-tip-row"><span class="meth-tip-key">Comparison</span><span>Compare two portfolios side by side to assess the composition trade-offs relevant to you.</span></div>
         </div>
       </div>
     </div>
