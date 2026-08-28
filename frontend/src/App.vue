@@ -34,7 +34,6 @@
     <main class="main" :class="{ 'main-home': currentPage === 'home' }">
       <Home v-if="currentPage === 'home'" :key="homeRenderKey" @navigate="currentPage = $event" />
       <ETFList v-else-if="currentPage === 'etfs'" />
-      <ETFDetail v-else-if="currentPage === 'etf-detail'" />
       <Scores v-else-if="currentPage === 'scores'" />
       <Analytics v-else-if="currentPage === 'analytics'" />
       <Methodology v-else-if="currentPage === 'methodology'" />
@@ -154,7 +153,6 @@ async function doAdminLogin() {
 }
 import Home from './pages/Home.vue'
 import ETFList from './pages/ETFList.vue'
-import ETFDetail from './pages/ETFDetail.vue'
 import Scores from './pages/Scores.vue'
 import Analytics from './pages/Analytics.vue'
 import ApiDocs from './pages/ApiDocs.vue'
@@ -181,9 +179,13 @@ function openApiKeyModal(tab = 'request') {
 provide('showApiKeyModal', showApiKeyModal)
 provide('hasApiKey', hasApiKey)
 
-const selectedETF = ref(null)
-provide('selectedETF', selectedETF)
-provide('navigateToETF', (etf) => { selectedETF.value = etf; currentPage.value = 'etf-detail' })
+const portfolioInit = ref(null)
+provide('portfolioInit', portfolioInit)
+provide('navigateToETF', (etf) => {
+  portfolioInit.value = { etf_id: etf.id, weight: 100 }
+  currentPage.value = 'analytics'
+  window.scrollTo({ top: 0, behavior: 'auto' })
+})
 const analyticsInitTab = ref(null)
 provide('analyticsInitTab', analyticsInitTab)
 provide('navigateTo', (page, tab) => { goToPage(page, tab) })

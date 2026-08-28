@@ -11,17 +11,10 @@
       </div>
       <button class="cta-btn" @click="showApiKeyModal = true">Get Free API Key</button>
     </div>
-    <div class="ana-tabs">
-      <button v-for="t in tabs" :key="t.id" :class="['ana-tab',{active:activeTab===t.id}]" @click="activeTab=t.id">
-        <span>{{ t.icon }}</span> {{ t.label }}
-      </button>
-    </div>
-
-    <!-- EXPOSURE -->
-    <div v-if="activeTab==='exposure'">
+    <div>
       <div class="card" style="margin-bottom:1.5rem">
         <h2 class="card-title">Portfolio Exposure</h2>
-        <p style="font-size:.875rem;color:var(--text-muted);margin-bottom:1rem">Define a portfolio (ETF ID + weight%) to analyse sector, country and currency exposure.</p>
+        <p style="font-size:.875rem;color:var(--text-muted);margin-bottom:1rem">Select one ETF for a complete ETF view, or combine several ETFs to analyse the portfolio as a whole.</p>
         <div v-for="(item,i) in portfolio" :key="i" style="display:flex;gap:.5rem;margin-bottom:.5rem;align-items:center">
           <select class="input" v-model="item.etf_id" style="flex:2">
             <option value="">Select ETF...</option>
@@ -86,15 +79,12 @@
         </p>
       </div>
       <div v-if="exposureError" class="error-box" style="margin-bottom:1rem">{{ exposureError }}</div>
-      <div v-if="exposureResult" class="grid-3">
-        <div class="card" v-for="group in exposureGroups" :key="group.label">
-          <h3 class="card-title">{{ group.label }}</h3>
-          <div class="alloc-bars">
-            <div v-for="[k,v] in group.entries" :key="k" class="alloc-row">
-              <span class="alloc-label">{{ k }}</span>
-              <div class="alloc-track"><div class="alloc-fill" :style="{width:Math.min(v,100)+'%'}"></div></div>
-              <span class="alloc-pct">{{ Number(v).toFixed(1) }}%</span>
-            </div>
+      <div v-if="exposureResult" class="portfolio-donut-grid">
+        <div v-for="group in portfolioExposureGroups" :key="group.key" class="card portfolio-donut-card">
+          <div class="portfolio-donut-head"><h3 class="card-title">{{ group.label }}</h3><span>{{ group.total.toFixed(1) }}%</span></div>
+          <div class="portfolio-donut-chart"><Doughnut :data="portfolioDonutData(group)" :options="portfolioDonutOptions" /></div>
+          <div class="portfolio-donut-legend">
+            <div v-for="entry in group.entries" :key="entry.name"><span><i :style="{ background: entry.color }"></i>{{ entry.name }}</span><strong>{{ entry.value.toFixed(1) }}%</strong></div>
           </div>
         </div>
       </div>
@@ -104,10 +94,10 @@
 
         <!-- Portfolio-level summary -->
         <div v-if="portfolioSummary" class="card" style="margin-top:1.5rem">
-          <h3 class="card-title" style="margin-bottom:1rem">Portfolio Summary <span style="font-size:.75rem;font-weight:400;color:var(--text-muted)">(weighted average across ETFs)</span></h3>
+          <h3 class="card-title" style="margin-bottom:1rem">Financial Figures <span style="font-size:.75rem;font-weight:400;color:var(--text-muted)">(weighted portfolio estimates)</span></h3>
           <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:.75rem">
             <div class="stat-box">
-              <div class="stat-label">1Y Return</div>
+              <div class="stat-label">Annual Return</div>
               <div class="stat-value" :class="signClass(portfolioSummary.ann_return)">{{ fmtPct(portfolioSummary.ann_return) }}</div>
             </div>
             <div class="stat-box">
@@ -126,9 +116,17 @@
               <div class="stat-label">Avg HHI</div>
               <div class="stat-value" :class="hhiClass(portfolioSummary.hhi)">{{ portfolioSummary.hhi.toFixed(0) }}</div>
             </div>
+            <div class="stat-box">
+              <div class="stat-label">Active ETFs</div>
+              <div class="stat-value">{{ portfolioSummary.etf_count }}</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-label">Price History</div>
+              <div class="stat-value">{{ portfolioSummary.data_points?.toLocaleString() ?? '—' }}</div>
+            </div>
           </div>
           <p style="font-size:.7rem;color:var(--text-muted);margin-top:.75rem;margin-bottom:0">
-            Weighted by portfolio allocation &nbsp;·&nbsp; Rf = {{ riskFreeRate }}% &nbsp;·&nbsp; Volatility is a weighted average (not true portfolio volatility, which requires correlation data)
+            Based on available price and holdings data &nbsp;·&nbsp; Rf = {{ riskFreeRate }}% &nbsp;·&nbsp; Return, volatility, drawdown, and HHI are weighted estimates, not a backtested portfolio series.
           </p>
         </div>
 
@@ -167,166 +165,26 @@
           Rf = {{ riskFreeRate }}% &nbsp;·&nbsp; HHI: Herfindahl-Hirschman Index (0-10,000; lower = more diversified)
         </div>
       </div>
-      </div>    </div>
-
-    <!-- PORTFOLIO COMPARISON -->
-    <div v-if="activeTab==='compare'">
-      <div class="card" style="margin-bottom:1.5rem">
-        <h2 class="card-title">Compare Portfolios</h2>
-        <p style="font-size:.875rem;color:var(--text-muted);margin-bottom:1rem">Compare the composition and diversification characteristics of two portfolios. Results describe the differences; they do not recommend a portfolio.</p>
-        <div class="compare-builders">
-          <div class="compare-builder">
-            <h3 class="compare-title">Portfolio A</h3>
-            <div v-for="(item,i) in comparisonPortfolioA" :key="`a-${i}`" class="compare-row">
-              <select class="input" v-model="item.etf_id">
-                <option value="">Select ETF...</option>
-                <option v-for="e in allEtfs" :key="e.id" :value="e.id">{{ e.ticker }} - {{ e.name }}</option>
-              </select>
-              <input class="input compare-weight" type="number" v-model.number="item.weight" aria-label="Portfolio A weight" min="0" max="100" />
-              <button class="btn btn-outline compare-remove" @click="comparisonPortfolioA.splice(i,1)" aria-label="Remove ETF from Portfolio A">✕</button>
-            </div>
-            <button class="btn btn-outline compare-add" @click="comparisonPortfolioA.push({etf_id:'',weight:0})">+ Add ETF</button>
-          </div>
-          <div class="compare-builder">
-            <h3 class="compare-title">Portfolio B</h3>
-            <div v-for="(item,i) in comparisonPortfolioB" :key="`b-${i}`" class="compare-row">
-              <select class="input" v-model="item.etf_id">
-                <option value="">Select ETF...</option>
-                <option v-for="e in allEtfs" :key="e.id" :value="e.id">{{ e.ticker }} - {{ e.name }}</option>
-              </select>
-              <input class="input compare-weight" type="number" v-model.number="item.weight" aria-label="Portfolio B weight" min="0" max="100" />
-              <button class="btn btn-outline compare-remove" @click="comparisonPortfolioB.splice(i,1)" aria-label="Remove ETF from Portfolio B">✕</button>
-            </div>
-            <button class="btn btn-outline compare-add" @click="comparisonPortfolioB.push({etf_id:'',weight:0})">+ Add ETF</button>
-          </div>
-        </div>
-        <div class="compare-actions">
-          <button class="btn btn-primary" @click="runComparison" :disabled="comparisonLoading || !activePortfolio(comparisonPortfolioA).length || !activePortfolio(comparisonPortfolioB).length">
-            {{ comparisonLoading ? 'Comparing...' : 'Compare Portfolios' }}
-          </button>
-          <label>Risk-free rate</label>
-          <input class="input" type="number" v-model.number="riskFreeRate" min="0" max="20" step="0.5" />
-          <span>% p.a.</span>
-        </div>
       </div>
-      <div v-if="comparisonError" class="error-box" style="margin-bottom:1rem">{{ comparisonError }}</div>
-      <template v-if="comparisonResult">
-        <div class="compare-summary">
-          <div class="card compare-summary-card">
-            <h3 class="compare-title">Portfolio A</h3>
-            <div class="compare-metric"><span>GoETF Score</span><strong>{{ comparisonResult.a.score.portfolio_score?.toFixed(1) }}</strong></div>
-            <div class="compare-metric"><span>Avg holdings overlap</span><strong>{{ comparisonResult.a.score.avg_overlap_pct?.toFixed(1) }}%</strong></div>
-            <div class="compare-metric"><span>Country diversity</span><strong>{{ comparisonResult.a.score.portfolio_geo_div?.toFixed(3) ?? '—' }}</strong></div>
-          </div>
-          <div class="card compare-summary-card">
-            <h3 class="compare-title">Portfolio B</h3>
-            <div class="compare-metric"><span>GoETF Score</span><strong>{{ comparisonResult.b.score.portfolio_score?.toFixed(1) }}</strong></div>
-            <div class="compare-metric"><span>Avg holdings overlap</span><strong>{{ comparisonResult.b.score.avg_overlap_pct?.toFixed(1) }}%</strong></div>
-            <div class="compare-metric"><span>Country diversity</span><strong>{{ comparisonResult.b.score.portfolio_geo_div?.toFixed(3) ?? '—' }}</strong></div>
-          </div>
-        </div>
-        <div v-for="group in [{key:'countries',label:'Country Exposure'}, {key:'sectors',label:'Sector Exposure'}, {key:'currencies',label:'Currency Exposure'}]" :key="group.key" class="card compare-exposure-card">
-          <div class="compare-chart-header">
-            <div>
-              <h3 class="card-title">{{ group.label }}</h3>
-              <p>Largest allocation differences between both portfolios</p>
-            </div>
-            <div class="compare-legend" aria-label="Chart legend">
-              <span><i class="legend-a"></i>Portfolio A</span>
-              <span><i class="legend-b"></i>Portfolio B</span>
-            </div>
-          </div>
-          <div v-if="exposureDifference(group.key).length" class="compare-grouped-chart" role="img" :aria-label="`${group.label} grouped bar comparison`">
-            <div v-for="row in exposureDifference(group.key)" :key="row.name" class="compare-grouped-row">
-              <div class="compare-chart-label" :title="row.name">{{ row.name }}</div>
-              <div class="compare-grouped-bars">
-                <div class="compare-bar-line">
-                  <span class="compare-bar-value">{{ row.a.toFixed(1) }}%</span>
-                  <div class="compare-track"><div class="compare-fill compare-fill-a" :style="{ width: `${Math.min(row.a, 100)}%` }"></div></div>
-                </div>
-                <div class="compare-bar-line">
-                  <span class="compare-bar-value">{{ row.b.toFixed(1) }}%</span>
-                  <div class="compare-track"><div class="compare-fill compare-fill-b" :style="{ width: `${Math.min(row.b, 100)}%` }"></div></div>
-                </div>
-              </div>
-              <div class="compare-delta" :class="row.b - row.a > 0 ? 'compare-delta-up' : row.b - row.a < 0 ? 'compare-delta-down' : ''">
-                {{ row.b - row.a > 0 ? '+' : '' }}{{ (row.b - row.a).toFixed(1) }} pts
-              </div>
-            </div>
-          </div>
-          <div v-else class="compare-empty">No allocation data available for this comparison.</div>
-        </div>
-      </template>
-    </div>
 
-    <!-- RISK METRICS -->
-    <div v-if="activeTab==='risk'">
-      <div class="card" style="margin-bottom:1.5rem;display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
-        <h2 class="card-title" style="margin:0">Risk Metrics</h2>
-        <label style="font-size:.8rem;color:var(--text-muted);margin-left:auto">Risk-free rate</label>
-        <input class="input" type="number" v-model.number="riskRfRate" min="0" max="20" step="0.5"
-          style="width:72px;padding:.3rem .5rem;font-size:.875rem" />
-        <span style="font-size:.8rem;color:var(--text-muted)">% p.a.</span>
-        <button class="btn btn-outline" style="font-size:.875rem" @click="runRiskMetrics" :disabled="riskLoading">
-          {{ riskLoading ? 'Loading…' : '↻ Recalculate' }}
-        </button>
-      </div>
-      <div v-if="riskError" class="error-box" style="margin-bottom:1rem">{{ riskError }}</div>
-      <div v-if="riskResult" class="card" style="padding:0;overflow:hidden">
-        <div style="padding:.75rem 1.25rem;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
-          <h3 class="card-title" style="margin:0">{{ riskResult.length }} ETF{{ riskResult.length !== 1 ? 's' : '' }}</h3>
-          <span style="font-size:.75rem;color:var(--text-muted)">Rf = {{ riskRfRate }}% &nbsp;·&nbsp; Click column header to sort</span>
-        </div>
-        <div class="table-wrap">
-          <table class="risk-table">
-            <thead>
-              <tr>
-                <th class="sortable-th" @click="toggleRiskSort('ticker')">Ticker <span class="sort-arrow">{{ riskSortKey==='ticker' ? (riskSortDir==='asc'?'↑':'↓') : '' }}</span></th>
-                <th class="sortable-th" @click="toggleRiskSort('ann_return')">1Y Return <span class="sort-arrow">{{ riskSortKey==='ann_return' ? (riskSortDir==='asc'?'↑':'↓') : '' }}</span></th>
-                <th class="sortable-th" @click="toggleRiskSort('volatility')">Volatility <span class="sort-arrow">{{ riskSortKey==='volatility' ? (riskSortDir==='asc'?'↑':'↓') : '' }}</span></th>
-                <th class="sortable-th" @click="toggleRiskSort('sharpe_ratio')">Sharpe <span class="sort-arrow">{{ riskSortKey==='sharpe_ratio' ? (riskSortDir==='asc'?'↑':'↓') : '' }}</span></th>
-                <th class="sortable-th" @click="toggleRiskSort('max_drawdown')">Max Drawdown <span class="sort-arrow">{{ riskSortKey==='max_drawdown' ? (riskSortDir==='asc'?'↑':'↓') : '' }}</span></th>
-                <th class="sortable-th" @click="toggleRiskSort('hhi')">HHI <span class="sort-arrow">{{ riskSortKey==='hhi' ? (riskSortDir==='asc'?'↑':'↓') : '' }}</span></th>
-                <th class="sortable-th" @click="toggleRiskSort('num_holdings')">Holdings <span class="sort-arrow">{{ riskSortKey==='num_holdings' ? (riskSortDir==='asc'?'↑':'↓') : '' }}</span></th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="row in riskSorted" :key="row.etf_id">
-                <td><strong style="color:var(--green-600)">{{ row.ticker }}</strong></td>
-                <td :class="signClass(row.ann_return)">{{ fmtPct(row.ann_return) }}</td>
-                <td :class="volClass(row.volatility)">{{ fmtPct(row.volatility) }}</td>
-                <td :class="sharpeClass(row.sharpe_ratio)">{{ row.sharpe_ratio !== null ? row.sharpe_ratio : '—' }}</td>
-                <td :class="ddClass(row.max_drawdown)">{{ fmtPct(row.max_drawdown) }}</td>
-                <td :class="hhiClass(row.hhi)">{{ row.hhi !== null ? row.hhi.toFixed(0) : '—' }}</td>
-                <td>{{ row.num_holdings?.toLocaleString() ?? '—' }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <div style="padding:.6rem 1.25rem;font-size:.72rem;color:var(--text-muted);border-top:1px solid var(--border)">
-          HHI: Herfindahl-Hirschman Index (0-10,000; lower = more diversified)
-        </div>
-      </div>
-    </div>
-
+  </div>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, inject } from 'vue'
+import { Doughnut } from 'vue-chartjs'
+import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js'
 import { etfService, analyticsService, scoreService } from '../services/api.js'
+
+ChartJS.register(ArcElement, Tooltip, Legend)
 
 const showApiKeyModal = inject('showApiKeyModal')
 const analyticsInitTab = inject('analyticsInitTab', ref(null))
+const portfolioInit = inject('portfolioInit', ref(null))
 const navigateTo = inject('navigateTo')
 const hasApiKey = inject('hasApiKey', ref(!!localStorage.getItem('api_key')))
 
-const activeTab = ref('exposure')
-const tabs = [
-  {id:'exposure',label:'Portfolio Exposure',icon:'🌍'},
-  {id:'compare',label:'Compare Portfolios',icon:'⇄'},
-  {id:'risk',label:'Risk Metrics',icon:'📊'},
-]
 const allEtfs = ref([])
 const etfsLoading = ref(false)
 
@@ -338,13 +196,6 @@ const exposureError = ref('')
 const portfolioRiskResult = ref(null)
 const portfolioScoreResult = ref(null)
 const portfolioScoreLoading = ref(false)
-
-// Portfolio comparison
-const comparisonPortfolioA = ref([{etf_id:'',weight:50},{etf_id:'',weight:50}])
-const comparisonPortfolioB = ref([{etf_id:'',weight:50},{etf_id:'',weight:50}])
-const comparisonLoading = ref(false)
-const comparisonError = ref('')
-const comparisonResult = ref(null)
 
 const portfolioSummary = computed(() => {
   if (!portfolioRiskResult.value?.length) return null
@@ -362,18 +213,76 @@ const portfolioSummary = computed(() => {
   }
   const rfDecimal = riskFreeRate.value / 100
   const sharpe = wVol > 0 ? ((wReturn - rfDecimal) / wVol).toFixed(2) : null
-  return { ann_return: wReturn, volatility: wVol, sharpe_ratio: sharpe !== null ? Number(sharpe) : null, max_drawdown: wDD, hhi: wHHI }
+  const dataPoints = portfolioRiskResult.value
+    .map(row => row.data_points || 0)
+    .filter(Boolean)
+  return {
+    ann_return: wReturn,
+    volatility: wVol,
+    sharpe_ratio: sharpe !== null ? Number(sharpe) : null,
+    max_drawdown: wDD,
+    hhi: wHHI,
+    etf_count: p.length,
+    data_points: dataPoints.length ? Math.min(...dataPoints) : 0,
+  }
 })
 
-const exposureGroups = computed(() => {
+const COUNTRY_NAMES = {
+  AF:'Afghanistan',AL:'Albania',DZ:'Algeria',AR:'Argentina',AU:'Australia',AT:'Austria',BE:'Belgium',BM:'Bermuda',BR:'Brazil',CA:'Canada',KY:'Cayman Islands',CL:'Chile',CN:'China',CO:'Colombia',CZ:'Czech Republic',DK:'Denmark',EG:'Egypt',FI:'Finland',FR:'France',DE:'Germany',GR:'Greece',HK:'Hong Kong',HU:'Hungary',IN:'India',ID:'Indonesia',IE:'Ireland',IL:'Israel',IT:'Italy',JP:'Japan',LU:'Luxembourg',MY:'Malaysia',MX:'Mexico',NL:'Netherlands',NZ:'New Zealand',NO:'Norway',PH:'Philippines',PL:'Poland',PT:'Portugal',QA:'Qatar',SA:'Saudi Arabia',SG:'Singapore',ZA:'South Africa',KR:'South Korea',ES:'Spain',SE:'Sweden',CH:'Switzerland',TW:'Taiwan',TH:'Thailand',TR:'Turkey',AE:'United Arab Emirates',GB:'United Kingdom',US:'United States',VN:'Vietnam',
+}
+const REGION_BY_COUNTRY = {
+  Afghanistan:'Asia',Albania:'Europe',Algeria:'Africa',Argentina:'Latin America',Australia:'Pacific',Austria:'Europe',Belgium:'Europe',Bermuda:'North America',Brazil:'Latin America',Canada:'North America','Cayman Islands':'Latin America',Chile:'Latin America',China:'Asia',Colombia:'Latin America','Czech Republic':'Europe',Denmark:'Europe',Egypt:'Africa',Finland:'Europe',France:'Europe',Germany:'Europe',Greece:'Europe','Hong Kong':'Asia',Hungary:'Europe',India:'Asia',Indonesia:'Asia',Ireland:'Europe',Israel:'Middle East',Italy:'Europe',Japan:'Asia',Luxembourg:'Europe',Malaysia:'Asia',Mexico:'Latin America',Netherlands:'Europe','New Zealand':'Pacific',Norway:'Europe',Philippines:'Asia',Poland:'Europe',Portugal:'Europe',Qatar:'Middle East','Saudi Arabia':'Middle East',Singapore:'Asia','South Africa':'Africa','South Korea':'Asia',Spain:'Europe',Sweden:'Europe',Switzerland:'Europe',Taiwan:'Asia',Thailand:'Asia',Turkey:'Europe','United Arab Emirates':'Middle East','United Kingdom':'Europe','United States':'North America',Vietnam:'Asia',
+}
+const DONUT_COLORS = ['#0f4c81','#00a98f','#e6a800','#d14343','#7b61a8','#2f85c8','#aab8c5']
+
+function fullCountryName(country) {
+  return COUNTRY_NAMES[country] || country
+}
+
+function regionExposures(countries) {
+  return Object.entries(countries || {}).reduce((regions, [country, weight]) => {
+    const region = REGION_BY_COUNTRY[fullCountryName(country)] || 'Other / Unclassified'
+    regions[region] = (regions[region] || 0) + weight
+    return regions
+  }, {})
+}
+
+function buildExposureGroup(key, label, values, formatter = name => name) {
+  const sorted = Object.entries(values || {}).map(([name, value]) => ({ name: formatter(name), value: Number(value) }))
+    .sort((left, right) => right.value - left.value)
+  const visible = sorted.slice(0, 6)
+  const other = sorted.slice(6).reduce((sum, item) => sum + item.value, 0)
+  if (other > 0) visible.push({ name: 'Other', value: other })
+  return { key, label, total: sorted.reduce((sum, item) => sum + item.value, 0), entries: visible.map((item, index) => ({ ...item, color: item.name === 'Other' ? '#aab8c5' : DONUT_COLORS[index % DONUT_COLORS.length] })) }
+}
+
+const portfolioExposureGroups = computed(() => {
   if (!exposureResult.value) return []
   const r = exposureResult.value
   return [
-    {label:'Sectors',entries:Object.entries(r.sectors||{}).sort((a,b)=>b[1]-a[1]).slice(0,8)},
-    {label:'Countries',entries:Object.entries(r.countries||{}).sort((a,b)=>b[1]-a[1]).slice(0,8)},
-    {label:'Currencies',entries:Object.entries(r.currencies||{}).sort((a,b)=>b[1]-a[1])},
-  ].filter(g=>g.entries.length)
+    buildExposureGroup('country', 'Country Exposure', r.countries, fullCountryName),
+    buildExposureGroup('region', 'Region Exposure', regionExposures(r.countries)),
+    buildExposureGroup('sector', 'Sector Exposure', r.sectors),
+    buildExposureGroup('currency', 'Currency Exposure', r.currencies),
+  ].filter(group => group.entries.length)
 })
+
+const portfolioDonutOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  cutout: '62%',
+  plugins: {
+    legend: { display: false },
+    tooltip: { callbacks: { label: context => ` ${context.label}: ${context.parsed.toFixed(1)}%` } },
+  },
+}
+
+function portfolioDonutData(group) {
+  return {
+    labels: group.entries.map(entry => entry.name),
+    datasets: [{ data: group.entries.map(entry => entry.value), backgroundColor: group.entries.map(entry => entry.color), borderColor: '#ffffff', borderWidth: 2, hoverOffset: 5 }],
+  }
+}
 
 async function loadETFs() {
   etfsLoading.value=true
@@ -397,92 +306,12 @@ async function runExposure() {
   } catch(e){exposureError.value=e.response?.data?.detail||e.message} finally{exposureLoading.value=false}
 }
 
-function activePortfolio(items) {
-  return items.filter(item => item.etf_id && item.weight > 0)
-}
-
-async function analysePortfolio(items) {
-  const portfolioItems = activePortfolio(items)
-  const [exposureResponse, scoreResponse] = await Promise.all([
-    analyticsService.calculateExposure(portfolioItems, null, riskFreeRate.value / 100),
-    scoreService.getPortfolioScore(portfolioItems, riskFreeRate.value / 100),
-  ])
-  return { exposure: exposureResponse.data, score: scoreResponse.data }
-}
-
-async function runComparison() {
-  const portfolioA = activePortfolio(comparisonPortfolioA.value)
-  const portfolioB = activePortfolio(comparisonPortfolioB.value)
-  if (!portfolioA.length || !portfolioB.length) return
-
-  comparisonLoading.value = true
-  comparisonError.value = ''
-  comparisonResult.value = null
-  try {
-    const [a, b] = await Promise.all([analysePortfolio(portfolioA), analysePortfolio(portfolioB)])
-    comparisonResult.value = { a, b }
-  } catch (error) {
-    comparisonError.value = error.response?.data?.detail || error.message
-  } finally {
-    comparisonLoading.value = false
-  }
-}
-
-function exposureDifference(type) {
-  if (!comparisonResult.value) return []
-  const a = comparisonResult.value.a.exposure[type] || {}
-  const b = comparisonResult.value.b.exposure[type] || {}
-  return [...new Set([...Object.keys(a), ...Object.keys(b)])]
-    .map(name => ({ name, a: a[name] || 0, b: b[name] || 0 }))
-    .sort((left, right) => Math.abs(right.a - right.b) - Math.abs(left.a - left.b))
-    .slice(0, 6)
-}
-
 // Risk-free rate (used for portfolio Sharpe in summary)
 const riskFreeRate = ref(4.0)     // % per year
 
 const scoreBadgeClass = (s) => s >= 7 ? 'score-high' : s >= 5 ? 'score-mid' : s >= 3.5 ? 'score-low' : 'score-poor'
 const hhiClass     = (v) => v == null ? '' : v < 200  ? 'cell-green' : v < 1000 ? 'cell-yellow' : 'cell-red'
 
-// Risk Metrics tab
-const riskSelectedEtfs = ref([])
-const riskRfRate = ref(4.0)
-const riskLoading = ref(false)
-const riskResult = ref(null)
-const riskError = ref('')
-const riskSortKey = ref('ticker')
-const riskSortDir = ref('asc')
-
-const riskSorted = computed(() => {
-  if (!riskResult.value) return []
-  return [...riskResult.value].sort((a, b) => {
-    let va = a[riskSortKey.value], vb = b[riskSortKey.value]
-    if (va === null || va === undefined) va = riskSortDir.value === 'asc' ? Infinity : -Infinity
-    if (vb === null || vb === undefined) vb = riskSortDir.value === 'asc' ? Infinity : -Infinity
-    if (typeof va === 'string') return riskSortDir.value === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va)
-    return riskSortDir.value === 'asc' ? va - vb : vb - va
-  })
-})
-
-function toggleRiskSort(key) {
-  if (riskSortKey.value === key) riskSortDir.value = riskSortDir.value === 'asc' ? 'desc' : 'asc'
-  else { riskSortKey.value = key; riskSortDir.value = 'asc' }
-}
-
-async function runRiskMetrics() {
-  riskLoading.value = true; riskError.value = ''; riskResult.value = null
-  try {
-    const tickers = riskSelectedEtfs.value.length
-      ? riskSelectedEtfs.value.map(id => allEtfs.value.find(e => e.id === id)?.ticker).filter(Boolean)
-      : []
-    const r = await etfService.getRiskMetrics(tickers, riskRfRate.value / 100)
-    riskResult.value = r.data
-  } catch (e) {
-    riskError.value = e.response?.data?.detail || e.message
-  } finally {
-    riskLoading.value = false
-  }
-}
 const fmtPct = v => v !== null && v !== undefined ? `${v >= 0 ? '+' : ''}${v.toFixed(2)}%` : '—'
 const signClass = v  => v === null ? '' : v >= 0 ? 'cell-green' : 'cell-red'
 const volClass  = v  => v === null ? '' : v < 12 ? 'cell-green' : v < 22 ? 'cell-yellow' : 'cell-red'
@@ -491,11 +320,12 @@ const ddClass   = v  => v === null ? '' : v > -10 ? 'cell-green' : v > -20 ? 'ce
 
 onMounted(() => {
   loadETFs()
-  runRiskMetrics()
-  if (analyticsInitTab.value && ['exposure', 'risk'].includes(analyticsInitTab.value)) {
-    activeTab.value = analyticsInitTab.value
-    analyticsInitTab.value = null
+  if (portfolioInit.value) {
+    portfolio.value = [{ ...portfolioInit.value }]
+    portfolioInit.value = null
+    runExposure()
   }
+  analyticsInitTab.value = null
 })
 </script>
 
@@ -530,47 +360,17 @@ onMounted(() => {
 .cell-yellow{color:#ca8a04;font-weight:600}
 .cell-red{color:#ef4444;font-weight:600}
 .table-wrap{overflow-x:auto}
-.ana-tabs{display:flex;gap:.5rem;margin-bottom:1.75rem;flex-wrap:wrap}
-.ana-tab{background:none;border:1px solid var(--border);cursor:pointer;padding:6px 12px;border-radius:6px;font-size:.88rem;font-weight:500;color:var(--text-muted);transition:all .15s;display:flex;align-items:center;gap:.35rem;font-family:inherit}
-.ana-tab:hover{border-color:#2f85c8;color:#0f4c81;background:var(--bg-3)}
-.ana-tab.active{background:#0f4c81;border-color:#0f4c81;color:#fff}
-.compare-builders,.compare-summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem}
-.compare-builder{min-width:0;padding:1rem;background:var(--bg-3);border:1px solid var(--border);border-radius:8px}
-.compare-title{margin:0 0 .75rem;font-size:.95rem;color:var(--text)}
-.compare-row{display:grid;grid-template-columns:minmax(0,1fr) 82px 34px;gap:.5rem;margin-bottom:.5rem;align-items:center}
-.compare-weight{min-width:0}
-.compare-remove{width:34px;height:34px;padding:0;line-height:1}
-.compare-add{margin-top:.25rem;font-size:.8rem}
-.compare-actions{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-top:1rem}
-.compare-actions label{margin-left:auto;font-size:.8rem;color:var(--text-muted)}
-.compare-actions input{width:72px;padding:.3rem .5rem;font-size:.875rem}
-.compare-actions span{font-size:.8rem;color:var(--text-muted)}
-.compare-summary{margin-bottom:1rem}
-.compare-summary-card{padding:1rem}
-.compare-metric{display:flex;justify-content:space-between;gap:1rem;padding:.45rem 0;border-top:1px solid var(--border);font-size:.82rem;color:var(--text-muted)}
-.compare-metric strong{color:var(--text);font-variant-numeric:tabular-nums}
-.compare-exposure-card{margin-bottom:1rem;padding:0;overflow:hidden}
-.compare-chart-header{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:1rem 1.25rem;border-bottom:1px solid var(--border)}
-.compare-chart-header .card-title{margin:0}
-.compare-chart-header p{margin:.25rem 0 0;font-size:.75rem;color:var(--text-muted)}
-.compare-legend{display:flex;gap:.85rem;flex-wrap:wrap;font-size:.75rem;color:var(--text-muted);white-space:nowrap}
-.compare-legend span{display:flex;align-items:center;gap:.35rem}
-.compare-legend i{width:9px;height:9px;border-radius:50%;display:block}
-.legend-a{background:#0f4c81}.legend-b{background:#00a98f}
-.compare-grouped-chart{padding:.5rem 1.25rem .75rem}
-.compare-grouped-row{display:grid;grid-template-columns:minmax(110px,150px) minmax(250px,1fr) 72px;gap:1rem;align-items:center;padding:.7rem 0;border-bottom:1px solid color-mix(in srgb,var(--border) 60%,transparent)}
-.compare-grouped-row:last-child{border-bottom:0}
-.compare-chart-label{font-size:.8rem;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.compare-grouped-bars{display:flex;flex-direction:column;gap:.35rem;min-width:0}
-.compare-bar-line{display:grid;grid-template-columns:38px minmax(0,1fr);align-items:center;gap:.45rem}
-.compare-bar-value{font-size:.7rem;text-align:right;color:var(--text-muted);font-variant-numeric:tabular-nums}
-.compare-track{height:8px;border-radius:4px;overflow:hidden;background:repeating-linear-gradient(90deg,var(--bg-3) 0,var(--bg-3) calc(25% - 1px),var(--border) calc(25% - 1px),var(--border) 25%)}
-.compare-fill{height:100%;border-radius:4px;min-width:2px;animation:compare-bar-grow .55s ease-out both;transform-origin:left}
-.compare-fill-a{background:#0f4c81}.compare-fill-b{background:#00a98f}
-.compare-delta{text-align:right;font-size:.75rem;font-weight:700;color:var(--text-muted);font-variant-numeric:tabular-nums}
-.compare-delta-up{color:#008a74}.compare-delta-down{color:#d14343}
-.compare-empty{padding:1.5rem;text-align:center;color:var(--text-muted);font-size:.85rem}
-@keyframes compare-bar-grow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+.portfolio-donut-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem;margin-top:1.5rem}
+.portfolio-donut-card{padding:1rem;min-width:0}
+.portfolio-donut-head{display:flex;justify-content:space-between;gap:1rem;align-items:baseline}
+.portfolio-donut-head .card-title{margin:0}
+.portfolio-donut-head>span{font-size:.75rem;font-weight:700;color:var(--text-muted);font-variant-numeric:tabular-nums}
+.portfolio-donut-chart{height:220px;margin:.5rem 0 .75rem}
+.portfolio-donut-legend{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.35rem .75rem}
+.portfolio-donut-legend div{display:flex;align-items:center;justify-content:space-between;gap:.5rem;min-width:0;font-size:.75rem;color:var(--text-muted)}
+.portfolio-donut-legend span{display:flex;align-items:center;gap:.35rem;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.portfolio-donut-legend i{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.portfolio-donut-legend strong{color:var(--text);font-size:.73rem;font-variant-numeric:tabular-nums}
 .etf-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:1rem}
 .etf-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1.25rem;box-shadow:var(--shadow)}
 .etf-card-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem}
@@ -595,10 +395,7 @@ onMounted(() => {
 [data-theme="dark"] .score-low{background:#3d1a00;color:#fdba74}
 [data-theme="dark"] .score-poor{background:#3d0000;color:#fca5a5}
 @media (max-width:640px){
-  .compare-builders,.compare-summary{grid-template-columns:1fr}
-  .compare-actions label{margin-left:0}
-  .compare-chart-header{align-items:flex-start;flex-direction:column}
-  .compare-grouped-row{grid-template-columns:1fr;gap:.45rem;padding:.85rem 0}
-  .compare-delta{text-align:left;margin-left:43px}
+  .portfolio-donut-grid{grid-template-columns:1fr}
+  .portfolio-donut-chart{height:240px}
 }
 </style>
