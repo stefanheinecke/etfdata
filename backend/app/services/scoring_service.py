@@ -505,6 +505,8 @@ def _compute_tip(
                 best_score = cand_score
                 old_ticker = ticker_map.get(item["etf_id"], item["etf_id"])
                 new_ticker = alt["ticker"]
+                displayed_current_score = round(current_score, 1)
+                displayed_candidate_score = round(best_score, 1)
                 individual_delta = cand_base - current_base
                 overlap_delta = current_overlap_penalty - cand_penalty
                 diversification_delta = cand_bonus - current_allocation_bonus
@@ -513,11 +515,12 @@ def _compute_tip(
                     "replace_ticker": old_ticker,
                     "with_etf_id": alt["etf_id"],
                     "with_ticker": new_ticker,
-                    "new_score": round(best_score, 1),
-                    "improvement": round(best_score - current_score, 1),
+                    "new_score": displayed_candidate_score,
+                    "improvement": round(displayed_candidate_score - displayed_current_score, 1),
                     "individual_score_delta": round(individual_delta, 2),
                     "overlap_impact": round(overlap_delta, 2),
                     "diversification_impact": round(diversification_delta, 2),
+                    "component_change": round(individual_delta + overlap_delta + diversification_delta, 2),
                     "reason": (
                         f"The suggested replacement is evaluated by its net effect on "
                         f"individual quality, overlap, and geographic diversification."
