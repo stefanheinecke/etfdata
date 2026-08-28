@@ -85,7 +85,8 @@
           <div>
             Replacing <strong style="color:var(--green-600)">{{ portfolioScoreResult.tip.replace_ticker }}</strong>
             with <strong style="color:var(--green-600)">{{ portfolioScoreResult.tip.with_ticker }}</strong>
-            would increase the portfolio score to <strong>{{ portfolioScoreResult.tip.new_score }}</strong>
+            would increase the portfolio score from <strong>{{ portfolioScoreResult.tip.current_score.toFixed(2) }}</strong>
+            to <strong>{{ portfolioScoreResult.tip.candidate_score.toFixed(2) }}</strong>
             (<span class="tip-impact-positive">+{{ portfolioScoreResult.tip.improvement.toFixed(2) }}</span>):
             <div class="tip-breakdown">
               <div><span>Weighted individual score impact</span><strong :class="portfolioScoreResult.tip.individual_score_delta >= 0 ? 'tip-impact-positive' : 'tip-impact-negative'">{{ portfolioScoreResult.tip.individual_score_delta >= 0 ? '+' : '' }}{{ portfolioScoreResult.tip.individual_score_delta.toFixed(2) }}</strong></div>
