@@ -102,7 +102,7 @@
             <thead>
               <tr>
                 <th style="width:50%">Holding Name</th>
-                <th>ISIN</th>
+                <th>Ticker</th>
                 <th style="text-align:right">Weight</th>
                 <th>Sector</th>
                 <th>Country</th>
@@ -112,7 +112,7 @@
               <tr v-for="(holding, idx) in topHoldings" :key="idx">
                 <td><span style="font-weight:600;color:var(--text)">{{ holding.name }}</span></td>
                 <td style="font-family:monospace;font-size:.8rem;color:var(--text-muted)">{{ holding.isin }}</td>
-                <td style="text-align:right;font-weight:600">{{ (holding.weight * 100).toFixed(2) }}%</td>
+                <td style="text-align:right;font-weight:600">{{ holding.weight.toFixed(2) }}%</td>
                 <td style="color:var(--text-muted);font-size:.85rem">{{ holding.sector || '—' }}</td>
                 <td style="color:var(--text-muted);font-size:.85rem">{{ holding.country || '—' }}</td>
               </tr>

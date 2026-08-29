@@ -240,8 +240,20 @@ class AnalyticsService:
 
     @staticmethod
     def calculate_portfolio_top_holdings(db: Session, portfolio: List[Dict], top_n: int = 10, holdings_date: date = None):
-        """Get the top N weighted holdings across a portfolio."""
+        """Get the top N weighted holdings across a portfolio from the latest available date."""
         holdings_dict = {}
+
+        # Find the latest date in holdings table across all portfolio ETFs
+        if not holdings_date:
+            etf_ids = [item.get("etf_id") for item in portfolio if item.get("weight", 0) > 0]
+            if etf_ids:
+                latest_date = db.query(func.max(Holding.date)).filter(
+                    Holding.etf_id.in_(etf_ids)
+                ).scalar()
+                holdings_date = latest_date
+
+        if not holdings_date:
+            return {"top_holdings": []}
 
         for item in portfolio:
             etf_id = item.get("etf_id")
@@ -250,24 +262,26 @@ class AnalyticsService:
             if weight <= 0:
                 continue
 
-            query = db.query(Holding).filter(Holding.etf_id == etf_id)
-            if holdings_date:
-                query = query.filter(Holding.date == holdings_date)
-            else:
-                latest_date = db.query(func.max(Holding.date)).filter(
-                    Holding.etf_id == etf_id
-                ).scalar()
-                if latest_date:
-                    query = query.filter(Holding.date == latest_date)
-
+            # Get holdings for this ETF on the specified date
+            query = db.query(Holding).filter(
+                Holding.etf_id == etf_id,
+                Holding.date == holdings_date
+            )
             holdings = query.all()
+
+            # Get the total weight of all holdings for this ETF to normalize
+            total_holding_weight = sum(float(h.weight) for h in holdings if h.weight)
+            
+            if total_holding_weight <= 0:
+                continue
 
             for holding in holdings:
                 isin = holding.instrument_isin
                 name = holding.instrument_name
                 
-                # Calculate weighted holding value
-                holding_weight = float(holding.weight) * weight / 100 if holding.weight else 0
+                # Normalize holding weight to 100% and then apply portfolio weight
+                normalized_weight = float(holding.weight) / total_holding_weight * 100 if holding.weight else 0
+                portfolio_weight = normalized_weight * weight / 100
                 
                 if isin not in holdings_dict:
                     holdings_dict[isin] = {
@@ -275,10 +289,10 @@ class AnalyticsService:
                         "name": name,
                         "sector": holding.sector,
                         "country": holding.country,
-                        "weight": holding_weight
+                        "weight": portfolio_weight
                     }
                 else:
-                    holdings_dict[isin]["weight"] += holding_weight
+                    holdings_dict[isin]["weight"] += portfolio_weight
 
         # Sort by weight and get top N
         sorted_holdings = sorted(
@@ -287,8 +301,8 @@ class AnalyticsService:
             reverse=True
         )[:top_n]
 
-        # Round weights
+        # Round weights to 2 decimal places for display as percentages
         for holding in sorted_holdings:
-            holding["weight"] = round(holding["weight"], 4)
+            holding["weight"] = round(holding["weight"], 2)
 
         return {"top_holdings": sorted_holdings}
