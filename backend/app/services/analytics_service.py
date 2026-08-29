@@ -237,3 +237,58 @@ class AnalyticsService:
             results.append(row)
 
         return results
+
+    @staticmethod
+    def calculate_portfolio_top_holdings(db: Session, portfolio: List[Dict], top_n: int = 10, holdings_date: date = None):
+        """Get the top N weighted holdings across a portfolio."""
+        holdings_dict = {}
+
+        for item in portfolio:
+            etf_id = item.get("etf_id")
+            weight = item.get("weight", 0)
+
+            if weight <= 0:
+                continue
+
+            query = db.query(Holding).filter(Holding.etf_id == etf_id)
+            if holdings_date:
+                query = query.filter(Holding.date == holdings_date)
+            else:
+                latest_date = db.query(func.max(Holding.date)).filter(
+                    Holding.etf_id == etf_id
+                ).scalar()
+                if latest_date:
+                    query = query.filter(Holding.date == latest_date)
+
+            holdings = query.all()
+
+            for holding in holdings:
+                isin = holding.instrument_isin
+                name = holding.instrument_name
+                
+                # Calculate weighted holding value
+                holding_weight = float(holding.weight) * weight / 100 if holding.weight else 0
+                
+                if isin not in holdings_dict:
+                    holdings_dict[isin] = {
+                        "isin": isin,
+                        "name": name,
+                        "sector": holding.sector,
+                        "country": holding.country,
+                        "weight": holding_weight
+                    }
+                else:
+                    holdings_dict[isin]["weight"] += holding_weight
+
+        # Sort by weight and get top N
+        sorted_holdings = sorted(
+            holdings_dict.values(),
+            key=lambda x: x["weight"],
+            reverse=True
+        )[:top_n]
+
+        # Round weights
+        for holding in sorted_holdings:
+            holding["weight"] = round(holding["weight"], 4)
+
+        return {"top_holdings": sorted_holdings}

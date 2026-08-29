@@ -65,13 +65,16 @@
         </div>
         <div v-if="portfolioScoreResult.pairwise_overlaps?.length" style="margin-bottom:1rem">
           <div style="font-size:.8rem;font-weight:600;color:var(--text-muted);margin-bottom:.5rem">Holdings Overlap by Pair</div>
-          <div v-for="ov in portfolioScoreResult.pairwise_overlaps" :key="ov.etf_a_id+ov.etf_b_id" style="display:flex;align-items:center;gap:.75rem;margin-bottom:.4rem">
-            <span style="font-size:.85rem;font-weight:600;color:var(--green-600)">{{ ov.etf_a_ticker }}</span>
-            <span style="font-size:.75rem;color:var(--text-muted)">↔</span>
-            <span style="font-size:.85rem;font-weight:600;color:var(--green-600)">{{ ov.etf_b_ticker }}</span>
-            <div class="alloc-track" style="flex:1;max-width:180px"><div class="alloc-fill" :style="{width:Math.min(ov.weight_overlap_pct,100)+'%',background:ov.weight_overlap_pct>50?'#ef4444':ov.weight_overlap_pct>20?'#ca8a04':'#0b6aa5'}"></div></div>
-            <span style="font-size:.85rem;font-weight:600">{{ ov.weight_overlap_pct?.toFixed(1) }}%</span>
+          <div v-if="filteredPairwiseOverlaps.length">
+            <div v-for="ov in filteredPairwiseOverlaps" :key="ov.etf_a_id+ov.etf_b_id" style="display:flex;align-items:center;gap:.75rem;margin-bottom:.4rem">
+              <span style="font-size:.85rem;font-weight:600;color:var(--green-600)">{{ ov.etf_a_ticker }}</span>
+              <span style="font-size:.75rem;color:var(--text-muted)">↔</span>
+              <span style="font-size:.85rem;font-weight:600;color:var(--green-600)">{{ ov.etf_b_ticker }}</span>
+              <div class="alloc-track" style="flex:1;max-width:180px"><div class="alloc-fill" :style="{width:Math.min(ov.weight_overlap_pct,100)+'%',background:ov.weight_overlap_pct>50?'#ef4444':ov.weight_overlap_pct>20?'#ca8a04':'#0b6aa5'}"></div></div>
+              <span style="font-size:.85rem;font-weight:600">{{ ov.weight_overlap_pct?.toFixed(1) }}%</span>
+            </div>
           </div>
+          <div v-else style="font-size:.85rem;color:var(--text-muted);padding:.5rem 0">No overlap pairs</div>
         </div>
         <p style="font-size:.7rem;color:var(--text-muted);margin-top:.75rem;margin-bottom:0">
           Base = weighted avg of individual GoETF Scores &nbsp;·&nbsp; Overlap Penalty: max −2 pts for 100% overlap &nbsp;·&nbsp; Bonus: portfolio country diversification vs individual weighted avg
@@ -86,6 +89,35 @@
           <div class="portfolio-donut-legend">
             <div v-for="entry in group.entries" :key="entry.name"><span><i :style="{ background: entry.color }"></i>{{ entry.name }}</span><strong>{{ entry.value.toFixed(1) }}%</strong></div>
           </div>
+        </div>
+      </div>
+
+      <!-- Top 10 Holdings -->
+      <div v-if="topHoldings && topHoldings.length" class="card" style="margin-top:1.5rem;padding:0;overflow:hidden">
+        <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--border)">
+          <h3 class="card-title" style="margin:0">Top 10 Holdings</h3>
+        </div>
+        <div class="table-wrap">
+          <table class="holdings-table">
+            <thead>
+              <tr>
+                <th style="width:50%">Holding Name</th>
+                <th>ISIN</th>
+                <th style="text-align:right">Weight</th>
+                <th>Sector</th>
+                <th>Country</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(holding, idx) in topHoldings" :key="idx">
+                <td><span style="font-weight:600;color:var(--text)">{{ holding.name }}</span></td>
+                <td style="font-family:monospace;font-size:.8rem;color:var(--text-muted)">{{ holding.isin }}</td>
+                <td style="text-align:right;font-weight:600">{{ (holding.weight * 100).toFixed(2) }}%</td>
+                <td style="color:var(--text-muted);font-size:.85rem">{{ holding.sector || '—' }}</td>
+                <td style="color:var(--text-muted);font-size:.85rem">{{ holding.country || '—' }}</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
 
@@ -203,6 +235,7 @@ const portfolio = ref([{etf_id:'',weight:50},{etf_id:'',weight:50}])
 const exposureLoading = ref(false)
 const exposureResult = ref(null)
 const exposureError = ref('')
+const topHoldings = ref(null)
 const portfolioRiskResult = ref(null)
 const portfolioScoreResult = ref(null)
 const portfolioScoreLoading = ref(false)
@@ -287,6 +320,10 @@ const portfolioExposureGroups = computed(() => {
   ].filter(group => group.entries.length)
 })
 
+const filteredPairwiseOverlaps = computed(() => {
+  return portfolioScoreResult.value?.pairwise_overlaps?.filter(ov => ov.weight_overlap_pct > 0) || []
+})
+
 const portfolioDonutOptions = {
   responsive: true,
   maintainAspectRatio: false,
@@ -313,11 +350,12 @@ async function loadETFs() {
   try { const r=await etfService.getETFs(0,50); allEtfs.value=r.data } catch(e){console.error(e)} finally{etfsLoading.value=false}
 }
 async function runExposure() {
-  exposureLoading.value=true; exposureError.value=''; exposureResult.value=null; portfolioRiskResult.value=null; portfolioScoreResult.value=null
+  exposureLoading.value=true; exposureError.value=''; exposureResult.value=null; topHoldings.value=null; portfolioRiskResult.value=null; portfolioScoreResult.value=null
   const p=portfolio.value.filter(x=>x.etf_id)
   try {
     const r = await analyticsService.calculateExposure(p, null, riskFreeRate.value / 100)
     exposureResult.value = r.data
+    topHoldings.value = r.data.top_holdings ?? null
     portfolioRiskResult.value = r.data.risk_metrics ?? null
     if (p.length >= 1) {
       portfolioScoreLoading.value = true
@@ -378,6 +416,10 @@ onMounted(() => {
 .risk-table thead tr{background:var(--bg-3)}
 .risk-table th,.risk-table td{padding:.58rem .75rem;text-align:left;border-bottom:1px solid var(--border)}
 .risk-table tbody tr:hover{background:var(--bg-3)}
+.holdings-table{width:100%;border-collapse:collapse;font-size:.85rem}
+.holdings-table thead tr{background:var(--bg-3)}
+.holdings-table th,.holdings-table td{padding:.65rem .75rem;text-align:left;border-bottom:1px solid var(--border)}
+.holdings-table tbody tr:hover{background:var(--bg-3)}
 .sortable-th{cursor:pointer;user-select:none;white-space:nowrap}
 .stat-box{background:var(--bg-3);border-radius:10px;padding:.75rem 1rem;display:flex;flex-direction:column}
 .stat-box .stat-value{font-size:1.25rem}

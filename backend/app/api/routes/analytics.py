@@ -31,4 +31,5 @@ async def calculate_exposure(
     exposure = AnalyticsService.calculate_portfolio_exposure(db, resolved_portfolio, date)
     etf_ids = [UUID(item["etf_id"]) for item in resolved_portfolio]
     risk_metrics = AnalyticsService.calculate_risk_metrics(db, rf_rate, etf_ids=etf_ids)
-    return {**exposure, "risk_metrics": risk_metrics}
+    top_holdings = AnalyticsService.calculate_portfolio_top_holdings(db, resolved_portfolio, top_n=10, holdings_date=date)
+    return {**exposure, "risk_metrics": risk_metrics, **top_holdings}
