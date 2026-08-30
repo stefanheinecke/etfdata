@@ -526,11 +526,12 @@ async def import_etf_data(
     
     try:
         # Create ETF
+        domicile = request.metadata.get('domicile')
         etf = ETF(
             isin=isin,
             name=request.metadata.get('name', isin),
             provider=request.metadata.get('provider'),
-            domicile=request.metadata.get('domicile'),
+            domicile=domicile.strip().upper()[:2] if domicile else None,
             ter=Decimal(str(request.metadata.get('ter', 0))) if request.metadata.get('ter') else None,
             fund_size=request.metadata.get('fund_size'),
             benchmark=request.metadata.get('benchmark'),
