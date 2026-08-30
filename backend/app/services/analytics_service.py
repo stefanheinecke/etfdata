@@ -24,11 +24,12 @@ class AnalyticsService:
                 query = query.filter(Holding.date == latest_date)
 
             holdings = query.all()
-            raw_weights = {h.instrument_isin: float(h.weight) for h in holdings}
+            # Use instrument_name as key since ISIN may not be available
+            raw_weights = {h.instrument_name: float(h.weight) for h in holdings}
             total_weight = sum(raw_weights.values())
             holdings_data[str(etf_id)] = {
-                isin: weight / total_weight * 100
-                for isin, weight in raw_weights.items()
+                name: weight / total_weight * 100
+                for name, weight in raw_weights.items()
             } if total_weight > 0 else {}
 
         matrix = {}
@@ -59,11 +60,11 @@ class AnalyticsService:
                     "weight_overlap": round(float(weight_overlap), 2)
                 }
 
-                for isin in common:
+                for holding_name in common:
                     common_holdings.append({
-                        "isin": isin,
-                        "etf_a_weight": round(float(holdings_data[etf_a_str][isin]), 4),
-                        "etf_b_weight": round(float(holdings_data[etf_b_str][isin]), 4)
+                        "name": holding_name,
+                        "etf_a_weight": round(float(holdings_data[etf_a_str][holding_name]), 4),
+                        "etf_b_weight": round(float(holdings_data[etf_b_str][holding_name]), 4)
                     })
 
         return {"matrix": matrix, "common_holdings": common_holdings[:20]}
@@ -274,8 +275,9 @@ class AnalyticsService:
             holdings = query.all()
 
             for holding in holdings:
-                isin = holding.instrument_isin
+                # Use name as primary key since ISIN may not be available
                 name = holding.instrument_name
+                isin = holding.instrument_isin
                 
                 if is_single_etf:
                     # For single ETF, use raw weight from database
@@ -290,16 +292,16 @@ class AnalyticsService:
                     normalized_weight = float(holding.weight) / total_holding_weight * 100 if holding.weight else 0
                     portfolio_weight = normalized_weight * weight / 100
                 
-                if isin not in holdings_dict:
-                    holdings_dict[isin] = {
-                        "isin": isin,
+                if name not in holdings_dict:
+                    holdings_dict[name] = {
                         "name": name,
+                        "isin": isin,  # May be None
                         "sector": holding.sector,
                         "country": holding.country,
                         "weight": portfolio_weight
                     }
                 else:
-                    holdings_dict[isin]["weight"] += portfolio_weight
+                    holdings_dict[name]["weight"] += portfolio_weight
 
         # Sort by weight and get top N
         sorted_holdings = sorted(

@@ -45,7 +45,7 @@ class HoldingUpdateBody(BaseModel):
 
 
 class HoldingCreateBody(BaseModel):
-    instrument_isin: str
+    instrument_isin: Optional[str] = None  # May not be available in all factsheets
     instrument_name: str
     weight: float
     sector: Optional[str] = None
