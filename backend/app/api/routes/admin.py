@@ -369,11 +369,11 @@ def update_etf_metadata(
     for field, value in body.dict(exclude_none=True).items():
         if field == "ter" and value is not None:
             setattr(etf, field, Decimal(str(value)))
-        elif field == "isin":
+        elif field == "isin" and value:
             setattr(etf, field, value.strip().upper() or None)
-        elif field == "domicile":
+        elif field == "domicile" and value:
             setattr(etf, field, value.strip().upper()[:2])
-        elif field == "currency":
+        elif field == "currency" and value:
             setattr(etf, field, value.strip().upper()[:3])
         else:
             setattr(etf, field, value or None)
@@ -514,7 +514,7 @@ async def import_etf_data(
     from app.schemas import ETF, Holding
     from datetime import date as date_type
     
-    isin = request.metadata.get('isin', '').strip().upper()
+    isin = (request.metadata.get('isin') or '').strip().upper()
     
     if not isin:
         raise HTTPException(status_code=400, detail="ISIN is required in metadata")
@@ -546,11 +546,11 @@ async def import_etf_data(
             holding = Holding(
                 etf_id=etf.id,
                 date=holding_date,
-                instrument_isin=holding_data.get('instrument_isin', '').strip().upper()[:12] or None,
-                instrument_name=holding_data.get('instrument_name', '')[:255],
+                instrument_isin=(holding_data.get('instrument_isin') or '').strip().upper()[:12] or None,
+                instrument_name=(holding_data.get('instrument_name') or '')[:255],
                 weight=Decimal(str(holding_data.get('weight', 0))),
                 sector=holding_data.get('sector'),
-                country=holding_data.get('country', '').strip().upper()[:2] or None,
+                country=(holding_data.get('country') or '').strip().upper()[:2] or None,
             )
             db.add(holding)
         
