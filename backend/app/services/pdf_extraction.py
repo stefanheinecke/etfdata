@@ -52,8 +52,6 @@ class PDFExtractionService:
         
         return {k: v for k, v in metadata.items() if v is not None}
 
-        return {k: v for k, v in metadata.items() if v is not None}
-
     @staticmethod
     def _find_isin(text: str) -> Optional[str]:
         """Find ISIN code in text."""
