@@ -14,7 +14,12 @@ class PDFExtractionService:
             pdf_file = BytesIO(pdf_bytes)
             
             with pdfplumber.open(pdf_file) as pdf:
-                metadata = PDFExtractionService._extract_metadata(pdf)
+                # Extract full text for metadata
+                full_text = ""
+                for page in pdf.pages[:3]:
+                    full_text += page.extract_text() + "\n"
+                
+                metadata = PDFExtractionService._extract_metadata(full_text, pdf)
                 holdings = PDFExtractionService._extract_holdings(pdf)
                 
                 return {
@@ -24,24 +29,22 @@ class PDFExtractionService:
                     "pages": len(pdf.pages)
                 }
         except Exception as e:
+            import traceback
             return {
                 "status": "error",
                 "message": str(e),
+                "error_detail": traceback.format_exc(),
                 "metadata": {},
                 "holdings": []
             }
 
     @staticmethod
-    def _extract_metadata(pdf) -> Dict[str, Any]:
-        """Extract ETF metadata from the PDF."""
-        text = ""
-        for page in pdf.pages[:3]:  # Check first 3 pages for metadata
-            text += page.extract_text() + "\n"
-
+    def _extract_metadata(text: str, pdf) -> Dict[str, Any]:
+        """Extract ETF metadata from PDF text."""
         metadata = {
+            "name": PDFExtractionService._find_etf_name(text),
             "isin": PDFExtractionService._find_isin(text),
             "ticker": PDFExtractionService._find_ticker(text),
-            "name": PDFExtractionService._find_etf_name(text),
             "provider": PDFExtractionService._find_provider(text),
             "benchmark": PDFExtractionService._find_benchmark(text),
             "ter": PDFExtractionService._find_ter(text),
@@ -66,79 +69,122 @@ class PDFExtractionService:
 
     @staticmethod
     def _find_etf_name(text: str) -> Optional[str]:
-        """Find ETF name in text."""
+        """Find ETF name - usually appears in first few lines or after 'Name of fund'."""
+        # First try to find after "Name of fund" label
+        match = re.search(r'Name\s+of\s+fund\s+([^\n]+)', text, re.IGNORECASE)
+        if match:
+            return match.group(1).strip()
+        
+        # Look for lines with "UCITS ETF" or similar fund indicators
         lines = text.split('\n')
-        # Usually the first non-empty line or within first 5 lines
-        for line in lines[:10]:
+        for line in lines[:20]:
             line = line.strip()
-            if line and len(line) > 10 and not any(x in line.upper() for x in ['FACTSHEET', 'FUND']):
-                # Filter out common non-name lines
-                if not re.match(r'^[0-9\-/.]+$', line):
+            if 'UCITS ETF' in line or 'ETF' in line.upper():
+                # Remove leading/trailing metadata
+                if len(line) > 10 and len(line) < 200:
                     return line
+        
         return None
 
     @staticmethod
     def _find_provider(text: str) -> Optional[str]:
-        """Find fund provider/company name."""
-        providers = ['iShares', 'Vanguard', 'Amundi', 'Fidelity', 'BlackRock', 
-                    'Invesco', 'J.P. Morgan', 'SPDR', 'Xtrackers', 'Lyxor']
+        """Find fund provider/management company name."""
+        # Look for "Management Company" or "Manager" patterns
+        match = re.search(r'(?:Management\s+Company|Fund\s+Manager|Provider)[\s:]*([^\n]+)', text, re.IGNORECASE)
+        if match:
+            provider_text = match.group(1).strip()
+            # Extract just the company name (before country/city info)
+            company_match = re.match(r'([^,()]+)', provider_text)
+            if company_match:
+                return company_match.group(1).strip()
+        
+        # Also look for specific known providers
+        providers = ['UBS', 'iShares', 'Vanguard', 'Amundi', 'Fidelity', 'BlackRock', 
+                    'Invesco', 'SPDR', 'Xtrackers', 'Lyxor', 'Wisdomtree', 'Ishares']
         for provider in providers:
             if provider.lower() in text.lower():
                 return provider
+        
         return None
 
     @staticmethod
     def _find_benchmark(text: str) -> Optional[str]:
         """Find benchmark index name."""
-        match = re.search(r'(?:Benchmark|Index)[\s:]*([^\n]+?)(?:\n|$)', text, re.IGNORECASE)
+        # Look for "Index name" or "Benchmark" patterns
+        match = re.search(r'(?:Index\s+name|Benchmark)[\s:]*([^\n]+)', text, re.IGNORECASE)
         if match:
             benchmark = match.group(1).strip()
-            return benchmark if len(benchmark) < 150 else None
+            # Clean up benchmark name
+            benchmark = re.sub(r'\s+(?:Net|Gross|Return|Total|Price|Index).*$', '', benchmark, flags=re.IGNORECASE)
+            return benchmark.strip() if benchmark else None
+        
         return None
 
     @staticmethod
     def _find_ter(text: str) -> Optional[float]:
         """Find Total Expense Ratio."""
-        # Look for patterns like "TER: 0.25%" or "Expense Ratio: 0.25%"
-        match = re.search(r'(?:TER|Total Expense Ratio|Expense Ratio)[\s:]*([0-9.]+)\s*%', text, re.IGNORECASE)
+        # Look for patterns like "TER: 0.25%" or "TER (flat fee) 0.25%"
+        match = re.search(r'TER\s*(?:\(flat\s+fee\))?\s*([0-9.]+)\s*%', text, re.IGNORECASE)
         if match:
             try:
                 return float(match.group(1))
             except ValueError:
                 pass
+        
+        # Also try "Expense Ratio"
+        match = re.search(r'(?:Total\s+)?Expense\s+Ratio[\s:]*([0-9.]+)\s*%', text, re.IGNORECASE)
+        if match:
+            try:
+                return float(match.group(1))
+            except ValueError:
+                pass
+        
         return None
 
     @staticmethod
     def _find_domicile(text: str) -> Optional[str]:
         """Find fund domicile country."""
+        # Look for "Fund domicile" or "Domicile" pattern
+        match = re.search(r'(?:Fund\s+)?Domicile[\s:]*([^\n]+)', text, re.IGNORECASE)
+        if match:
+            return match.group(1).strip()
+        
+        # Also check for country codes and names
         countries = {
-            'Ireland': ['IE', 'Ireland'],
             'Luxembourg': ['LU', 'Luxembourg'],
+            'Ireland': ['IE', 'Ireland'],
             'Switzerland': ['CH', 'Switzerland'],
-            'United States': ['US', 'United States'],
+            'United States': ['US', 'United States', 'USA'],
             'Germany': ['DE', 'Germany'],
             'France': ['FR', 'France'],
         }
         
         for country, codes in countries.items():
             for code in codes:
-                if code in text:
+                if re.search(rf'\b{code}\b', text):
                     return country
+        
         return None
 
     @staticmethod
     def _find_fund_size(text: str) -> Optional[int]:
         """Find fund asset size."""
-        # Look for patterns like "Assets: $1.5B" or "AUM: €500M"
-        match = re.search(r'(?:Assets|AUM)[\s:]*\$?€?([0-9.]+)\s*([BMK])', text, re.IGNORECASE)
+        # Look for "Total fund assets" pattern
+        match = re.search(r'(?:Total\s+)?fund\s+assets?[\s:]*([0-9.]+)\s*([a-z]*)', text, re.IGNORECASE)
         if match:
             try:
                 value = float(match.group(1))
-                multiplier = {'B': 1e9, 'M': 1e6, 'K': 1e3}
-                mult = multiplier.get(match.group(2).upper(), 1)
+                unit = match.group(2).strip().upper()
+                
+                if not unit or 'M' in unit or 'EUR' in unit or 'USD' in unit:
+                    unit = 'M'  # Default to millions
+                
+                multiplier = {'B': 1e9, 'M': 1e6, 'K': 1e3, 'T': 1e12}
+                mult = multiplier.get(unit[0] if unit else 'M', 1e6)
                 return int(value * mult)
-            except (ValueError, KeyError):
+            except (ValueError, KeyError, IndexError):
                 pass
+        
         return None
 
     @staticmethod
@@ -176,27 +222,34 @@ class PDFExtractionService:
         headers = table[0]
         header_lower = [str(h).lower() if h else '' for h in headers]
 
-        # Find relevant column indices
-        name_idx = PDFExtractionService._find_column(header_lower, ['name', 'holding', 'stock', 'isin'])
-        weight_idx = PDFExtractionService._find_column(header_lower, ['weight', 'weightage', 'proportion', '%'])
-        country_idx = PDFExtractionService._find_column(header_lower, ['country', 'country of issue'])
-        sector_idx = PDFExtractionService._find_column(header_lower, ['sector', 'industry'])
-        isin_idx = PDFExtractionService._find_column(header_lower, ['isin', 'cusip'])
+        # Find relevant column indices with more flexible matching
+        name_idx = PDFExtractionService._find_column(header_lower, ['name', 'holding', 'stock', 'isin', 'security', 'position'])
+        weight_idx = PDFExtractionService._find_column(header_lower, ['weight', 'weightage', 'proportion', '%', 'percentage', 'percent'])
+        country_idx = PDFExtractionService._find_column(header_lower, ['country', 'country of issue', 'domicile'])
+        sector_idx = PDFExtractionService._find_column(header_lower, ['sector', 'industry', 'classification'])
+        isin_idx = PDFExtractionService._find_column(header_lower, ['isin', 'cusip', 'id', 'code'])
 
+        # If we can't identify columns, try to infer from data
         if name_idx is None or weight_idx is None:
-            return []
+            # Try to detect based on row patterns
+            return PDFExtractionService._parse_holdings_auto(table)
 
         # Parse data rows
         for row in table[1:]:
-            if not row or len(row) <= max(filter(lambda x: x is not None, 
-                                                  [name_idx, weight_idx, country_idx, sector_idx, isin_idx])):
+            if not row:
+                continue
+            
+            # Skip if row is too short
+            max_idx = max(filter(lambda x: x is not None, 
+                                [name_idx, weight_idx, country_idx, sector_idx, isin_idx]))
+            if len(row) <= max_idx:
                 continue
 
             try:
-                name = str(row[name_idx]).strip() if name_idx < len(row) else None
-                weight_str = str(row[weight_idx]).strip() if weight_idx < len(row) else '0'
+                name = str(row[name_idx]).strip() if name_idx < len(row) and row[name_idx] else None
+                weight_str = str(row[weight_idx]).strip() if weight_idx < len(row) and row[weight_idx] else '0'
                 
-                if not name or name.lower() in ['total', 'name']:
+                if not name or name.lower() in ['total', 'name', '']:
                     continue
 
                 # Clean weight value
@@ -206,16 +259,57 @@ class PDFExtractionService:
 
                 holding = {
                     "instrument_name": name,
-                    "instrument_isin": row[isin_idx].strip() if isin_idx and isin_idx < len(row) else None,
+                    "instrument_isin": row[isin_idx].strip() if isin_idx and isin_idx < len(row) and row[isin_idx] else None,
                     "weight": weight,
-                    "country": row[country_idx].strip() if country_idx and country_idx < len(row) else None,
-                    "sector": row[sector_idx].strip() if sector_idx and sector_idx < len(row) else None,
+                    "country": row[country_idx].strip() if country_idx and country_idx < len(row) and row[country_idx] else None,
+                    "sector": row[sector_idx].strip() if sector_idx and sector_idx < len(row) and row[sector_idx] else None,
                 }
 
                 holdings.append(holding)
-            except (ValueError, IndexError, AttributeError):
+            except (ValueError, IndexError, AttributeError, TypeError):
                 continue
 
+        return holdings
+    
+    @staticmethod
+    def _parse_holdings_auto(table: List[List[str]]) -> List[Dict[str, Any]]:
+        """Auto-detect and parse holdings when headers are unclear."""
+        holdings = []
+        
+        # For simple tables, assume first column is name, second is weight
+        for row in table[1:]:
+            if not row or len(row) < 2:
+                continue
+            
+            try:
+                # Get first two non-empty elements
+                name = None
+                weight_str = None
+                
+                for cell in row:
+                    if cell and name is None:
+                        name = str(cell).strip()
+                    elif cell and weight_str is None:
+                        weight_str = str(cell).strip()
+                
+                if not name or name.lower() in ['total', 'name', '']:
+                    continue
+                
+                weight = PDFExtractionService._parse_weight(weight_str or '0')
+                if weight is None or weight <= 0:
+                    continue
+                
+                holding = {
+                    "instrument_name": name,
+                    "weight": weight,
+                    "instrument_isin": None,
+                    "country": None,
+                    "sector": None,
+                }
+                holdings.append(holding)
+            except (ValueError, TypeError, AttributeError):
+                continue
+        
         return holdings
 
     @staticmethod
