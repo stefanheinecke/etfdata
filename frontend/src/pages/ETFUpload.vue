@@ -184,7 +184,7 @@ async function uploadAndExtract() {
     const formDataObj = new FormData()
     formDataObj.append('file', selectedFile.value)
 
-    const response = await fetch(`${API_BASE_URL}/api/admin/etf/upload-factsheet`, {
+    const response = await fetch(`${API_BASE_URL}/admin/etf/upload-factsheet`, {
       method: 'POST',
       body: formDataObj,
     })
@@ -235,7 +235,7 @@ async function importETF() {
   importError.value = ''
 
   try {
-    const response = await fetch(`${API_BASE_URL}/api/admin/etf/import-data`, {
+    const response = await fetch(`${API_BASE_URL}/admin/etf/import-data`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
