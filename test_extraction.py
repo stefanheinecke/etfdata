@@ -16,6 +16,12 @@ for key, value in result['metadata'].items():
     print(f"  {key}: {value}")
 
 print(f"\nHoldings found: {len(result['holdings'])}")
-print("\nFirst 15 holdings:")
+print("\nFirst 15 holdings (with enrichment):")
+print(f"{'Name':<30} {'Weight':>8} {'Country':<15} {'Sector':<20}")
+print("-" * 75)
 for holding in result['holdings'][:15]:
-    print(f"  {holding['instrument_name']}: {holding['weight']}%")
+    name = holding['instrument_name'][:28]
+    weight = f"{holding['weight']}%"
+    country = holding.get('country') or 'N/A'
+    sector = holding.get('sector') or 'N/A'
+    print(f"{name:<30} {weight:>8} {country:<15} {sector:<20}")
