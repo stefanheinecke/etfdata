@@ -557,7 +557,7 @@ def import_etf(
         if provider:
             etf.provider = provider
         if domicile:
-            etf.domicile = domicile
+            etf.domicile = domicile.strip().upper()[:2]
         # Always persist the EODHD symbol so daily refresh can find it
         etf.listings = {**(etf.listings or {}), "eodhd_symbol": eodhd_symbol}
         db.commit()
@@ -567,10 +567,10 @@ def import_etf(
         etf = ETF(
             isin=isin,
             name=name[:255], provider=provider,
-            domicile=domicile,
+            domicile=domicile.strip().upper()[:2] if domicile else None,
             ter=Decimal(str(ter)) if ter is not None else None,
             fund_size=fund_size, benchmark=benchmark,
-            currency=currency[:3].upper() if currency else None,
+            currency=currency.strip().upper()[:3] if currency else None,
             dividend_policy=div_policy,
             listings={"eodhd_symbol": eodhd_symbol},
         )
