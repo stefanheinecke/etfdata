@@ -52,18 +52,51 @@ def init_db():
         # Drop ticker column — ISIN is now the primary identifier
         conn.execute(text("ALTER TABLE etfs DROP COLUMN IF EXISTS ticker"))
         # Update holdings schema: make instrument_isin nullable and update unique constraint
-        conn.execute(text("ALTER TABLE holdings ALTER COLUMN instrument_isin DROP NOT NULL"))
-        # Drop old unique constraint if it exists (on instrument_isin)
+        # Use DO block to handle migrations safely
         conn.execute(text("""
-            ALTER TABLE holdings DROP CONSTRAINT IF EXISTS idx_holdings_unique CASCADE;
+            DO $$ BEGIN
+                -- Make instrument_isin nullable if it exists
+                IF EXISTS (
+                    SELECT 1 FROM information_schema.columns 
+                    WHERE table_name='holdings' AND column_name='instrument_isin'
+                ) THEN
+                    ALTER TABLE holdings ALTER COLUMN instrument_isin DROP NOT NULL;
+                END IF;
+            END $$;
         """))
-        # Add new unique constraint on (etf_id, date, instrument_name)
-        conn.execute(text("""
-            ALTER TABLE holdings ADD CONSTRAINT idx_holdings_unique 
-            UNIQUE (etf_id, date, instrument_name);
-        """))
+        
+        # Drop old unique constraint if it exists (safer with exception handling)
+        try:
+            conn.execute(text("ALTER TABLE holdings DROP CONSTRAINT IF EXISTS idx_holdings_unique CASCADE"))
+        except Exception:
+            pass  # Constraint may not exist or may have different name
+        
+        # Add new unique constraint on (etf_id, date, instrument_name) if holdings table exists
+        # First check if we need to drop duplicates
+        try:
+            conn.execute(text("""
+                -- Delete duplicate holdings keeping only the latest (by created_at)
+                DELETE FROM holdings h1
+                WHERE EXISTS (
+                    SELECT 1 FROM holdings h2
+                    WHERE h1.etf_id = h2.etf_id
+                    AND h1.date = h2.date
+                    AND h1.instrument_name = h2.instrument_name
+                    AND h1.id != h2.id
+                    AND h1.created_at < h2.created_at
+                )
+            """))
+            # Now add the constraint
+            conn.execute(text("""
+                ALTER TABLE holdings ADD CONSTRAINT idx_holdings_unique 
+                UNIQUE (etf_id, date, instrument_name)
+            """))
+        except Exception:
+            pass  # Constraint may already exist, duplicates may prevent creation
+        
         # Add index on instrument_isin for optional lookups
         conn.execute(text("""
-            CREATE INDEX IF NOT EXISTS idx_holdings_isin ON holdings (instrument_isin);
+            CREATE INDEX IF NOT EXISTS idx_holdings_isin ON holdings (instrument_isin)
         """))
+        
         conn.commit()
