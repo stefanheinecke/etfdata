@@ -44,13 +44,13 @@ class PDFExtractionService:
         metadata = {
             "name": PDFExtractionService._find_etf_name(text),
             "isin": PDFExtractionService._find_isin(text),
-            "ticker": PDFExtractionService._find_ticker(text),
             "provider": PDFExtractionService._find_provider(text),
-            "benchmark": PDFExtractionService._find_benchmark(text),
             "ter": PDFExtractionService._find_ter(text),
             "domicile": PDFExtractionService._find_domicile(text),
             "fund_size": PDFExtractionService._find_fund_size(text),
         }
+        
+        return {k: v for k, v in metadata.items() if v is not None}
 
         return {k: v for k, v in metadata.items() if v is not None}
 
@@ -189,19 +189,34 @@ class PDFExtractionService:
 
     @staticmethod
     def _extract_holdings(pdf) -> List[Dict[str, Any]]:
-        """Extract holdings table from PDF."""
+        """Extract holdings from PDF - try both tables and text patterns."""
         holdings = []
 
+        # First try to extract from tables
         for page in pdf.pages:
-            # Try to find tables on the page
             tables = page.extract_tables()
             if tables:
                 for table in tables:
                     extracted = PDFExtractionService._parse_holdings_table(table)
-                    holdings.extend(extracted)
+                    if extracted:  # Only use if we got results
+                        holdings.extend(extracted)
+
+        # If no holdings found in tables, try to parse from text
+        if not holdings:
+            for page in pdf.pages:
+                text = page.extract_text()
+                if text:
+                    extracted = PDFExtractionService._parse_holdings_from_text(text)
+                    if extracted:
+                        holdings.extend(extracted)
 
         # Remove duplicates and sort by weight
-        unique_holdings = {h['instrument_name']: h for h in holdings}
+        unique_holdings = {}
+        for h in holdings:
+            key = h['instrument_name'].upper()
+            if key not in unique_holdings:
+                unique_holdings[key] = h
+        
         sorted_holdings = sorted(
             unique_holdings.values(),
             key=lambda x: float(x.get('weight', 0)),
@@ -209,6 +224,76 @@ class PDFExtractionService:
         )
 
         return sorted_holdings[:100]  # Top 100 holdings
+
+    @staticmethod
+    def _parse_holdings_from_text(text: str) -> List[Dict[str, Any]]:
+        """Parse holdings from text patterns like 'NAME WEIGHT'."""
+        holdings = []
+        import re
+        
+        lines = text.split('\n')
+        in_holdings_section = False
+        
+        for line in lines:
+            # Check if we're entering a holdings section
+            if 'largest equity positions' in line.lower():
+                in_holdings_section = True
+                continue
+            
+            # Check if we're leaving the section
+            if in_holdings_section and any(keyword in line.lower() for keyword in ['benefits', 'risks', 'disclaimer']):
+                in_holdings_section = False
+                continue
+            
+            if not in_holdings_section:
+                continue
+            
+            line = line.strip()
+            if not line or len(line) < 5:
+                continue
+            
+            # Skip header rows
+            if 'table_captions' in line.lower() or line.startswith('Index'):
+                continue
+            
+            # Parse holdings from lines with pattern: "NAME1 WEIGHT1 NAME2 WEIGHT2"
+            # Weights are always in format XX.XX
+            # Use regex to find all "name weight" pairs
+            
+            # Pattern: (One or more uppercase letters/spaces followed by) (number.number)
+            # This matches: "ASML HLDG 8.67 ALLIANZ 3.72" -> [("ASML HLDG", "8.67"), ("ALLIANZ", "3.72")]
+            pattern = r'([A-Z][A-Z0-9\s]*?)\s+([0-9]{1,3}\.[0-9]{2})'
+            
+            matches = re.findall(pattern, line)
+            
+            for name, weight_str in matches:
+                name = name.strip()
+                
+                # Filter out invalid names
+                if not name or len(name) < 2 or len(name) > 100:
+                    continue
+                
+                # Skip rows that are clearly not holdings
+                if name.lower() in ['index', 'total', 'other', 'cash'] or name.isdigit():
+                    continue
+                
+                try:
+                    weight = float(weight_str)
+                    if weight <= 0 or weight > 100:
+                        continue
+                    
+                    holding = {
+                        'instrument_name': name,
+                        'weight': weight,
+                        'instrument_isin': None,
+                        'country': None,
+                        'sector': None,
+                    }
+                    holdings.append(holding)
+                except ValueError:
+                    continue
+        
+        return holdings
 
     @staticmethod
     def _parse_holdings_table(table: List[List[str]]) -> List[Dict[str, Any]]:
