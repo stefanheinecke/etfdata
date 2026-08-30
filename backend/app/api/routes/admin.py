@@ -473,17 +473,25 @@ async def upload_factsheet(
     file: UploadFile = File(...),
 ):
     """Upload an ETF factsheet PDF for data extraction."""
-    from app.services.pdf_extraction import PDFExtractionService
-    
-    if not file.filename.endswith('.pdf'):
-        raise HTTPException(status_code=400, detail="Only PDF files are supported")
+    import logging
+    logger = logging.getLogger(__name__)
     
     try:
+        from app.services.pdf_extraction import PDFExtractionService
+        
+        if not file.filename.endswith('.pdf'):
+            return {"status": "error", "message": "Only PDF files are supported"}
+        
         pdf_bytes = await file.read()
         result = PDFExtractionService.extract_from_pdf(pdf_bytes)
         return result
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Failed to process PDF: {str(e)}")
+        logger.exception(f"PDF upload error: {str(e)}")
+        return {
+            "status": "error",
+            "message": f"Failed to process PDF: {str(e)}",
+            "error_type": type(e).__name__
+        }
 
 
 class ETFImportRequest(BaseModel):
