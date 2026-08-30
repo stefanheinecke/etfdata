@@ -462,3 +462,100 @@ def add_holding(
     db.commit()
     db.refresh(h)
     return _holding_dict(h)
+
+
+# ───────────────────────────────────────────────────────────────────────────
+# ETF Import from Factsheet PDF
+# ───────────────────────────────────────────────────────────────────────────
+
+@router.post("/etf/upload-factsheet")
+async def upload_factsheet(
+    file: UploadFile = File(...),
+    _: None = Depends(verify_admin_secret),
+):
+    """Upload an ETF factsheet PDF for data extraction."""
+    from app.services.pdf_extraction import PDFExtractionService
+    
+    if not file.filename.endswith('.pdf'):
+        raise HTTPException(status_code=400, detail="Only PDF files are supported")
+    
+    try:
+        pdf_bytes = await file.read()
+        result = PDFExtractionService.extract_from_pdf(pdf_bytes)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to process PDF: {str(e)}")
+
+
+class ETFImportRequest(BaseModel):
+    ticker: str
+    metadata: dict
+    holdings: List[dict]
+    date: Optional[date_type] = None
+
+
+@router.post("/etf/import-data")
+async def import_etf_data(
+    request: ETFImportRequest,
+    db: Session = Depends(get_db),
+    _: None = Depends(verify_admin_secret),
+):
+    """Import extracted ETF data into the database."""
+    from decimal import Decimal
+    from app.schemas import ETF, Holding
+    from datetime import date as date_type
+    
+    ticker = request.ticker.strip().upper()
+    
+    # Check if ETF already exists
+    existing_etf = db.query(ETF).filter(ETF.ticker == ticker).first()
+    if existing_etf:
+        raise HTTPException(status_code=409, detail=f"ETF {ticker} already exists")
+    
+    try:
+        # Create ETF
+        etf = ETF(
+            ticker=ticker,
+            name=request.metadata.get('name', ticker),
+            isin=request.metadata.get('isin', '').strip().upper() or None,
+            provider=request.metadata.get('provider'),
+            domicile=request.metadata.get('domicile'),
+            ter=Decimal(str(request.metadata.get('ter', 0))) if request.metadata.get('ter') else None,
+            fund_size=request.metadata.get('fund_size'),
+            benchmark=request.metadata.get('benchmark'),
+            currency=request.metadata.get('currency', 'USD'),
+        )
+        db.add(etf)
+        db.flush()  # Get the ETF ID
+        
+        # Add holdings
+        holding_date = request.date or date_type.today()
+        for holding_data in request.holdings:
+            holding = Holding(
+                etf_id=etf.id,
+                date=holding_date,
+                instrument_isin=holding_data.get('instrument_isin', '').strip().upper()[:12] or None,
+                instrument_name=holding_data.get('instrument_name', '')[:255],
+                weight=Decimal(str(holding_data.get('weight', 0))),
+                sector=holding_data.get('sector'),
+                country=holding_data.get('country', '').strip().upper()[:2] or None,
+            )
+            db.add(holding)
+        
+        db.commit()
+        db.refresh(etf)
+        
+        return {
+            "status": "success",
+            "etf": {
+                "id": str(etf.id),
+                "ticker": etf.ticker,
+                "name": etf.name,
+                "isin": etf.isin,
+                "provider": etf.provider,
+                "holdings_count": len(request.holdings),
+            }
+        }
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"Failed to import ETF: {str(e)}")
