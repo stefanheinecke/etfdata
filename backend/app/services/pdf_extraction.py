@@ -190,6 +190,8 @@ class PDFExtractionService:
     @staticmethod
     def _extract_holdings(pdf) -> List[Dict[str, Any]]:
         """Extract holdings from PDF - try both tables and text patterns."""
+        from app.services.holdings_enrichment import HoldingsEnrichmentService
+        
         holdings = []
 
         # First try to extract from tables
@@ -223,7 +225,13 @@ class PDFExtractionService:
             reverse=True
         )
 
-        return sorted_holdings[:100]  # Top 100 holdings
+        # Enrich holdings with country, sector, and ISIN
+        enriched_holdings = []
+        for holding in sorted_holdings[:100]:  # Top 100 holdings
+            enriched_holding = HoldingsEnrichmentService.enrich_holding(holding)
+            enriched_holdings.append(enriched_holding)
+
+        return enriched_holdings
 
     @staticmethod
     def _parse_holdings_from_text(text: str) -> List[Dict[str, Any]]:
