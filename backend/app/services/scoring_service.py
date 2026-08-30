@@ -300,7 +300,7 @@ def compute_portfolio_score(
     all_scores = compute_goetf_scores(db, rf_annual)
     score_map = {s["etf_id"]: s.get("goetf_score") or 5.0 for s in all_scores}
     geo_map = {s["etf_id"]: s.get("geo_div", 0.5) for s in all_scores}
-    ticker_map = {s["etf_id"]: s["ticker"] for s in all_scores}
+    isin_map = {s["etf_id"]: s["isin"] for s in all_scores}
 
     # 1. Base score
     base = sum((p["weight"] / total_w) * score_map.get(p["etf_id"], 5.0) for p in active)
@@ -322,8 +322,8 @@ def compute_portfolio_score(
                 {
                     "etf_a_id": str(etf_uuids[i]),
                     "etf_b_id": str(etf_uuids[j]),
-                    "etf_a_ticker": ticker_map.get(str(etf_uuids[i]), active[i]["etf_id"]),
-                    "etf_b_ticker": ticker_map.get(str(etf_uuids[j]), active[j]["etf_id"]),
+                    "etf_a_isin": isin_map.get(str(etf_uuids[i]), active[i]["etf_id"]),
+                    "etf_b_isin": isin_map.get(str(etf_uuids[j]), active[j]["etf_id"]),
                     "weight_overlap_pct": round(float(weight_ov), 1),
                     "combined_weight_pct": round(combined_w * 100, 1),
                 }

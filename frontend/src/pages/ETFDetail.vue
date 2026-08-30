@@ -5,7 +5,7 @@
       <div class="page crumb-inner">
         <button class="back-link" @click="goBack">← ETF Explorer</button>
         <span class="crumb-sep">›</span>
-        <span class="crumb-cur">{{ etf?.ticker }}</span>
+        <span class="crumb-cur">{{ etf?.isin }}</span>
       </div>
     </div>
 
@@ -16,7 +16,7 @@
         <div class="page header-inner">
           <div class="header-id">
             <div class="ticker-row">
-              <span class="ticker">{{ etf.ticker }}</span>
+              <span class="ticker">{{ etf.isin }}</span>
               <span v-if="etf.provider" class="tag">{{ etf.provider }}</span>
               <span v-if="etf.dividend_policy" :class="['tag', etf.dividend_policy === 'Accumulating' ? 'tag-acc' : 'tag-dist']">
                 {{ etf.dividend_policy === 'Accumulating' ? 'Acc' : 'Dist' }}
@@ -213,7 +213,6 @@ const fundRows = computed(() => {
   const e = etf.value; if (!e) return []
   return [
     { label: 'ISIN', value: e.isin || '—' },
-    { label: 'Ticker', value: e.ticker },
     { label: 'Provider', value: e.provider || '—' },
     { label: 'Domicile', value: e.domicile || '—' },
     { label: 'Currency', value: e.currency || '—' },

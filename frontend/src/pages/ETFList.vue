@@ -80,7 +80,7 @@
     <div v-else-if="filteredETFs.length" class="etf-grid">
       <div v-for="etf in filteredETFs" :key="etf.id" class="etf-card" @click="openETF(etf)">
         <div class="etf-card-top">
-          <div><span class="etf-ticker">{{ etf.ticker }}</span><span v-if="etf.provider" class="badge" style="margin-left:.5rem">{{ etf.provider }}</span></div>
+          <div><span class="etf-ticker">{{ etf.isin }}</span><span v-if="etf.provider" class="badge" style="margin-left:.5rem">{{ etf.provider }}</span></div>
           <span class="etf-ter">TER {{ etf.ter != null ? etf.ter + '%' : '—' }}</span>
         </div>
         <h3 class="etf-name">{{ etf.name }}</h3>
@@ -143,7 +143,7 @@ const filteredETFs = computed(() => {
   let list = allETFs.value
 
   const q = search.value.trim().toLowerCase()
-  if (q) list = list.filter(e => e.ticker?.toLowerCase().includes(q) || e.name?.toLowerCase().includes(q))
+  if (q) list = list.filter(e => e.isin?.toLowerCase().includes(q) || e.name?.toLowerCase().includes(q))
   if (filterProvider.value)    list = list.filter(e => e.provider === filterProvider.value)
   if (filterDomicile.value)    list = list.filter(e => e.domicile === filterDomicile.value)
   if (filterCurrency.value)    list = list.filter(e => e.currency === filterCurrency.value)

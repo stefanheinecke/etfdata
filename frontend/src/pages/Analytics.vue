@@ -18,7 +18,7 @@
         <div v-for="(item,i) in portfolio" :key="i" style="display:flex;gap:.5rem;margin-bottom:.5rem;align-items:center">
           <select class="input" v-model="item.etf_id" style="flex:2">
             <option value="">Select ETF...</option>
-            <option v-for="e in allEtfs" :key="e.id" :value="e.id">{{ e.ticker }} - {{ e.name }}</option>
+            <option v-for="e in allEtfs" :key="e.id" :value="e.id">{{ e.isin }} - {{ e.name }}</option>
           </select>
           <input class="input" type="number" v-model.number="item.weight" placeholder="Weight %" style="flex:1;max-width:120px" min="0" max="100" />
           <button class="btn btn-outline" @click="portfolio.splice(i,1)" style="flex-shrink:0">✕</button>
@@ -67,9 +67,9 @@
           <div style="font-size:.8rem;font-weight:600;color:var(--text-muted);margin-bottom:.5rem">Holdings Overlap by Pair</div>
           <div v-if="filteredPairwiseOverlaps.length">
             <div v-for="ov in filteredPairwiseOverlaps" :key="ov.etf_a_id+ov.etf_b_id" style="display:flex;align-items:center;gap:.75rem;margin-bottom:.4rem">
-              <span style="font-size:.85rem;font-weight:600;color:var(--green-600)">{{ ov.etf_a_ticker }}</span>
+              <span style="font-size:.85rem;font-weight:600;color:var(--green-600)">{{ ov.etf_a_isin }}</span>
               <span style="font-size:.75rem;color:var(--text-muted)">↔</span>
-              <span style="font-size:.85rem;font-weight:600;color:var(--green-600)">{{ ov.etf_b_ticker }}</span>
+              <span style="font-size:.85rem;font-weight:600;color:var(--green-600)">{{ ov.etf_b_isin }}</span>
               <div class="alloc-track" style="flex:1;max-width:180px"><div class="alloc-fill" :style="{width:Math.min(ov.weight_overlap_pct,100)+'%',background:ov.weight_overlap_pct>50?'#ef4444':ov.weight_overlap_pct>20?'#ca8a04':'#0b6aa5'}"></div></div>
               <span style="font-size:.85rem;font-weight:600">{{ ov.weight_overlap_pct?.toFixed(1) }}%</span>
             </div>
@@ -175,7 +175,7 @@
           <table class="risk-table">
             <thead>
               <tr>
-                <th>Ticker</th>
+                <th>ISIN</th>
                 <th>1Y Return</th>
                 <th>Volatility</th>
                 <th>Sharpe</th>
@@ -189,7 +189,7 @@
             </thead>
             <tbody>
               <tr v-for="row in portfolioRiskResult" :key="row.etf_id">
-                <td><strong style="color:var(--green-600)">{{ row.ticker }}</strong></td>
+                <td><strong style="color:var(--green-600)">{{ row.isin }}</strong></td>
                 <td :class="signClass(row.ann_return)">{{ fmtPct(row.ann_return) }}</td>
                 <td :class="volClass(row.volatility)">{{ fmtPct(row.volatility) }}</td>
                 <td :class="sharpeClass(row.sharpe_ratio)">{{ row.sharpe_ratio !== null ? row.sharpe_ratio : '—' }}</td>

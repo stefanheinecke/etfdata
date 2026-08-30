@@ -154,7 +154,7 @@
       </button>
       <div v-if="importError" class="error-box" style="margin-top:.75rem">{{ importError }}</div>
       <div v-if="importResult" class="success-msg" style="margin-top:.75rem">
-        ✓ {{ importResult.name }} ({{ importResult.ticker }}) imported: {{ importResult.holdings }} holdings, {{ importResult.allocations }} allocations.
+        ✓ {{ importResult.name }} ({{ importResult.isin }}) imported: {{ importResult.holdings }} holdings, {{ importResult.allocations }} allocations.
       </div>
       <div v-if="importLogs.length" style="margin-top:.75rem;background:#f8f9fa;border-radius:6px;padding:.75rem;font-family:monospace;font-size:.8rem;white-space:pre-wrap;max-height:200px;overflow-y:auto;">{{ importLogs.join('\n') }}</div>
     </div>
@@ -180,7 +180,7 @@
         <div class="etf-list">
           <div v-for="etf in etfList" :key="etf.id" class="etf-row">
             <input type="checkbox" :value="etf.id" v-model="selectedEtfIds">
-            <span class="etf-ticker">{{ etf.ticker }}</span>
+            <span class="etf-ticker">{{ etf.isin }}</span>
             <span class="etf-name">{{ etf.name }}</span>
             <span class="etf-provider">{{ etf.provider }}</span>
           </div>
@@ -300,7 +300,7 @@
             <div style="display:flex;gap:.5rem">
               <select class="input" v-model="valuesEtfId" style="flex:1">
                 <option value="">— select ETF —</option>
-                <option v-for="e in valuesEtfList" :key="e.id" :value="e.id">{{ e.ticker }} - {{ e.name }}</option>
+                <option v-for="e in valuesEtfList" :key="e.id" :value="e.id">{{ e.isin }} - {{ e.name }}</option>
               </select>
               <button class="btn btn-outline" @click="loadValuesEtfList" :disabled="valuesEtfListLoading" title="Refresh ETF list">
                 {{ valuesEtfListLoading ? '…' : '↻' }}
@@ -369,7 +369,7 @@
         <div style="display:flex;gap:.5rem;align-items:center">
           <select class="input" v-model="editorEtfId" style="flex:1">
             <option value="">— select ETF —</option>
-            <option v-for="e in editorEtfList" :key="e.id" :value="e.id">{{ e.ticker }} - {{ e.name }}</option>
+            <option v-for="e in editorEtfList" :key="e.id" :value="e.id">{{ e.isin }} - {{ e.name }}</option>
           </select>
           <button class="btn btn-outline" @click="loadEditorEtfList" title="Refresh list">↻</button>
           <button class="btn btn-primary" @click="loadEditorData" :disabled="!editorEtfId || editorLoading">
@@ -382,7 +382,7 @@
       <!-- Metadata editor -->
       <div v-if="editorEtf" class="card" style="margin-bottom:1.5rem">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
-          <h2 class="card-title" style="margin:0">Metadata: {{ editorEtf.ticker }}</h2>
+          <h2 class="card-title" style="margin:0">Metadata: {{ editorEtf.isin }}</h2>
           <button class="btn btn-primary" @click="saveMetadata" :disabled="metaSaving">
             {{ metaSaving ? 'Saving…' : 'Save Metadata' }}
           </button>
@@ -776,7 +776,7 @@ async function loadETFs() {
 
 async function deleteSelectedEtfs() {
   if (!selectedEtfIds.value.length) return
-  const names = etfList.value.filter(e => selectedEtfIds.value.includes(e.id)).map(e => e.ticker).join(', ')
+  const names = etfList.value.filter(e => selectedEtfIds.value.includes(e.id)).map(e => e.isin).join(', ')
   if (!confirm(`Delete ${selectedEtfIds.value.length} ETF(s): ${names}?\n\nThis removes all holdings and allocations.`)) return
   deleteEtfLoading.value = true; deleteEtfResult.value = ''; deleteEtfError.value = ''
   try {
@@ -834,7 +834,7 @@ async function loadEtfValues() {
 function downloadValuesCsv() {
   if (!valuesData.value || valuesData.value.length === 0) return
   const etf = valuesEtfList.value.find(e => e.id === valuesEtfId.value)
-  const ticker = etf ? etf.ticker : 'etf'
+  const isin = etf ? etf.isin : 'etf'
   const header = ['date', 'close_price', 'nav', 'currency', 'dividend']
   const rows = valuesData.value.map(r => [
     r.date,
@@ -848,7 +848,7 @@ function downloadValuesCsv() {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = `${ticker}_performance.csv`
+  a.download = `${isin}_performance.csv`
   a.click()
   URL.revokeObjectURL(url)
 }
