@@ -34,7 +34,7 @@ class Holding(Base):
     id = Column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
     etf_id = Column(PGUUID(as_uuid=True), ForeignKey("etfs.id"), nullable=False, index=True)
     date = Column(Date, nullable=False, index=True)
-    instrument_isin = Column(String(50), nullable=False)
+    instrument_isin = Column(String(50), nullable=True)  # May not be available in all factsheets
     instrument_name = Column(String(255), nullable=False)
     weight = Column(Numeric(8, 4), nullable=False)
     country = Column(String(2), index=True)
@@ -44,8 +44,9 @@ class Holding(Base):
     etf = relationship("ETF", back_populates="holdings")
 
     __table_args__ = (
-        UniqueConstraint("etf_id", "date", "instrument_isin", name="idx_holdings_unique"),
+        UniqueConstraint("etf_id", "date", "instrument_name", name="idx_holdings_unique"),
         Index("idx_holdings_etf_date", "etf_id", "date"),
+        Index("idx_holdings_isin", "instrument_isin"),  # For optional ISIN lookups
     )
 
 class Allocation(Base):

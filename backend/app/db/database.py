@@ -51,4 +51,19 @@ def init_db():
         conn.execute(text("ALTER TABLE holdings ALTER COLUMN instrument_isin TYPE VARCHAR(50)"))
         # Drop ticker column — ISIN is now the primary identifier
         conn.execute(text("ALTER TABLE etfs DROP COLUMN IF EXISTS ticker"))
+        # Update holdings schema: make instrument_isin nullable and update unique constraint
+        conn.execute(text("ALTER TABLE holdings ALTER COLUMN instrument_isin DROP NOT NULL"))
+        # Drop old unique constraint if it exists (on instrument_isin)
+        conn.execute(text("""
+            ALTER TABLE holdings DROP CONSTRAINT IF EXISTS idx_holdings_unique CASCADE;
+        """))
+        # Add new unique constraint on (etf_id, date, instrument_name)
+        conn.execute(text("""
+            ALTER TABLE holdings ADD CONSTRAINT idx_holdings_unique 
+            UNIQUE (etf_id, date, instrument_name);
+        """))
+        # Add index on instrument_isin for optional lookups
+        conn.execute(text("""
+            CREATE INDEX IF NOT EXISTS idx_holdings_isin ON holdings (instrument_isin);
+        """))
         conn.commit()
