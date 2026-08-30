@@ -138,30 +138,30 @@ def backfill_eodhd_symbols(
     if not token:
         raise HTTPException(status_code=503, detail="EODHD_TOKEN not set — cannot verify symbols.")
 
-    etfs = db.query(ETFModel).order_by(ETFModel.ticker).all()
+    etfs = db.query(ETFModel).order_by(ETFModel.isin).all()
     updated = []
     skipped = []
 
     for etf in etfs:
         # Already has a symbol stored
         if etf.listings and etf.listings.get("eodhd_symbol"):
-            skipped.append({"ticker": etf.ticker, "reason": "already set",
+            skipped.append({"isin": etf.isin, "reason": "already set",
                             "eodhd_symbol": etf.listings["eodhd_symbol"]})
             continue
 
-        # Try to derive from catalogue yfinance symbol
-        yf_sym = _YF_PERF_SYMBOL.get(etf.ticker)
-        if yf_sym:
-            if "." not in yf_sym:
-                candidate = yf_sym + ".US"
-            elif yf_sym.endswith(".L"):
-                candidate = yf_sym[:-2] + ".LSE"
-            else:
-                candidate = yf_sym
+        # Try to derive from catalogue yfinance symbol - use ISIN if available
+        candidate = None
+        if etf.listings and etf.listings.get("eodhd_symbol"):
+            candidate = etf.listings["eodhd_symbol"]
         else:
-            # Guess based on currency: USD→.SW, GBP→.LSE, EUR→.AS (best effort)
-            suffix = {"USD": ".SW", "GBP": ".LSE", "EUR": ".AS"}.get(etf.currency or "", ".SW")
-            candidate = etf.ticker + suffix
+            # Guess based on currency: USD→.US, EUR→.AS, GBP→.LSE (best effort)
+            # Without ticker, we use ISIN-based logic or currency hints
+            suffix = {"USD": ".US", "GBP": ".LSE", "EUR": ".AS"}.get(etf.currency or "", ".AS")
+            # Use provider name + ISIN for better matching
+            if etf.provider:
+                candidate = f"{etf.provider}_{etf.isin}{suffix}"
+            else:
+                candidate = f"{etf.isin}{suffix}"
 
         # Verify the candidate actually returns data from EODHD
         try:
@@ -174,12 +174,12 @@ def backfill_eodhd_symbols(
             if resp.status_code == 200 and resp.json():
                 etf.listings = {**(etf.listings or {}), "eodhd_symbol": candidate}
                 db.commit()
-                updated.append({"ticker": etf.ticker, "eodhd_symbol": candidate})
+                updated.append({"isin": etf.isin, "eodhd_symbol": candidate})
             else:
-                skipped.append({"ticker": etf.ticker, "reason": f"HTTP {resp.status_code} or empty",
+                skipped.append({"isin": etf.isin, "reason": f"HTTP {resp.status_code} or empty",
                                 "candidate": candidate})
         except Exception as exc:
-            skipped.append({"ticker": etf.ticker, "reason": str(exc), "candidate": candidate})
+            skipped.append({"isin": etf.isin, "reason": str(exc), "candidate": candidate})
 
     return {"updated": updated, "skipped": skipped}
 
@@ -309,9 +309,13 @@ def import_ishares_endpoint(
 ):
     """
     Download real holdings data from iShares.com and import into the database.
-    Provide {"tickers": ["IVV", "EEM"]} to import a subset, or omit / send {} to import all.
+    Provide {"isins": ["IE00B4L5Y983", "IE00B6R52259"]} to import a subset, or omit / send {} to import all.
+    
+    Note: For now, this endpoint still expects the old ticker format for backward compatibility.
+    Update the request body to use ISINs instead of tickers.
     """
-    tickers = body.tickers if body else None
+    # Support both 'tickers' (for backward compatibility) and 'isins' in the request
+    tickers = getattr(body, 'tickers', None) or getattr(body, 'isins', None) if body else None
     result = import_ishares(db, tickers=tickers)
     return result
 
@@ -376,7 +380,7 @@ def update_etf_metadata(
     db.commit()
     db.refresh(etf)
     return {
-        "id": str(etf.id), "ticker": etf.ticker, "name": etf.name,
+        "id": str(etf.id), "name": etf.name,
         "isin": etf.isin, "ter": float(etf.ter) if etf.ter else None,
         "currency": etf.currency, "provider": etf.provider,
         "domicile": etf.domicile, "fund_size": etf.fund_size,
@@ -495,8 +499,7 @@ async def upload_factsheet(
 
 
 class ETFImportRequest(BaseModel):
-    ticker: str
-    metadata: dict
+    metadata: dict  # Must include 'isin' as the unique identifier
     holdings: List[dict]
     date: Optional[date_type] = None
 
@@ -511,19 +514,21 @@ async def import_etf_data(
     from app.schemas import ETF, Holding
     from datetime import date as date_type
     
-    ticker = request.ticker.strip().upper()
+    isin = request.metadata.get('isin', '').strip().upper()
+    
+    if not isin:
+        raise HTTPException(status_code=400, detail="ISIN is required in metadata")
     
     # Check if ETF already exists
-    existing_etf = db.query(ETF).filter(ETF.ticker == ticker).first()
+    existing_etf = db.query(ETF).filter(ETF.isin == isin).first()
     if existing_etf:
-        raise HTTPException(status_code=409, detail=f"ETF {ticker} already exists")
+        raise HTTPException(status_code=409, detail=f"ETF with ISIN {isin} already exists")
     
     try:
         # Create ETF
         etf = ETF(
-            ticker=ticker,
-            name=request.metadata.get('name', ticker),
-            isin=request.metadata.get('isin', '').strip().upper() or None,
+            isin=isin,
+            name=request.metadata.get('name', isin),
             provider=request.metadata.get('provider'),
             domicile=request.metadata.get('domicile'),
             ter=Decimal(str(request.metadata.get('ter', 0))) if request.metadata.get('ter') else None,
@@ -555,9 +560,8 @@ async def import_etf_data(
             "status": "success",
             "etf": {
                 "id": str(etf.id),
-                "ticker": etf.ticker,
-                "name": etf.name,
                 "isin": etf.isin,
+                "name": etf.name,
                 "provider": etf.provider,
                 "holdings_count": len(request.holdings),
             }

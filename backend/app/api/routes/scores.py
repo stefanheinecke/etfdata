@@ -13,37 +13,24 @@ from app.services.scoring_service import compute_goetf_scores, compute_portfolio
 router = APIRouter(prefix="/scores", tags=["scores"])
 
 
-def _is_demo(api_key: APIKey) -> bool:
-    return getattr(api_key, "name", "") == "__demo__"
-
-
 @router.get("/etfs")
 async def get_etf_scores(
-    tickers: Optional[str] = None,
+    isins: Optional[str] = None,
     rf_rate: float = 0.04,
     db: Session = Depends(get_db),
     api_key: APIKey = Depends(verify_api_key),
 ):
     """
-    GoETF Score for all ETFs (or a comma-separated ticker subset).
+    GoETF Score for all ETFs (or a comma-separated ISIN subset).
     Each ETF receives a 1-10 quality score based on seven equally weighted
     return, risk, diversification, and cost components.
     """
     etf_ids = None
 
-    if tickers:
-        ticker_list = [t.strip().upper() for t in tickers.split(",") if t.strip()]
-        if _is_demo(api_key):
-            if any(t != "SWDA" for t in ticker_list):
-                raise HTTPException(
-                    status_code=403,
-                    detail="Demo key only allows access to the SWDA ETF.",
-                )
-        resolved = [resolve_etf(db, t) for t in ticker_list]
+    if isins:
+        isin_list = [t.strip().upper() for t in isins.split(",") if t.strip()]
+        resolved = [resolve_etf(db, t) for t in isin_list]
         etf_ids = [e.id for e in resolved]
-    elif _is_demo(api_key):
-        swda = db.query(ETF).filter(ETF.ticker == "SWDA").first()
-        etf_ids = [swda.id] if swda else []
 
     return compute_goetf_scores(db, rf_annual=rf_rate, etf_ids=etf_ids)
 

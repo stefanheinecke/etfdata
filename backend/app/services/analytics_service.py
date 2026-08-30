@@ -133,7 +133,7 @@ class AnalyticsService:
                     score = overlap_data.get("overlap_percent", 0)
                     similarities.append({
                         "etf_id": str(other_etf.id),
-                        "ticker": other_etf.ticker,
+                        "isin": other_etf.isin,
                         "name": other_etf.name,
                         "provider": other_etf.provider,
                         "similarity_score": round(score, 2)
@@ -156,14 +156,14 @@ class AnalyticsService:
         elif etf_id:
             query = query.filter(ETF.id == etf_id)
         else:
-            query = query.order_by(ETF.ticker)
+            query = query.order_by(ETF.isin)
         etfs = query.all()
         results = []
 
         for etf in etfs:
             row: dict = {
                 "etf_id":       str(etf.id),
-                "ticker":       etf.ticker,
+                "isin":         etf.isin,
                 "name":         etf.name,
                 "volatility":   None,
                 "sharpe_ratio": None,

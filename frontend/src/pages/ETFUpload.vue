@@ -43,16 +43,12 @@
         <h3 style="font-size: 1rem; font-weight: 600; margin-bottom: 1rem">ETF Metadata</h3>
         <div class="form-grid">
           <div class="form-group">
-            <label>Ticker *</label>
-            <input v-model="formData.ticker" class="input" placeholder="e.g., CHDVD" required />
+            <label>ISIN *</label>
+            <input v-model="formData.metadata.isin" class="input" placeholder="e.g., LU0136234068" required />
           </div>
           <div class="form-group">
             <label>Name</label>
             <input v-model="formData.metadata.name" class="input" />
-          </div>
-          <div class="form-group">
-            <label>ISIN</label>
-            <input v-model="formData.metadata.isin" class="input" />
           </div>
           <div class="form-group">
             <label>Provider</label>
@@ -79,8 +75,8 @@
             <thead>
               <tr>
                 <th style="width: 40%">Name</th>
-                <th style="width: 15%">Ticker/ISIN</th>
-                <th style="width: 12%; text-align: right">Weight</th>
+                <th style="width: 20%">ISIN</th>
+                <th style="width: 10%; text-align: right">Weight</th>
                 <th style="width: 18%">Sector</th>
                 <th style="width: 10%">Country</th>
                 <th style="width: 5%"></th>
@@ -127,7 +123,7 @@
         <div style="font-size: 3rem; margin-bottom: 1rem">✓</div>
         <h2 class="card-title">Import Successful!</h2>
         <p style="color: var(--text-muted); margin-bottom: 1.5rem">
-          ETF <strong>{{ successData.ticker }}</strong> has been imported with 
+          ETF <strong>{{ successData.isin }}</strong> ({{ successData.name }}) has been imported with 
           <strong>{{ successData.holdings_count }}</strong> holdings.
         </p>
         <button class="btn btn-primary" @click="resetForm">Import Another ETF</button>
@@ -151,13 +147,11 @@ const importError = ref('')
 const successData = ref(null)
 
 const formData = ref({
-  ticker: '',
   metadata: {
     name: '',
     isin: '',
     provider: '',
     ter: null,
-    benchmark: '',
   },
   holdings: [],
 })
@@ -226,8 +220,8 @@ async function uploadAndExtract() {
 }
 
 async function importETF() {
-  if (!formData.value.ticker) {
-    importError.value = 'Ticker is required'
+  if (!formData.value.metadata.isin) {
+    importError.value = 'ISIN is required'
     return
   }
 
@@ -265,13 +259,11 @@ function resetForm() {
   importError.value = ''
   successData.value = null
   formData.value = {
-    ticker: '',
     metadata: {
       name: '',
       isin: '',
       provider: '',
       ter: null,
-      benchmark: '',
     },
     holdings: [],
   }

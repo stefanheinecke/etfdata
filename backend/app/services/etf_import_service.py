@@ -540,8 +540,8 @@ def import_etf(
     logs.append(f"  name={name}, currency={currency}, ter={ter}%, isin={isin}, "
                 f"domicile={domicile}, provider={provider}, dividend_policy={div_policy}")
 
-    # ---- Upsert ETF row ----
-    etf = db.query(ETF).filter(ETF.ticker == ticker).first()
+    # ---- Upsert ETF row (use ISIN as primary key) ----
+    etf = db.query(ETF).filter(ETF.isin == isin).first()
     if etf:
         etf.name = name[:255]
         if ter is not None:
@@ -562,10 +562,10 @@ def import_etf(
         etf.listings = {**(etf.listings or {}), "eodhd_symbol": eodhd_symbol}
         db.commit()
         db.refresh(etf)
-        logs.append(f"Updated existing ETF: {etf.name} ({etf.ticker}), id={etf.id}")
+        logs.append(f"Updated existing ETF: {etf.name} (ISIN: {etf.isin}), id={etf.id}")
     else:
         etf = ETF(
-            isin=isin, ticker=ticker,
+            isin=isin,
             name=name[:255], provider=provider,
             domicile=domicile,
             ter=Decimal(str(ter)) if ter is not None else None,
@@ -577,7 +577,7 @@ def import_etf(
         db.add(etf)
         db.commit()
         db.refresh(etf)
-        logs.append(f"Created new ETF: {etf.name} ({etf.ticker}), id={etf.id}")
+        logs.append(f"Created new ETF: {etf.name} (ISIN: {etf.isin}), id={etf.id}")
 
     # ---- Performance ----
     logs.append("Uploading performance data...")
@@ -638,7 +638,7 @@ def import_etf(
 
     return {
         "etf_id": str(etf.id),
-        "ticker": etf.ticker,
+        "isin": etf.isin,
         "name":   etf.name,
         **summary,
     }
