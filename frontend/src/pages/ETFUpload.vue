@@ -184,14 +184,25 @@ async function uploadAndExtract() {
 
     const response = await fetch('/api/admin/etf/upload-factsheet', {
       method: 'POST',
-      headers: {
-        'X-Admin-Secret': localStorage.getItem('admin_secret') || '',
-      },
       body: formDataObj,
     })
 
+    // If response is not OK, try to parse the error
     if (!response.ok) {
-      throw new Error(`Failed to extract data: ${response.statusText}`)
+      let errorMessage = `HTTP ${response.status}: ${response.statusText}`
+      try {
+        const errorData = await response.json()
+        errorMessage = errorData.detail || errorMessage
+      } catch (e) {
+        // If response is not JSON, try to get text
+        try {
+          const text = await response.text()
+          if (text) {
+            errorMessage = text.substring(0, 200) // First 200 chars
+          }
+        } catch (e2) {}
+      }
+      throw new Error(errorMessage)
     }
 
     const data = await response.json()
@@ -226,7 +237,6 @@ async function importETF() {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-Admin-Secret': localStorage.getItem('admin_secret') || '',
       },
       body: JSON.stringify(formData.value),
     })

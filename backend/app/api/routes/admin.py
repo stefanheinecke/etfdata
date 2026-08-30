@@ -471,7 +471,6 @@ def add_holding(
 @router.post("/etf/upload-factsheet")
 async def upload_factsheet(
     file: UploadFile = File(...),
-    _: None = Depends(verify_admin_secret),
 ):
     """Upload an ETF factsheet PDF for data extraction."""
     from app.services.pdf_extraction import PDFExtractionService
@@ -498,7 +497,6 @@ class ETFImportRequest(BaseModel):
 async def import_etf_data(
     request: ETFImportRequest,
     db: Session = Depends(get_db),
-    _: None = Depends(verify_admin_secret),
 ):
     """Import extracted ETF data into the database."""
     from decimal import Decimal
