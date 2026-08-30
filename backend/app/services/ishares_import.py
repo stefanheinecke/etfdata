@@ -144,7 +144,8 @@ def _upsert_etf(meta: dict, db: Session) -> ETF:
         db.add(etf)
         db.flush()
     else:
-        etf.ticker = meta["ticker"]
+        # Don't set ticker - it no longer exists in ETF schema
+        # ISIN is now the primary identifier
         etf.name = meta["name"]
         etf.ter = meta["ter"]
         etf.benchmark = meta["benchmark"]
@@ -203,7 +204,7 @@ def _upsert_performance(etf: ETF, ticker_obj: "yf.Ticker", db: Session,
     # Use a dedicated USD-listed ticker for price history if specified
     if perf_yf_symbol:
         price_ticker = yf.Ticker(perf_yf_symbol)
-        logger.info("%s: fetching price history from %s", etf.ticker, perf_yf_symbol)
+        logger.info("%s: fetching price history from %s", etf.isin, perf_yf_symbol)
     else:
         price_ticker = ticker_obj
 
@@ -225,7 +226,7 @@ def _upsert_performance(etf: ETF, ticker_obj: "yf.Ticker", db: Session,
     if actual_currency in ("GBp", "GBX", "GBx"):
         gbx_factor = 0.01
         actual_currency = "GBP"
-        logger.info("%s: prices are in pence (GBX), converting to GBP", etf.ticker)
+        logger.info("%s: prices are in pence (GBX), converting to GBP", etf.isin)
 
     db.query(Performance).filter_by(etf_id=etf.id).delete()
     count = 0
@@ -364,21 +365,11 @@ _YF_PERF_SYMBOL: dict[str, str] = {
 def _eodhd_symbol_for_etf(etf) -> str | None:
     """
     Return the EODHD-format price symbol for an ETF.
-    Priority:
-      1. etf.listings["eodhd_symbol"]  — stored during import (all EODHD-imported ETFs)
-      2. Catalogue yfinance perf symbol converted to EODHD format (iShares catalogue ETFs)
-      3. None (unknown — will fall back to yfinance)
+    Returns etf.listings["eodhd_symbol"] if stored, otherwise None.
+    (Ticker-based lookup removed since ticker column no longer exists)
     """
     if etf.listings and etf.listings.get("eodhd_symbol"):
         return etf.listings["eodhd_symbol"]
-    yf_sym = _YF_PERF_SYMBOL.get(etf.ticker)
-    if yf_sym:
-        # Convert yfinance format → EODHD format
-        if "." not in yf_sym:
-            return yf_sym + ".US"
-        if yf_sym.endswith(".L"):
-            return yf_sym[:-2] + ".LSE"
-        return yf_sym   # .SW, .AS etc. are unchanged
     return None
 
 
@@ -415,7 +406,7 @@ def refresh_daily_prices(db: Session, progress_cb=None) -> dict:
     token = os.getenv("EODHD_TOKEN")
     from_date = (datetime.utcnow() - timedelta(days=7)).strftime("%Y-%m-%d")
 
-    etfs = db.query(ETF).order_by(ETF.ticker).all()
+    etfs = db.query(ETF).order_by(ETF.isin).all()
     total = len(etfs)
     total_rows = 0
     etf_results = []
@@ -423,7 +414,7 @@ def refresh_daily_prices(db: Session, progress_cb=None) -> dict:
 
     for i, etf in enumerate(etfs):
         if progress_cb:
-            progress_cb(i, total, etf.ticker)
+            progress_cb(i, total, etf.isin)
 
         eodhd_sym = _eodhd_symbol_for_etf(etf)
         source = "eodhd" if (token and eodhd_sym) else "yfinance"
@@ -443,7 +434,7 @@ def refresh_daily_prices(db: Session, progress_cb=None) -> dict:
                 )
             else:
                 # ── yfinance fallback ──────────────────────────────────────
-                yf_sym = _YF_PERF_SYMBOL.get(etf.ticker, etf.ticker)
+                yf_sym = _YF_PERF_SYMBOL.get(etf.isin, etf.isin)
                 ticker_obj = yf.Ticker(yf_sym)
                 hist = ticker_obj.history(period="7d")
                 if hist is None or hist.empty:
@@ -469,13 +460,13 @@ def refresh_daily_prices(db: Session, progress_cb=None) -> dict:
 
             db.commit()
             total_rows += count
-            etf_results.append({"ticker": etf.ticker, "rows_upserted": count, "source": source})
-            logger.info("refresh_daily_prices: %s — %d rows via %s", etf.ticker, count, source)
+            etf_results.append({"isin": etf.isin, "rows_upserted": count, "source": source})
+            logger.info("refresh_daily_prices: %s — %d rows via %s", etf.isin, count, source)
 
         except Exception as exc:
             db.rollback()
-            errors.append(f"{etf.ticker}: {exc}")
-            logger.error("refresh_daily_prices failed for %s: %s", etf.ticker, exc)
+            errors.append(f"{etf.isin}: {exc}")
+            logger.error("refresh_daily_prices failed for %s: %s", etf.isin, exc)
 
     if progress_cb:
         progress_cb(total, total, "")

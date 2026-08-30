@@ -208,13 +208,13 @@ def compute_goetf_scores(
     query = db.query(ETF)
     if etf_ids:
         query = query.filter(ETF.id.in_(etf_ids))
-    etfs = query.order_by(ETF.ticker).all()
+    etfs = query.order_by(ETF.isin).all()
 
     # Step 1: raw metrics per ETF
     rows = []
     for etf in etfs:
         raw = _compute_raw_metrics(db, etf, rf_annual)
-        rows.append({"etf_id": str(etf.id), "ticker": etf.ticker, "name": etf.name, "metrics": raw})
+        rows.append({"etf_id": str(etf.id), "isin": etf.isin, "name": etf.name, "metrics": raw})
 
     # Step 2: score each ETF against fixed absolute reference ranges
     results = []
