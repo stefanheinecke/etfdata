@@ -216,6 +216,13 @@ def _fetch_yfinance_prices_by_ticker(ticker: str, from_date: str) -> list[dict]:
             ticker_obj = yf.Ticker(ticker)
             print(f"[yfinance] Downloading history for {ticker}...")
             data = ticker_obj.history(start=start, end=end, interval="1d")
+            # fast_info.currency is populated after history() and needs no extra request
+            try:
+                currency = (ticker_obj.fast_info.currency or "USD").upper()
+            except Exception:
+                currency = "USD"
+        
+        print(f"[yfinance] Currency for {ticker}: {currency}")
         
         if data is None or data.empty:
             print(f"[yfinance] No data returned for {ticker}")
@@ -242,7 +249,7 @@ def _fetch_yfinance_prices_by_ticker(ticker: str, from_date: str) -> list[dict]:
                 prices.append({
                     "date": date_str,
                     "close_price": round(close, 4),
-                    "currency": "USD",
+                    "currency": currency,
                 })
             except Exception as row_err:
                 print(f"[yfinance] Error processing row {date}: {row_err}")
