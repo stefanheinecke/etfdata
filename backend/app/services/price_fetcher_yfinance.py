@@ -115,10 +115,12 @@ def fetch_prices_yfinance(
         db.commit()
         
         print(f"[yfinance] ✓ Success! Upserted {count} prices")
+        detected_currency = prices[0]["currency"] if prices else None
         return {
             "success": True,
             "ticker": ticker_used,
             "price_count": count,
+            "currency": detected_currency,
             "message": f"Fetched {count} prices from Yahoo Finance for {ticker_used}",
             "error": None,
         }

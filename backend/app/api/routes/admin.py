@@ -796,6 +796,11 @@ async def import_etf_data(
                     price_count = result["price_count"]
                     price_source = f"yfinance ({result['ticker']})"
                     price_error = None
+                    # Correct the ETF currency from the actual trading currency
+                    if result.get("currency") and result["currency"] != etf.currency:
+                        print(f"Updating ETF currency: {etf.currency} -> {result['currency']}")
+                        etf.currency = result["currency"]
+                        db.commit()
                 else:
                     if not price_error:
                         price_error = result["message"]
