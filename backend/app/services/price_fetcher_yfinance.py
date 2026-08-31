@@ -40,26 +40,38 @@ def fetch_prices_yfinance(
         }
     """
     try:
+        print(f"\n[yfinance] Starting price fetch for ISIN {isin}, name: {etf_name}")
+        
         # Step 1: Try to find ticker by ISIN (try direct ISIN first)
         ticker = None
+        prices = []
         
         # Try direct ISIN first (this often works for yfinance)
+        print(f"[yfinance] Step 1: Trying direct ISIN {isin}...")
         try:
             prices = _fetch_yfinance_prices(isin, from_date)
             if prices and len(prices) > 0:
                 ticker = isin
-        except:
-            pass
+                print(f"[yfinance] ✓ Direct ISIN worked! Got {len(prices)} prices")
+        except Exception as e:
+            print(f"[yfinance] ✗ Direct ISIN failed: {e}")
         
         # Step 2: If direct ISIN didn't work, try exchange suffixes
         if not ticker:
+            print(f"[yfinance] Step 2: Trying ISIN with exchange suffixes...")
             ticker = _lookup_ticker_by_isin(isin)
+            if ticker:
+                print(f"[yfinance] ✓ Found ticker with suffixes: {ticker}")
         
         # Step 3: Fallback to name search if ISIN lookup fails
         if not ticker and etf_name:
+            print(f"[yfinance] Step 3: Trying name lookup for '{etf_name}'...")
             ticker = _lookup_ticker_by_name(etf_name)
+            if ticker:
+                print(f"[yfinance] ✓ Found ticker by name: {ticker}")
         
         if not ticker:
+            print(f"[yfinance] ✗ Failed to find ticker for ISIN {isin}")
             return {
                 "success": False,
                 "ticker": None,
@@ -68,13 +80,15 @@ def fetch_prices_yfinance(
                 "error": "ticker_not_found",
             }
         
-        # Step 3: Fetch prices from Yahoo Finance (if not already fetched above)
-        if ticker == isin:
-            prices = _fetch_yfinance_prices(isin, from_date)
+        # Step 4: Fetch prices from Yahoo Finance (if not already fetched above)
+        print(f"[yfinance] Step 4: Fetching prices for ticker {ticker}...")
+        if ticker == isin and prices and len(prices) > 0:
+            print(f"[yfinance] Using cached prices from direct ISIN fetch")
         else:
             prices = _fetch_yfinance_prices(ticker, from_date)
         
         if not prices or len(prices) == 0:
+            print(f"[yfinance] ✗ No price data found for {ticker}")
             return {
                 "success": False,
                 "ticker": ticker,
@@ -83,10 +97,12 @@ def fetch_prices_yfinance(
                 "error": "no_price_data",
             }
         
-        # Step 4: Upsert prices into database
+        # Step 5: Upsert prices into database
+        print(f"[yfinance] Step 5: Upserting {len(prices)} prices into database...")
         count = _upsert_prices(etf_id, prices, db)
         db.commit()
         
+        print(f"[yfinance] ✓ Success! Upserted {count} prices")
         return {
             "success": True,
             "ticker": ticker,
@@ -96,6 +112,9 @@ def fetch_prices_yfinance(
         }
     
     except Exception as e:
+        print(f"[yfinance] ✗ Exception in fetch_prices_yfinance: {e}")
+        import traceback
+        traceback.print_exc()
         return {
             "success": False,
             "ticker": None,
@@ -198,30 +217,50 @@ def _fetch_yfinance_prices(ticker: str, from_date: str) -> list[dict]:
         data = yf.download(ticker, start=start, end=end, interval="1d", progress=False)
         
         if data is None or data.empty:
+            print(f"[yfinance] No data returned for {ticker}")
             return []
         
-        # Ensure we have a proper DataFrame (yfinance may return Series for single ticker)
-        if not isinstance(data.index, type(data.index)):
-            # Single column, wrap in DataFrame
-            data = data.to_frame()
+        print(f"[yfinance] Downloaded {len(data)} rows for {ticker}")
+        print(f"[yfinance] DataFrame shape: {data.shape}, columns: {list(data.columns)}")
         
         prices = []
         for date, row in data.iterrows():
-            close = float(row.get("Close") or row.get("Adj Close") or 0)
-            
-            if close <= 0:
+            try:
+                # Try different ways to get the close price
+                close = None
+                if isinstance(row, dict):
+                    close = row.get("Close") or row.get("Adj Close")
+                else:
+                    # pandas Series
+                    if "Close" in row.index:
+                        close = row["Close"]
+                    elif "Adj Close" in row.index:
+                        close = row["Adj Close"]
+                
+                if close is None:
+                    continue
+                
+                close = float(close)
+                if close <= 0:
+                    continue
+                
+                date_str = date.strftime("%Y-%m-%d") if hasattr(date, "strftime") else str(date)[:10]
+                prices.append({
+                    "date": date_str,
+                    "close_price": round(close, 4),
+                    "currency": "USD",
+                })
+            except Exception as row_err:
+                print(f"[yfinance] Error processing row {date}: {row_err}")
                 continue
-            
-            prices.append({
-                "date": date.strftime("%Y-%m-%d") if hasattr(date, "strftime") else str(date)[:10],
-                "close_price": round(close, 4),
-                "currency": "USD",  # Yahoo Finance returns USD for most ETFs
-            })
         
+        print(f"[yfinance] Processed {len(prices)} valid prices for {ticker}")
         return prices
     
     except Exception as e:
-        print(f"Error fetching prices from Yahoo Finance: {e}")
+        print(f"[yfinance] Error fetching prices from Yahoo Finance for {ticker}: {e}")
+        import traceback
+        traceback.print_exc()
         return []
 
 
