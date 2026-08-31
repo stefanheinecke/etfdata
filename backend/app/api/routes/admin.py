@@ -184,6 +184,151 @@ def backfill_eodhd_symbols(
     return {"updated": updated, "skipped": skipped}
 
 
+@router.post("/preview-import")
+def preview_import_endpoint(
+    symbol: str,
+    isin: Optional[str] = None,
+    name: Optional[str] = None,
+    ter: Optional[float] = None,
+    csv_file: Optional[UploadFile] = File(None),
+    db: Session = Depends(get_db),
+    _: None = Depends(verify_admin_secret),
+):
+    """
+    Preview an ETF import without committing to database.
+    Fetches metadata, prices (1-2 years), and calculates performance metrics.
+    
+    Returns: {
+        metadata: {name, isin, ter, currency, provider, domicile, fund_size},
+        metrics: {total_return, ytd_return, volatility, sharpe_ratio, max_drawdown, ...},
+        prices: [{date, close_price}, ...],  # Last 1-2 years, sampled for charting
+        holdings_preview: {count, ...},
+        message: "Ready to import"
+    }
+    """
+    from app.services.etf_import_service import (
+        _eodhd_token, _fetch_eodhd_meta, _fetch_eodhd_isin, 
+        _fetch_eodhd_currency, _upload_performance, upsert_eodhd_prices
+    )
+    from app.services.performance_calculator import calculate_metrics, get_price_points_for_chart
+    from app.schemas import Performance
+    
+    logs: list = []
+    symbol = symbol.strip().upper()
+    ticker = symbol.split(".")[0]
+    
+    try:
+        # ---- Metadata ----
+        logs.append(f"Preview: fetching metadata for {symbol}...")
+        token = _eodhd_token()
+        eodhd_meta = {}
+        if token:
+            eodhd_meta = _fetch_eodhd_meta(symbol, token, logs)
+            if not eodhd_meta or not eodhd_meta.get("name"):
+                # Try fallback exchanges
+                fallback_exchanges = ["LSE", "XETRA", "MI", "PA", "AS"]
+                for fb_exch in fallback_exchanges:
+                    fb_sym = f"{ticker}.{fb_exch}"
+                    eodhd_meta = _fetch_eodhd_meta(fb_sym, token, logs)
+                    if eodhd_meta and eodhd_meta.get("name"):
+                        break
+        
+        # Apply overrides
+        isin_final = (isin or eodhd_meta.get("isin") or "").strip().upper() or None
+        name_final = name or eodhd_meta.get("name") or ticker
+        ter_final = ter if ter is not None else eodhd_meta.get("ter")
+        currency_final = eodhd_meta.get("currency") or "USD"
+        
+        metadata = {
+            "name": name_final,
+            "isin": isin_final,
+            "ter": ter_final,
+            "currency": currency_final,
+            "provider": eodhd_meta.get("provider"),
+            "domicile": eodhd_meta.get("domicile"),
+            "fund_size": eodhd_meta.get("fund_size"),
+            "benchmark": eodhd_meta.get("benchmark"),
+            "dividend_policy": eodhd_meta.get("dividend_policy"),
+        }
+        
+        # ---- Fetch Last 2 Years of Prices ----
+        logs.append(f"Fetching price history...")
+        price_data = []
+        if token:
+            try:
+                import requests
+                from datetime import date, timedelta
+                
+                to_date = date.today()
+                from_date = to_date - timedelta(days=730)  # ~2 years
+                
+                resp = requests.get(
+                    f"https://eodhd.com/api/eod/{symbol}",
+                    params={
+                        "api_token": token,
+                        "fmt": "json",
+                        "from": from_date.isoformat(),
+                        "to": to_date.isoformat(),
+                        "period": "d"
+                    },
+                    timeout=60,
+                )
+                
+                if resp.status_code == 200:
+                    rows = resp.json()
+                    for row in rows:
+                        close = float(row.get("adjusted_close") or row.get("close") or 0)
+                        if close > 0:
+                            price_data.append({
+                                "date": row["date"],
+                                "close_price": round(close, 4),
+                            })
+                    logs.append(f"Fetched {len(price_data)} price records")
+                else:
+                    logs.append(f"Price fetch failed: HTTP {resp.status_code}")
+            except Exception as e:
+                logs.append(f"Price fetch error: {e}")
+        
+        # ---- Calculate Metrics ----
+        metrics = {}
+        if price_data:
+            metrics = calculate_metrics(price_data)
+            logs.append(f"Calculated metrics from {metrics['price_count']} prices")
+        else:
+            logs.append("No price data available for metrics")
+        
+        # ---- Holdings Preview ----
+        holdings_preview = {
+            "count": len(eodhd_meta.get("holdings", [])),
+            "sample": [
+                {
+                    "name": h["name"],
+                    "weight": h["weight"],
+                    "sector": h.get("sector", "—"),
+                }
+                for h in eodhd_meta.get("holdings", [])[:5]
+            ] if eodhd_meta.get("holdings") else []
+        }
+        
+        # ---- Chart Data (sampled for frontend) ----
+        chart_data = get_price_points_for_chart(price_data, max_points=250)
+        
+        return {
+            "status": "ok",
+            "metadata": metadata,
+            "metrics": metrics,
+            "prices": chart_data,
+            "holdings_preview": holdings_preview,
+            "logs": logs,
+            "ready_to_import": isin_final is not None and len(price_data) > 10,
+            "message": "Preview complete. Ready to import." if len(price_data) > 10 else "Warning: Limited price data"
+        }
+    
+    except Exception as exc:
+        logs.append(f"Preview failed: {exc}")
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
 @router.post("/import-etf")
 def import_etf_endpoint(
     symbol: str,

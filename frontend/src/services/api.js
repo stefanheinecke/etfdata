@@ -144,5 +144,18 @@ export const adminService = {
   addHolding(adminSecret, etfId, holdingData) {
     return api.post(`/admin/etfs/${etfId}/holdings`, holdingData, { headers: { 'x-admin-secret': adminSecret } })
   },
+  previewImport(adminSecret, symbol, csvFile = null, name = null, ter = null, isin = null) {
+    const params = { symbol }
+    if (isin) params.isin = isin
+    if (name) params.name = name
+    if (ter != null) params.ter = ter
+    const config = { params, headers: { 'x-admin-secret': adminSecret } }
+    if (csvFile) {
+      const form = new FormData()
+      form.append('csv_file', csvFile)
+      return api.post('/admin/preview-import', form, config)
+    }
+    return api.post('/admin/preview-import', null, config)
+  },
 }
 

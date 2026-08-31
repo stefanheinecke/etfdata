@@ -149,14 +149,132 @@
       </div>
       <label class="label">Holdings CSV <span style="font-weight:400;color:var(--text-muted)">(optional, EODHD holdings used if not provided)</span></label>
       <input type="file" accept=".csv" class="input" style="margin-bottom:.75rem" @change="e => importCsvFile = e.target.files[0]" />
-      <button class="btn btn-primary" @click="importETF" :disabled="!adminVerified || !importSymbol || importLoading" style="width:100%">
-        {{ importLoading ? 'Importing…' : 'Import ETF' }}
+      <button class="btn btn-primary" @click="importETF" :disabled="!adminVerified || !importSymbol || previewLoading" style="width:100%">
+        {{ previewLoading ? 'Checking…' : 'Preview Import' }}
       </button>
-      <div v-if="importError" class="error-box" style="margin-top:.75rem">{{ importError }}</div>
+      <div v-if="previewError" class="error-box" style="margin-top:.75rem">{{ previewError }}</div>
       <div v-if="importResult" class="success-msg" style="margin-top:.75rem">
         ✓ {{ importResult.name }} ({{ importResult.isin }}) imported: {{ importResult.holdings }} holdings, {{ importResult.allocations }} allocations.
       </div>
       <div v-if="importLogs.length" style="margin-top:.75rem;background:#f8f9fa;border-radius:6px;padding:.75rem;font-family:monospace;font-size:.8rem;white-space:pre-wrap;max-height:200px;overflow-y:auto;">{{ importLogs.join('\n') }}</div>
+    </div>
+
+    <!-- Import Preview Modal -->
+    <div v-if="showPreview && previewData" class="card" style="margin-bottom:1.5rem;border:2px solid var(--green-600);background:var(--bg-2)">
+      <h2 class="card-title" style="color:var(--green-600)">📊 Import Preview</h2>
+      
+      <!-- Metadata -->
+      <div style="margin-bottom:1.5rem">
+        <h3 style="font-size:.95rem;font-weight:600;margin-bottom:.75rem">ETF Metadata</h3>
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:.75rem;font-size:.875rem">
+          <div><strong>Name:</strong> {{ previewData.metadata.name }}</div>
+          <div><strong>ISIN:</strong> {{ previewData.metadata.isin || '—' }}</div>
+          <div><strong>TER:</strong> {{ previewData.metadata.ter ? previewData.metadata.ter.toFixed(2) + '%' : '—' }}</div>
+          <div><strong>Currency:</strong> {{ previewData.metadata.currency }}</div>
+          <div><strong>Provider:</strong> {{ previewData.metadata.provider || '—' }}</div>
+          <div><strong>Domicile:</strong> {{ previewData.metadata.domicile || '—' }}</div>
+        </div>
+      </div>
+
+      <!-- Performance Metrics Table -->
+      <div v-if="previewData.metrics && Object.keys(previewData.metrics).length > 0" style="margin-bottom:1.5rem">
+        <h3 style="font-size:.95rem;font-weight:600;margin-bottom:.75rem">Performance Metrics</h3>
+        <div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:.75rem;font-size:.85rem">
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.75rem">
+            <div v-if="previewData.metrics.total_return !== null" style="padding:.5rem;background:var(--bg-3);border-radius:4px">
+              <div style="color:var(--text-muted);font-size:.75rem">Total Return</div>
+              <div style="font-weight:600;font-size:1rem" :style="{color: previewData.metrics.total_return >= 0 ? '#0b6aa5' : '#dc2626'}">
+                {{ previewData.metrics.total_return.toFixed(2) }}%
+              </div>
+            </div>
+            <div v-if="previewData.metrics.ytd_return !== null" style="padding:.5rem;background:var(--bg-3);border-radius:4px">
+              <div style="color:var(--text-muted);font-size:.75rem">YTD Return</div>
+              <div style="font-weight:600;font-size:1rem" :style="{color: previewData.metrics.ytd_return >= 0 ? '#0b6aa5' : '#dc2626'}">
+                {{ previewData.metrics.ytd_return.toFixed(2) }}%
+              </div>
+            </div>
+            <div v-if="previewData.metrics.return_1y !== null" style="padding:.5rem;background:var(--bg-3);border-radius:4px">
+              <div style="color:var(--text-muted);font-size:.75rem">1-Year Return</div>
+              <div style="font-weight:600;font-size:1rem" :style="{color: previewData.metrics.return_1y >= 0 ? '#0b6aa5' : '#dc2626'}">
+                {{ previewData.metrics.return_1y.toFixed(2) }}%
+              </div>
+            </div>
+            <div v-if="previewData.metrics.return_3y !== null" style="padding:.5rem;background:var(--bg-3);border-radius:4px">
+              <div style="color:var(--text-muted);font-size:.75rem">3-Year Return (Ann.)</div>
+              <div style="font-weight:600;font-size:1rem" :style="{color: previewData.metrics.return_3y >= 0 ? '#0b6aa5' : '#dc2626'}">
+                {{ previewData.metrics.return_3y.toFixed(2) }}%
+              </div>
+            </div>
+            <div style="padding:.5rem;background:var(--bg-3);border-radius:4px">
+              <div style="color:var(--text-muted);font-size:.75rem">Volatility (Ann.)</div>
+              <div style="font-weight:600;font-size:1rem">{{ previewData.metrics.volatility_annual?.toFixed(2) || '—' }}%</div>
+            </div>
+            <div style="padding:.5rem;background:var(--bg-3);border-radius:4px">
+              <div style="color:var(--text-muted);font-size:.75rem">Sharpe Ratio</div>
+              <div style="font-weight:600;font-size:1rem">{{ previewData.metrics.sharpe_ratio?.toFixed(2) || '—' }}</div>
+            </div>
+            <div style="padding:.5rem;background:var(--bg-3);border-radius:4px">
+              <div style="color:var(--text-muted);font-size:.75rem">Max Drawdown</div>
+              <div style="font-weight:600;font-size:1rem;color:#dc2626">{{ previewData.metrics.max_drawdown?.toFixed(2) || '—' }}%</div>
+            </div>
+            <div style="padding:.5rem;background:var(--bg-3);border-radius:4px">
+              <div style="color:var(--text-muted);font-size:.75rem">Price Points</div>
+              <div style="font-weight:600;font-size:1rem">{{ previewData.metrics.price_count }}</div>
+            </div>
+          </div>
+          <div style="font-size:.75rem;color:var(--text-muted);margin-top:.5rem">{{ previewData.metrics.date_range }}</div>
+        </div>
+      </div>
+
+      <!-- Simple Price Chart -->
+      <div v-if="previewData.prices && previewData.prices.length > 0" style="margin-bottom:1.5rem">
+        <h3 style="font-size:.95rem;font-weight:600;margin-bottom:.75rem">Price History ({{ previewData.prices.length }} points)</h3>
+        <div style="height:200px;background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:.75rem;position:relative;overflow:hidden">
+          <svg style="width:100%;height:100%" viewBox="0 0 500 150" preserveAspectRatio="none">
+            <!-- Grid lines -->
+            <line x1="0" y1="0" x2="500" y2="0" stroke="var(--border)" stroke-width="1" />
+            <line x1="0" y1="50" x2="500" y2="50" stroke="var(--border)" stroke-width="0.5" stroke-dasharray="2,2" />
+            <line x1="0" y1="100" x2="500" y2="100" stroke="var(--border)" stroke-width="0.5" stroke-dasharray="2,2" />
+            <line x1="0" y1="150" x2="500" y2="150" stroke="var(--border)" stroke-width="1" />
+            
+            <!-- Price polyline -->
+            <polyline 
+              :points="generateChartPoints(previewData.prices)"
+              fill="none"
+              stroke="#0b6aa5"
+              stroke-width="2"
+              vector-effect="non-scaling-stroke"
+            />
+          </svg>
+          <div style="position:absolute;top:0;right:0;bottom:0;left:0;display:flex;align-items:flex-end;padding:.75rem;font-size:.75rem;color:var(--text-muted);pointer-events:none">
+            <span>{{ previewData.prices[0].close_price }}</span>
+            <div style="flex:1"></div>
+            <span>{{ previewData.prices[previewData.prices.length-1].close_price }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Holdings Preview -->
+      <div v-if="previewData.holdings_preview.count > 0" style="margin-bottom:1.5rem">
+        <h3 style="font-size:.95rem;font-weight:600;margin-bottom:.75rem">Holdings ({{ previewData.holdings_preview.count }} total)</h3>
+        <div style="font-size:.85rem">
+          <div v-for="h in previewData.holdings_preview.sample" :key="h.name" style="display:flex;justify-content:space-between;padding:.4rem;border-bottom:1px solid var(--border)">
+            <span>{{ h.name }}</span>
+            <span style="color:var(--text-muted)">{{ h.weight.toFixed(2) }}% · {{ h.sector }}</span>
+          </div>
+          <div v-if="previewData.holdings_preview.count > previewData.holdings_preview.sample.length" style="padding:.4rem;color:var(--text-muted);font-size:.8rem">
+            +{{ previewData.holdings_preview.count - previewData.holdings_preview.sample.length }} more holdings...
+          </div>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div style="display:flex;gap:.75rem;align-items:center">
+        <button class="btn btn-primary" :disabled="approveLoading" @click="approveAndImport" style="flex:1">
+          {{ approveLoading ? 'Importing…' : '✓ Approve & Import' }}
+        </button>
+        <button class="btn btn-outline" @click="showPreview = false">Cancel</button>
+      </div>
     </div>
 
     <!-- Quick Delete ETF by ISIN -->
@@ -609,6 +727,13 @@ const importError = ref('')
 const importResult = ref(null)
 const importLogs = ref([])
 
+// Preview import state
+const previewLoading = ref(false)
+const previewError = ref('')
+const previewData = ref(null)
+const showPreview = ref(false)
+const approveLoading = ref(false)
+
 const healthLoading = ref(false)
 const healthResult = ref(null)
 
@@ -657,8 +782,27 @@ async function createKey() {
   finally { createLoading.value = false }
 }
 
-async function importETF() {
-  importLoading.value = true; importError.value = ''; importResult.value = null; importLogs.value = []
+async function previewETF() {
+  previewLoading.value = true; previewError.value = ''; previewData.value = null
+  try {
+    const r = await adminService.previewImport(
+      adminSecret.value,
+      importSymbol.value.trim().toUpperCase(),
+      importCsvFile.value || null,
+      importName.value.trim() || null,
+      importTer.value != null && importTer.value !== '' ? importTer.value : null,
+      importIsin.value.trim().toUpperCase() || null,
+    )
+    previewData.value = r.data
+    showPreview.value = true
+  } catch(e) {
+    previewError.value = e.response?.data?.detail || e.message
+  }
+  finally { previewLoading.value = false }
+}
+
+async function approveAndImport() {
+  approveLoading.value = true
   try {
     const r = await adminService.importETF(
       adminSecret.value,
@@ -670,11 +814,37 @@ async function importETF() {
     )
     importResult.value = r.data
     importLogs.value = r.data.logs || []
+    showPreview.value = false
+    previewData.value = null
+    // Clear form
+    importSymbol.value = ''
+    importName.value = ''
+    importTer.value = null
+    importIsin.value = ''
+    importCsvFile.value = null
+  } catch(e) {
+    previewError.value = e.response?.data?.detail || e.message
+  }
+  finally { approveLoading.value = false }
+}
+
+async function importETF() {
+  previewLoading.value = true; previewError.value = ''; previewData.value = null
+  try {
+    const r = await adminService.previewImport(
+      adminSecret.value,
+      importSymbol.value.trim().toUpperCase(),
+      importCsvFile.value || null,
+      importName.value.trim() || null,
+      importTer.value != null && importTer.value !== '' ? importTer.value : null,
+      importIsin.value.trim().toUpperCase() || null,
+    )
+    previewData.value = r.data
+    showPreview.value = true
   } catch(e) {
     importError.value = e.response?.data?.detail || e.message
-    importLogs.value = e.response?.data?.logs || []
   }
-  finally { importLoading.value = false }
+  finally { previewLoading.value = false }
 }
 
 async function initDb() {
@@ -1054,6 +1224,26 @@ async function loadLogs(offset = 0) {
   } finally {
     logsLoading.value = false
   }
+}
+
+// ─── Chart Helper ─────────────────────────────────────────
+function generateChartPoints(prices) {
+  if (!prices || prices.length < 2) return ''
+  
+  // Find min and max prices
+  const closePrices = prices.map(p => parseFloat(p.close_price))
+  const minPrice = Math.min(...closePrices)
+  const maxPrice = Math.max(...closePrices)
+  const range = maxPrice - minPrice || 1
+  
+  // Generate SVG path points (normalized to 0-150 y-axis range)
+  const points = prices.map((p, i) => {
+    const x = (i / (prices.length - 1)) * 500
+    const y = 150 - ((parseFloat(p.close_price) - minPrice) / range) * 150
+    return `${x},${y}`
+  })
+  
+  return points.join(' ')
 }
 </script>
 
