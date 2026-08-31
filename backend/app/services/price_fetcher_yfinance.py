@@ -47,30 +47,19 @@ def fetch_prices_yfinance(
     try:
         print(f"\n[yfinance] Starting price fetch for ISIN {isin}, name: {etf_name}")
         
-        # Step 1: Try to find ticker by ISIN (try direct ISIN first)
+        # Step 1: Try to find ticker by ISIN with exchange suffixes
+        # NOTE: Skip direct ISIN download - yfinance has a bug with ISIN lookups
         ticker = None
         prices = []
         
-        # Try direct ISIN first (this often works for yfinance)
-        print(f"[yfinance] Step 1: Trying direct ISIN {isin}...")
-        try:
-            prices = _fetch_yfinance_prices(isin, from_date)
-            if prices and len(prices) > 0:
-                ticker = isin
-                print(f"[yfinance] ✓ Direct ISIN worked! Got {len(prices)} prices")
-        except Exception as e:
-            print(f"[yfinance] ✗ Direct ISIN failed: {e}")
+        print(f"[yfinance] Step 1: Trying ISIN with exchange suffixes...")
+        ticker = _lookup_ticker_by_isin(isin)
+        if ticker:
+            print(f"[yfinance] ✓ Found ticker with suffixes: {ticker}")
         
-        # Step 2: If direct ISIN didn't work, try exchange suffixes
-        if not ticker:
-            print(f"[yfinance] Step 2: Trying ISIN with exchange suffixes...")
-            ticker = _lookup_ticker_by_isin(isin)
-            if ticker:
-                print(f"[yfinance] ✓ Found ticker with suffixes: {ticker}")
-        
-        # Step 3: Fallback to name search if ISIN lookup fails
+        # Step 2: Fallback to name search if ISIN lookup fails
         if not ticker and etf_name:
-            print(f"[yfinance] Step 3: Trying name lookup for '{etf_name}'...")
+            print(f"[yfinance] Step 2: Trying name lookup for '{etf_name}'...")
             ticker = _lookup_ticker_by_name(etf_name)
             if ticker:
                 print(f"[yfinance] ✓ Found ticker by name: {ticker}")
@@ -85,12 +74,9 @@ def fetch_prices_yfinance(
                 "error": "ticker_not_found",
             }
         
-        # Step 4: Fetch prices from Yahoo Finance (if not already fetched above)
-        print(f"[yfinance] Step 4: Fetching prices for ticker {ticker}...")
-        if ticker == isin and prices and len(prices) > 0:
-            print(f"[yfinance] Using cached prices from direct ISIN fetch")
-        else:
-            prices = _fetch_yfinance_prices(ticker, from_date)
+        # Step 3: Fetch prices from Yahoo Finance
+        print(f"[yfinance] Step 3: Fetching prices for ticker {ticker}...")
+        prices = _fetch_yfinance_prices(ticker, from_date)
         
         if not prices or len(prices) == 0:
             print(f"[yfinance] ✗ No price data found for {ticker}")
@@ -102,8 +88,8 @@ def fetch_prices_yfinance(
                 "error": "no_price_data",
             }
         
-        # Step 5: Upsert prices into database
-        print(f"[yfinance] Step 5: Upserting {len(prices)} prices into database...")
+        # Step 4: Upsert prices into database
+        print(f"[yfinance] Step 4: Upserting {len(prices)} prices into database...")
         count = _upsert_prices(etf_id, prices, db)
         db.commit()
         
@@ -133,22 +119,16 @@ def _lookup_ticker_by_isin(isin: str) -> str | None:
     """
     Look up a Yahoo Finance ticker by ISIN code.
     
-    Uses yfinance's Ticker lookup which accepts ISIN codes for many ETFs.
+    Uses thread lock to ensure safe access to yfinance API.
     Tries multiple exchange suffixes to find the ticker.
     """
     if not isin or len(isin) < 12:
         return None
     
     try:
-        # Try direct ISIN lookup first
-        ticker_obj = yf.Ticker(isin)
-        
-        # Check if we got valid data (has info)
-        if ticker_obj.info and ticker_obj.info.get("shortName"):
-            return isin
-        
         # Try common exchange suffixes for the ISIN
         # Order: prefer liquid markets (LSE, Xetra, US, Amsterdam, Swiss, Milan, Paris, Madrid, Lisbon, etc.)
+        # NOTE: Skip bare ISIN (yfinance has internal ISIN lookup bug)
         exchange_suffixes = [
             ".L",    # London Stock Exchange
             ".DE",   # Xetra (Germany)
@@ -174,10 +154,13 @@ def _lookup_ticker_by_isin(isin: str) -> str | None:
         for suffix in exchange_suffixes:
             test_ticker = isin + suffix
             try:
-                test_obj = yf.Ticker(test_ticker)
-                if test_obj.info and test_obj.info.get("shortName"):
-                    return test_ticker
-            except:
+                # Use lock to ensure thread-safe yf.Ticker() calls
+                with _yfinance_lock:
+                    test_obj = yf.Ticker(test_ticker)
+                    if test_obj.info and test_obj.info.get("shortName"):
+                        return test_ticker
+            except Exception as e:
+                print(f"[yfinance] Ticker {test_ticker} not found: {type(e).__name__}")
                 continue
         
         return None
@@ -191,16 +174,17 @@ def _lookup_ticker_by_name(name: str) -> str | None:
     Look up a Yahoo Finance ticker by ETF name (fallback method).
     
     This is less reliable; ISIN lookup is preferred.
+    Uses thread lock for safe API access.
     """
     if not name or len(name) < 3:
         return None
     
     try:
-        # Extract key words from name (e.g., "iShares Core FTSE 100" -> try "FTSE100")
-        # For now, try the name as-is
-        ticker_obj = yf.Ticker(name)
-        if ticker_obj.info and ticker_obj.info.get("shortName"):
-            return name
+        # Use lock to ensure thread-safe yf.Ticker() calls
+        with _yfinance_lock:
+            ticker_obj = yf.Ticker(name)
+            if ticker_obj.info and ticker_obj.info.get("shortName"):
+                return name
         
         return None
     
