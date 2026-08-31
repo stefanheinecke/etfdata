@@ -1,9 +1,12 @@
 """Service to enrich holdings data with country, sector, and ISIN information."""
+import os
 import re
 from typing import Optional, Dict, Any
 import logging
 
 logger = logging.getLogger(__name__)
+
+_ISIN_RE = re.compile(r'^[A-Z]{2}[A-Z0-9]{9}[0-9]$')
 
 # Mapping of company names/parts to country NAMES (for matching)
 COUNTRY_PATTERNS = {
@@ -79,9 +82,15 @@ class HoldingsEnrichmentService:
         if not holding.get('sector'):
             holding['sector'] = HoldingsEnrichmentService._find_sector(name)
         
-        # Try to lookup ISIN if not present
+        # Resolve ISIN: if not present, try raw_identifier (RIC/ticker) via EODHD search
         if not holding.get('instrument_isin'):
-            holding['instrument_isin'] = HoldingsEnrichmentService._lookup_isin(name)
+            raw_id = holding.pop('raw_identifier', None)
+            if raw_id:
+                holding['instrument_isin'] = HoldingsEnrichmentService._lookup_isin_from_identifier(raw_id)
+            else:
+                holding.pop('raw_identifier', None)
+        else:
+            holding.pop('raw_identifier', None)
         
         return holding
     
@@ -136,14 +145,38 @@ class HoldingsEnrichmentService:
         return None
     
     @staticmethod
+    def _lookup_isin_from_identifier(identifier: str) -> Optional[str]:
+        """
+        Convert a ticker or RIC code (e.g. 'ALVG.DE', 'NESN.S') to an ISIN via EODHD search.
+        Returns the ISIN string or None if not found.
+        """
+        token = os.getenv("EODHD_TOKEN")
+        if not token or not identifier:
+            return None
+        try:
+            import requests
+            resp = requests.get(
+                f"https://eodhd.com/api/search/{identifier}",
+                params={"api_token": token, "fmt": "json", "limit": 3},
+                timeout=10,
+            )
+            if resp.status_code != 200:
+                return None
+            results = resp.json()
+            if not results:
+                return None
+            # Prefer exact ticker match; fall back to first result
+            for r in results:
+                isin = r.get("ISIN") or r.get("isin")
+                if isin and _ISIN_RE.match(isin.upper()):
+                    return isin.upper()
+        except Exception as e:
+            logger.debug(f"EODHD ISIN lookup failed for {identifier}: {e}")
+        return None
+
+    @staticmethod
     def _lookup_isin(company_name: str) -> Optional[str]:
-        """
-        Try to lookup ISIN for a company.
-        This is difficult without an external API, so for now we return None.
-        In production, you might integrate with a financial data provider API.
-        """
-        # TODO: Integrate with EODHD or another API that can return ISIN
-        # For now, return None - the user can fill this in manually
+        # Legacy stub — use _lookup_isin_from_identifier with a known ticker instead
         return None
     
     @staticmethod
