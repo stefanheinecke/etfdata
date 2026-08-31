@@ -223,7 +223,7 @@ def compute_goetf_scores(
             results.append(
                 {
                     "etf_id": row["etf_id"],
-                    "ticker": row["ticker"],
+                    "isin": row["isin"],
                     "name": row["name"],
                     "goetf_score": None,
                     "insufficient_data": True,
@@ -244,7 +244,7 @@ def compute_goetf_scores(
             results.append(
                 {
                     "etf_id": row["etf_id"],
-                    "ticker": row["ticker"],
+                    "isin": row["isin"],
                     "name": row["name"],
                     "goetf_score": None,
                     "insufficient_data": True,
@@ -256,7 +256,7 @@ def compute_goetf_scores(
         results.append(
             {
                 "etf_id": row["etf_id"],
-                "ticker": row["ticker"],
+                "isin": row["isin"],
                 "name": row["name"],
                 "goetf_score": goetf_score,
                 **row["metrics"],
