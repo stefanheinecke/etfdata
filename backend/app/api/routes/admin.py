@@ -511,7 +511,7 @@ async def import_etf_data(
 ):
     """Import extracted ETF data into the database."""
     from decimal import Decimal
-    from app.schemas import ETF, Holding
+    from app.schemas import ETF, Holding, Allocation
     from datetime import date as date_type
     
     isin = (request.metadata.get('isin') or '').strip().upper()
@@ -553,6 +553,34 @@ async def import_etf_data(
                 country=(holding_data.get('country') or '').strip().upper()[:2] or None,
             )
             db.add(holding)
+        
+        db.flush()  # Flush holdings before creating allocations
+        
+        # Create allocations from holdings (for donut charts)
+        holdings = db.query(Holding).filter(Holding.etf_id == etf.id, Holding.date == holding_date).all()
+        total_weight = sum(float(h.weight) for h in holdings if h.weight)
+        
+        # Country allocations
+        country_totals = {}
+        for holding in holdings:
+            if holding.country and holding.weight:
+                country_totals[holding.country] = country_totals.get(holding.country, 0.0) + float(holding.weight)
+        
+        for country, weight in country_totals.items():
+            if weight > 0:
+                pct = round(weight / total_weight * 100, 4) if total_weight > 0 else 0
+                db.add(Allocation(etf_id=etf.id, date=holding_date, type="country", bucket=country, weight=pct))
+        
+        # Sector allocations
+        sector_totals = {}
+        for holding in holdings:
+            if holding.sector and holding.weight:
+                sector_totals[holding.sector] = sector_totals.get(holding.sector, 0.0) + float(holding.weight)
+        
+        for sector, weight in sector_totals.items():
+            if weight > 0:
+                pct = round(weight / total_weight * 100, 4) if total_weight > 0 else 0
+                db.add(Allocation(etf_id=etf.id, date=holding_date, type="sector", bucket=sector, weight=pct))
         
         db.commit()
         db.refresh(etf)
