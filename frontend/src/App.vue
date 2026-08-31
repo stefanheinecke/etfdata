@@ -288,6 +288,16 @@ onMounted(async () => {
       currentUserEmail.value = res.data.email || ''
     } catch { /* key may be invalid — silently ignore */ }
   }
+  // Re-verify stored admin secret on every load; clear it if it's no longer valid
+  const storedSecret = sessionStorage.getItem('admin_secret')
+  if (storedSecret) {
+    try {
+      await adminService.verify(storedSecret)
+    } catch {
+      sessionStorage.removeItem('admin_secret')
+      setAdminActive(false)
+    }
+  }
 })
 
 onUnmounted(() => {
