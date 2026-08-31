@@ -9,6 +9,7 @@
           <li><a href="#" @click.prevent="goToPage('analytics', 'exposure')">Portfolio</a></li>
           <li><a href="#" :class="{ active: currentPage === 'docs' }" @click.prevent="goToPage('docs')">API</a></li>
           <li><a href="#" :class="{ active: currentPage === 'methodology' }" @click.prevent="goToPage('methodology')">Methodology</a></li>
+          <li><a href="#" :class="{ active: currentPage === 'admin' }" @click.prevent="goToPage('admin')" style="color:#dc2626;font-weight:600">Admin</a></li>
         </ul>
         <a v-if="!hasApiKey" href="#" class="btn btn-outline nav-cta" @click.prevent="openApiKeyModal('request')">Get API Key</a>
         <span v-else class="api-online-pill"><span class="status-dot"></span>API Online</span>
@@ -26,6 +27,7 @@
         <a href="#" @click.prevent="goToPage('analytics', 'exposure')">Portfolio</a>
         <a href="#" @click.prevent="goToPage('docs')">API</a>
         <a href="#" @click.prevent="goToPage('methodology')">Methodology</a>
+        <a href="#" @click.prevent="goToPage('admin'); mobileMenuOpen = false" style="color:#dc2626;font-weight:600">Admin</a>
         <a v-if="!hasApiKey" href="#" class="btn btn-primary" @click.prevent="openApiKeyModal('request'); mobileMenuOpen = false">Get API Key</a>
       </div>
     </div>

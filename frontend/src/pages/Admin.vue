@@ -159,6 +159,22 @@
       <div v-if="importLogs.length" style="margin-top:.75rem;background:#f8f9fa;border-radius:6px;padding:.75rem;font-family:monospace;font-size:.8rem;white-space:pre-wrap;max-height:200px;overflow-y:auto;">{{ importLogs.join('\n') }}</div>
     </div>
 
+    <!-- Quick Delete ETF by ISIN -->
+    <div class="card" style="margin-bottom:1.5rem;background:#fff5f5">
+      <h2 class="card-title" style="color:#dc2626">Quick Delete ETF by ISIN</h2>
+      <p style="font-size:.875rem;color:var(--text-muted);margin-bottom:1rem">
+        Delete a single ETF by ISIN without loading the full list.
+      </p>
+      <div style="display:flex;gap:.75rem;margin-bottom:1rem">
+        <input v-model="quickDeleteIsin" type="text" placeholder="e.g., LU0136234068" class="input" style="flex:1;max-width:200px;font-family:monospace">
+        <button class="btn btn-danger" :disabled="!quickDeleteIsin.trim() || quickDeleteLoading" @click="quickDeleteETF">
+          {{ quickDeleteLoading ? 'Deleting...' : 'Delete' }}
+        </button>
+      </div>
+      <span v-if="quickDeleteResult" class="success-msg">{{ quickDeleteResult }}</span>
+      <span v-if="quickDeleteError" class="error-box">{{ quickDeleteError }}</span>
+    </div>
+
     <!-- ETF Management -->
     <div class="card" style="margin-bottom:1.5rem">
       <h2 class="card-title">ETF Management</h2>
@@ -754,6 +770,12 @@ const deleteEtfLoading = ref(false)
 const deleteEtfResult = ref('')
 const deleteEtfError = ref('')
 
+// Quick delete by ISIN
+const quickDeleteIsin = ref('')
+const quickDeleteLoading = ref(false)
+const quickDeleteResult = ref('')
+const quickDeleteError = ref('')
+
 const allEtfsSelected = computed(
   () => etfList.value.length > 0 && selectedEtfIds.value.length === etfList.value.length
 )
@@ -788,6 +810,24 @@ async function deleteSelectedEtfs() {
     deleteEtfError.value = e.response?.status === 403 ? 'Invalid admin secret.' : (e.response?.data?.detail || e.message)
   } finally {
     deleteEtfLoading.value = false
+  }
+}
+
+async function quickDeleteETF() {
+  const isin = quickDeleteIsin.value.trim().toUpperCase()
+  if (!isin) return
+  if (!confirm(`Delete ETF ${isin} and all its holdings and allocations?\n\nThis cannot be undone.`)) return
+  
+  quickDeleteLoading.value = true; quickDeleteResult.value = ''; quickDeleteError.value = ''
+  try {
+    const r = await adminService.deleteETFByISIN(adminSecret.value, isin)
+    quickDeleteResult.value = `✓ ETF ${isin} deleted successfully.`
+    quickDeleteIsin.value = ''
+    await loadETFs()
+  } catch(e) {
+    quickDeleteError.value = e.response?.status === 403 ? 'Invalid admin secret.' : (e.response?.data?.detail || e.message)
+  } finally {
+    quickDeleteLoading.value = false
   }
 }
 

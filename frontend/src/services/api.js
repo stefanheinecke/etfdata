@@ -120,6 +120,11 @@ export const adminService = {
       headers: { 'x-admin-secret': adminSecret }
     })
   },
+  deleteETFByISIN(adminSecret, isin) {
+    return api.delete(`/admin/etfs/by-isin/${isin}`, {
+      headers: { 'x-admin-secret': adminSecret }
+    })
+  },
   requestLogs(adminSecret, { limit = 100, offset = 0, api_key_name = '', email = '', path = '' } = {}) {
     const params = { limit, offset }
     if (api_key_name) params.api_key_name = api_key_name
