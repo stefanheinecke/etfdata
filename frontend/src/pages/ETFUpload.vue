@@ -62,7 +62,14 @@
             <label>Benchmark</label>
             <input v-model="formData.metadata.benchmark" class="input" />
           </div>
+          <div class="form-group">
+            <label>EODHD Symbol <span style="font-weight: 400; color: var(--text-muted)">(optional, for prices)</span></label>
+            <input v-model="formData.eodhd_symbol" class="input" placeholder="e.g., SWDA.LSE" style="text-transform: uppercase" />
+          </div>
         </div>
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.5rem">
+          💡 Leave EODHD symbol blank to auto-fetch prices from Yahoo Finance using the ISIN.
+        </p>
       </div>
 
       <!-- Holdings Section -->
@@ -126,6 +133,13 @@
           ETF <strong>{{ successData.isin }}</strong> ({{ successData.name }}) has been imported with 
           <strong>{{ successData.holdings_count }}</strong> holdings.
         </p>
+        <div v-if="successData.price_count > 0" style="background: var(--bg-2); border-radius: var(--radius); padding: 1rem; margin-bottom: 1.5rem; font-size: 0.9rem">
+          <div style="color: var(--green-600); font-weight: 600; margin-bottom: 0.25rem">📈 Prices Fetched</div>
+          <div style="color: var(--text-muted)">{{ successData.price_count }} price points from {{ successData.price_source || 'source unknown' }}</div>
+        </div>
+        <div v-else-if="successData.price_error" style="background: #fef2f2; border-radius: var(--radius); padding: 1rem; margin-bottom: 1.5rem; font-size: 0.9rem; color: #dc2626">
+          ⚠️ {{ successData.price_error }}
+        </div>
         <button class="btn btn-primary" @click="resetForm">Import Another ETF</button>
       </div>
     </div>
@@ -154,6 +168,7 @@ const formData = ref({
     ter: null,
   },
   holdings: [],
+  eodhd_symbol: null,
 })
 
 function handleFileSelect(event) {
@@ -266,6 +281,7 @@ function resetForm() {
       ter: null,
     },
     holdings: [],
+    eodhd_symbol: null,
   }
 }
 </script>
