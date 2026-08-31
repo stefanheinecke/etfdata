@@ -244,22 +244,6 @@ class AnalyticsService:
         """Get the top N weighted holdings across a portfolio from the latest available date."""
         holdings_dict = {}
 
-        # Find the latest date in holdings table across all portfolio ETFs
-        if not holdings_date:
-            etf_ids = [item.get("etf_id") for item in portfolio if item.get("weight", 0) > 0]
-            if etf_ids:
-                latest_date = db.query(func.max(Holding.date)).filter(
-                    Holding.etf_id.in_(etf_ids)
-                ).scalar()
-                holdings_date = latest_date
-
-        if not holdings_date:
-            return {"top_holdings": []}
-
-        # Check if this is a single ETF portfolio
-        active_etfs = [item for item in portfolio if item.get("weight", 0) > 0]
-        is_single_etf = len(active_etfs) == 1
-
         for item in portfolio:
             etf_id = item.get("etf_id")
             weight = item.get("weight", 0)
@@ -267,35 +251,32 @@ class AnalyticsService:
             if weight <= 0:
                 continue
 
-            # Get holdings for this ETF on the specified date
-            query = db.query(Holding).filter(
+            # Use each ETF's own latest date when no global date is pinned
+            etf_date = holdings_date
+            if not etf_date:
+                etf_date = db.query(func.max(Holding.date)).filter(
+                    Holding.etf_id == etf_id
+                ).scalar()
+
+            if not etf_date:
+                continue
+
+            holdings = db.query(Holding).filter(
                 Holding.etf_id == etf_id,
-                Holding.date == holdings_date
-            )
-            holdings = query.all()
+                Holding.date == etf_date
+            ).all()
 
             for holding in holdings:
-                # Use name as primary key since ISIN may not be available
                 name = holding.instrument_name
                 isin = holding.instrument_isin
-                
-                if is_single_etf:
-                    # For single ETF, use raw weight from database
-                    portfolio_weight = float(holding.weight) if holding.weight else 0
-                else:
-                    # For multiple ETFs, normalize to 100% and apply portfolio weight
-                    total_holding_weight = sum(float(h.weight) for h in holdings if h.weight)
-                    
-                    if total_holding_weight <= 0:
-                        continue
-                    
-                    normalized_weight = float(holding.weight) / total_holding_weight * 100 if holding.weight else 0
-                    portfolio_weight = normalized_weight * weight / 100
-                
+
+                # holding.weight is already % of the ETF; apply the ETF's portfolio weight
+                portfolio_weight = float(holding.weight) * weight / 100 if holding.weight else 0
+
                 if name not in holdings_dict:
                     holdings_dict[name] = {
                         "name": name,
-                        "isin": isin,  # May be None
+                        "isin": isin,
                         "sector": holding.sector,
                         "country": holding.country,
                         "weight": portfolio_weight

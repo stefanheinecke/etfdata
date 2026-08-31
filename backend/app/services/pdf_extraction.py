@@ -123,11 +123,12 @@ class PDFExtractionService:
     @staticmethod
     def _find_ter(text: str) -> Optional[float]:
         """Find Total Expense Ratio."""
-        # Look for patterns like "TER: 0.25%" or "TER (flat fee) 0.25%"
-        match = re.search(r'TER\s*(?:\(flat\s+fee\))?\s*([0-9.]+)\s*%', text, re.IGNORECASE)
+        # Match TER followed by any text (including German parentheticals) then a number%
+        # Handles: "TER: 0.25%", "TER (flat fee) 0.25%", "TER (Pauschale 0.09%" (German)
+        match = re.search(r'TER[^%]{0,80}?([0-9]+[.,][0-9]+)\s*%', text, re.IGNORECASE)
         if match:
             try:
-                return float(match.group(1))
+                return float(match.group(1).replace(',', '.'))
             except ValueError:
                 pass
         
@@ -243,13 +244,19 @@ class PDFExtractionService:
         in_holdings_section = False
         
         for line in lines:
-            # Check if we're entering a holdings section
-            if 'largest equity positions' in line.lower():
+            # Check if we're entering a holdings section (English or German)
+            line_lower = line.lower()
+            if ('largest equity positions' in line_lower
+                    or 'gr\u00f6sste' in line_lower
+                    or 'aktienpositionen' in line_lower
+                    or 'top holdings' in line_lower
+                    or 'top 10' in line_lower):
                 in_holdings_section = True
                 continue
             
-            # Check if we're leaving the section
-            if in_holdings_section and any(keyword in line.lower() for keyword in ['benefits', 'risks', 'disclaimer']):
+            # Check if we're leaving the section (English or German)
+            if in_holdings_section and any(keyword in line_lower for keyword in [
+                    'benefits', 'risks', 'disclaimer', 'vorteile', 'risiken', 'disclaimer']):
                 in_holdings_section = False
                 continue
             
