@@ -109,19 +109,6 @@ class HoldingsEnrichmentService:
                     # Return ISO2 code, not country name
                     return COUNTRY_TO_ISO2.get(country_name, country_name[:2].upper())
         
-        # Try yfinance lookup as fallback
-        try:
-            import yfinance as yf
-            ticker = HoldingsEnrichmentService._extract_ticker(company_name)
-            if ticker:
-                info = yf.Ticker(ticker).info
-                if info and 'country' in info:
-                    country_from_yf = info.get('country')
-                    # Convert country name to ISO2 if needed
-                    return COUNTRY_TO_ISO2.get(country_from_yf, country_from_yf[:2].upper() if country_from_yf else None)
-        except Exception as e:
-            logger.debug(f"yfinance country lookup failed for {company_name}: {e}")
-        
         return None
     
     @staticmethod
@@ -133,17 +120,6 @@ class HoldingsEnrichmentService:
             for pattern in patterns:
                 if pattern.upper() in company_upper:
                     return sector
-        
-        # Try yfinance lookup as fallback
-        try:
-            import yfinance as yf
-            ticker = HoldingsEnrichmentService._extract_ticker(company_name)
-            if ticker:
-                info = yf.Ticker(ticker).info
-                if info and 'sector' in info:
-                    return info.get('sector')
-        except Exception as e:
-            logger.debug(f"yfinance sector lookup failed for {company_name}: {e}")
         
         return None
     
