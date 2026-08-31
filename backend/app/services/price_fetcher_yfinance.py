@@ -1,11 +1,11 @@
 """
-price_fetcher_yfinance.py — Fetch historical prices from Yahoo Finance using ISIN or ETF name.
+price_fetcher_yfinance.py — Fetch historical prices from Yahoo Finance using ISIN lookup.
 
-Provides a fallback when EODHD symbol is not available. Handles ISIN lookup and price fetching.
+Uses yf.Ticker(isin).history() for thread-safe ISIN lookups.
 """
 
 import yfinance as yf
-from datetime import datetime, timedelta
+from datetime import datetime
 from decimal import Decimal
 from uuid import uuid4
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -26,7 +26,10 @@ def fetch_prices_yfinance(
     from_date: str = "2000-01-01",
 ) -> dict:
     """
-    Fetch historical prices from Yahoo Finance for an ETF by ISIN or name.
+    Fetch historical prices from Yahoo Finance for an ETF by ISIN.
+    
+    yfinance supports ISIN lookup directly via yf.Ticker(isin).history().
+    This avoids the internal ISIN lookup bug in yf.download().
     
     Args:
         etf_id: UUID of the ETF in database
@@ -38,7 +41,7 @@ def fetch_prices_yfinance(
     Returns:
         {
             "success": bool,
-            "ticker": str or None,  # The Yahoo Finance ticker found
+            "ticker": str or None,  # The ISIN or name used
             "price_count": int,     # Number of prices upserted
             "message": str,         # Status message
             "error": str or None,   # Error message if failed
@@ -47,58 +50,52 @@ def fetch_prices_yfinance(
     try:
         print(f"\n[yfinance] Starting price fetch for ISIN {isin}, name: {etf_name}")
         
-        # Step 1: Try to find ticker by ISIN with exchange suffixes
-        # NOTE: Skip direct ISIN download - yfinance has a bug with ISIN lookups
-        ticker = None
         prices = []
+        ticker_used = None
         
-        print(f"[yfinance] Step 1: Trying ISIN with exchange suffixes...")
-        ticker = _lookup_ticker_by_isin(isin)
-        if ticker:
-            print(f"[yfinance] ✓ Found ticker with suffixes: {ticker}")
+        # Step 1: Try ISIN lookup via yf.Ticker(isin).history()
+        # This avoids the buggy internal ISIN lookup in yf.download()
+        print(f"[yfinance] Step 1: Trying ISIN {isin}...")
+        try:
+            prices = _fetch_yfinance_prices_by_ticker(isin, from_date)
+            if prices and len(prices) > 0:
+                ticker_used = isin
+                print(f"[yfinance] ✓ ISIN lookup worked! Got {len(prices)} prices")
+        except Exception as e:
+            print(f"[yfinance] ✗ ISIN lookup failed: {type(e).__name__}: {e}")
         
         # Step 2: Fallback to name search if ISIN lookup fails
-        if not ticker and etf_name:
+        if not ticker_used and etf_name:
             print(f"[yfinance] Step 2: Trying name lookup for '{etf_name}'...")
-            ticker = _lookup_ticker_by_name(etf_name)
-            if ticker:
-                print(f"[yfinance] ✓ Found ticker by name: {ticker}")
+            try:
+                prices = _fetch_yfinance_prices_by_ticker(etf_name, from_date)
+                if prices and len(prices) > 0:
+                    ticker_used = etf_name
+                    print(f"[yfinance] ✓ Name lookup worked! Got {len(prices)} prices")
+            except Exception as e:
+                print(f"[yfinance] ✗ Name lookup failed: {type(e).__name__}: {e}")
         
-        if not ticker:
-            print(f"[yfinance] ✗ Failed to find ticker for ISIN {isin}")
+        if not ticker_used or len(prices) == 0:
+            print(f"[yfinance] ✗ Failed to find prices for ISIN {isin}")
             return {
                 "success": False,
                 "ticker": None,
                 "price_count": 0,
-                "message": f"Could not find Yahoo Finance ticker for ISIN {isin}",
-                "error": "ticker_not_found",
-            }
-        
-        # Step 3: Fetch prices from Yahoo Finance
-        print(f"[yfinance] Step 3: Fetching prices for ticker {ticker}...")
-        prices = _fetch_yfinance_prices(ticker, from_date)
-        
-        if not prices or len(prices) == 0:
-            print(f"[yfinance] ✗ No price data found for {ticker}")
-            return {
-                "success": False,
-                "ticker": ticker,
-                "price_count": 0,
-                "message": f"No price data found for {ticker}",
+                "message": f"Could not find prices for ISIN {isin}",
                 "error": "no_price_data",
             }
         
-        # Step 4: Upsert prices into database
-        print(f"[yfinance] Step 4: Upserting {len(prices)} prices into database...")
+        # Step 3: Upsert prices into database
+        print(f"[yfinance] Step 3: Upserting {len(prices)} prices into database...")
         count = _upsert_prices(etf_id, prices, db)
         db.commit()
         
         print(f"[yfinance] ✓ Success! Upserted {count} prices")
         return {
             "success": True,
-            "ticker": ticker,
+            "ticker": ticker_used,
             "price_count": count,
-            "message": f"Fetched {count} prices from Yahoo Finance for {ticker}",
+            "message": f"Fetched {count} prices from Yahoo Finance for {ticker_used}",
             "error": None,
         }
     
@@ -115,86 +112,24 @@ def fetch_prices_yfinance(
         }
 
 
-def _lookup_ticker_by_isin(isin: str) -> str | None:
-    """
-    Look up a Yahoo Finance ticker by ISIN code.
-    
-    Uses thread lock to ensure safe access to yfinance API.
-    Tries multiple exchange suffixes to find the ticker.
-    """
-    if not isin or len(isin) < 12:
-        return None
-    
-    try:
-        # Try common exchange suffixes for the ISIN
-        # Order: prefer liquid markets (LSE, Xetra, US, Amsterdam, Swiss, Milan, Paris, Madrid, Lisbon, etc.)
-        # NOTE: Skip bare ISIN (yfinance has internal ISIN lookup bug)
-        exchange_suffixes = [
-            ".L",    # London Stock Exchange
-            ".DE",   # Xetra (Germany)
-            ".US",   # NYSE/NASDAQ
-            ".AS",   # Euronext Amsterdam
-            ".SW",   # SIX Swiss Exchange
-            ".MI",   # Borsa Italiana
-            ".PA",   # Euronext Paris
-            ".MA",   # Euronext Madrid
-            ".LI",   # Euronext Lisbon
-            ".BR",   # Euronext Brussels
-            ".AX",   # ASX (Australia)
-            ".NZ",   # NZX (New Zealand)
-            ".TO",   # TSX (Toronto)
-            ".V",    # TSX Venture (Canada)
-            ".OL",   # Oslo Stock Exchange
-            ".ST",   # Nasdaq Stockholm
-            ".HE",   # Nasdaq Helsinki
-            ".CO",   # Nasdaq Copenhagen
-            ".VX",   # SIX (alternate)
-        ]
-        
-        for suffix in exchange_suffixes:
-            test_ticker = isin + suffix
-            try:
-                # Use lock to ensure thread-safe yf.Ticker() calls
-                with _yfinance_lock:
-                    test_obj = yf.Ticker(test_ticker)
-                    if test_obj.info and test_obj.info.get("shortName"):
-                        return test_ticker
-            except Exception as e:
-                print(f"[yfinance] Ticker {test_ticker} not found: {type(e).__name__}")
-                continue
-        
-        return None
-    
-    except Exception:
-        return None
+# All ISIN lookups now use yf.Ticker(isin).history() which works directly
 
 
-def _lookup_ticker_by_name(name: str) -> str | None:
-    """
-    Look up a Yahoo Finance ticker by ETF name (fallback method).
-    
-    This is less reliable; ISIN lookup is preferred.
-    Uses thread lock for safe API access.
-    """
-    if not name or len(name) < 3:
-        return None
-    
-    try:
-        # Use lock to ensure thread-safe yf.Ticker() calls
-        with _yfinance_lock:
-            ticker_obj = yf.Ticker(name)
-            if ticker_obj.info and ticker_obj.info.get("shortName"):
-                return name
-        
-        return None
-    
-    except Exception:
-        return None
 
 
-def _fetch_yfinance_prices(ticker: str, from_date: str) -> list[dict]:
+
+
+
+
+
+
+
+def _fetch_yfinance_prices_by_ticker(ticker: str, from_date: str) -> list[dict]:
     """
-    Fetch daily historical prices from Yahoo Finance.
+    Fetch daily historical prices from Yahoo Finance using yf.Ticker().history().
+    
+    This approach works with ISINs and ticker symbols.
+    Avoids the buggy yf.download(isin) path that triggers internal ISIN lookup.
     
     Returns list of dicts with keys: date, close_price, currency
     Thread-safe: uses lock to prevent yfinance threading issues.
@@ -203,48 +138,36 @@ def _fetch_yfinance_prices(ticker: str, from_date: str) -> list[dict]:
         start = datetime.strptime(from_date, "%Y-%m-%d")
         end = datetime.now()
         
-        # Use lock to ensure thread-safe access to yfinance
-        # Set auto_adjust=False to skip problematic internal ISIN lookups
+        print(f"[yfinance] Creating Ticker object for {ticker}...")
+        
+        # Use lock to ensure thread-safe yf.Ticker() call
         with _yfinance_lock:
-            print(f"[yfinance] Downloading data for {ticker}...")
-            data = yf.download(
-                ticker, 
-                start=start, 
-                end=end, 
-                interval="1d", 
-                progress=False,
-                auto_adjust=False  # Avoids yfinance's problematic cookie/session operations
-            )
+            ticker_obj = yf.Ticker(ticker)
+            print(f"[yfinance] Downloading history for {ticker}...")
+            data = ticker_obj.history(start=start, end=end, interval="1d")
         
         if data is None or data.empty:
             print(f"[yfinance] No data returned for {ticker}")
             return []
         
         print(f"[yfinance] Downloaded {len(data)} rows for {ticker}")
-        print(f"[yfinance] DataFrame shape: {data.shape}, columns: {list(data.columns)}")
         
         prices = []
         for date, row in data.iterrows():
             try:
-                # Try different ways to get the close price
+                # Get close price (Adj Close preferred, fallback to Close)
                 close = None
-                if isinstance(row, dict):
-                    close = row.get("Close") or row.get("Adj Close")
+                if "Adj Close" in data.columns:
+                    close = row.get("Adj Close") or row.get("Close")
                 else:
-                    # pandas Series
-                    if "Close" in row.index:
-                        close = row["Close"]
-                    elif "Adj Close" in row.index:
-                        close = row["Adj Close"]
+                    close = row.get("Close")
                 
-                if close is None:
+                if close is None or close == 0 or close <= 0:
                     continue
                 
                 close = float(close)
-                if close <= 0:
-                    continue
-                
                 date_str = date.strftime("%Y-%m-%d") if hasattr(date, "strftime") else str(date)[:10]
+                
                 prices.append({
                     "date": date_str,
                     "close_price": round(close, 4),
@@ -258,7 +181,7 @@ def _fetch_yfinance_prices(ticker: str, from_date: str) -> list[dict]:
         return prices
     
     except Exception as e:
-        print(f"[yfinance] Error fetching prices from Yahoo Finance for {ticker}: {e}")
+        print(f"[yfinance] Error fetching prices for {ticker}: {type(e).__name__}: {e}")
         import traceback
         traceback.print_exc()
         return []
@@ -267,26 +190,36 @@ def _fetch_yfinance_prices(ticker: str, from_date: str) -> list[dict]:
 def _upsert_prices(etf_id, prices: list[dict], db) -> int:
     """
     Upsert prices into the Performance table.
+    
+    Returns the count of upserted rows.
     """
     from datetime import date as date_type
     
-    count = 0
-    for price_data in prices:
-        try:
+    if not prices:
+        return 0
+    
+    try:
+        upserted = 0
+        for price in prices:
             stmt = pg_insert(Performance).values(
-                id=uuid4(),
                 etf_id=etf_id,
-                date=date_type.fromisoformat(price_data["date"]),
-                close_price=price_data["close_price"],
-                currency=price_data["currency"],
+                date=price["date"],
+                close_price=Decimal(str(price["close_price"])),
+                currency=price.get("currency", "USD"),
             ).on_conflict_do_update(
                 index_elements=["etf_id", "date"],
-                set_={"close_price": price_data["close_price"], "currency": price_data["currency"]},
+                set_={
+                    "close_price": Decimal(str(price["close_price"])),
+                    "currency": price.get("currency", "USD"),
+                }
             )
             db.execute(stmt)
-            count += 1
-        except Exception as e:
-            print(f"Error upserting price: {e}")
-            continue
+            upserted += 1
+        
+        return upserted
     
-    return count
+    except Exception as e:
+        print(f"[yfinance] Error upserting prices: {e}")
+        import traceback
+        traceback.print_exc()
+        return 0
