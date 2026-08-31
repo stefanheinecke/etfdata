@@ -751,6 +751,30 @@ async def import_etf_data(
                 pct = round(weight / total_weight * 100, 4) if total_weight > 0 else 0
                 db.add(Allocation(etf_id=etf.id, date=holding_date, type="sector", bucket=sector, weight=pct))
         
+        # Currency allocations — derived from holding country codes
+        _COUNTRY_CURRENCY = {
+            'DE': 'EUR', 'FR': 'EUR', 'IT': 'EUR', 'ES': 'EUR', 'NL': 'EUR',
+            'BE': 'EUR', 'FI': 'EUR', 'AT': 'EUR', 'IE': 'EUR', 'PT': 'EUR',
+            'GR': 'EUR', 'SK': 'EUR', 'SI': 'EUR', 'LU': 'EUR', 'EE': 'EUR',
+            'LV': 'EUR', 'LT': 'EUR', 'MT': 'EUR', 'CY': 'EUR',
+            'GB': 'GBP', 'CH': 'CHF', 'US': 'USD', 'CA': 'CAD',
+            'JP': 'JPY', 'AU': 'AUD', 'NZ': 'NZD', 'SE': 'SEK',
+            'DK': 'DKK', 'NO': 'NOK', 'HK': 'HKD', 'CN': 'CNY',
+            'KR': 'KRW', 'TW': 'TWD', 'SG': 'SGD', 'IN': 'INR',
+            'BR': 'BRL', 'MX': 'MXN', 'ZA': 'ZAR', 'PL': 'PLN',
+            'HU': 'HUF', 'CZ': 'CZK', 'IL': 'ILS', 'TH': 'THB',
+        }
+        currency_totals = {}
+        for holding in holdings:
+            if holding.country and holding.weight:
+                currency = _COUNTRY_CURRENCY.get(holding.country.upper(), 'Other')
+                currency_totals[currency] = currency_totals.get(currency, 0.0) + float(holding.weight)
+        
+        for currency, weight in currency_totals.items():
+            if weight > 0:
+                pct = round(weight / total_weight * 100, 4) if total_weight > 0 else 0
+                db.add(Allocation(etf_id=etf.id, date=holding_date, type="currency", bucket=currency, weight=pct))
+        
         db.commit()
         db.refresh(etf)
         
