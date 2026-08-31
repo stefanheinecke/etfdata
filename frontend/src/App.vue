@@ -12,7 +12,7 @@
           <li><a href="#" :class="{ active: currentPage === 'admin' }" @click.prevent="goToPage('admin')" style="color:#dc2626;font-weight:600">Admin</a></li>
         </ul>
         <a v-if="!hasApiKey" href="#" class="btn btn-outline nav-cta" @click.prevent="openApiKeyModal('request')">Get API Key</a>
-        <span v-else class="api-online-pill"><span class="status-dot"></span>API Online</span>
+        <span v-else class="api-online-pill"><span class="status-dot"></span><span v-if="currentUserEmail" class="user-email">{{ currentUserEmail }}</span><span v-else>API Online</span></span>
         <button class="hamburger" @click="mobileMenuOpen = true" aria-label="Open menu">
           <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
         </button>
@@ -122,7 +122,7 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted, provide } from 'vue'
-import { healthService, adminService } from './services/api.js'
+import { healthService, adminService, authService } from './services/api.js'
 
 const adminActive = ref(!!sessionStorage.getItem('admin_secret'))
 function setAdminActive(val) {
@@ -173,6 +173,7 @@ const showApiKeyModal = ref(false)
 const apiKeyModalTab = ref('request')
 const mobileMenuOpen = ref(false)
 const hasApiKey = ref(!!localStorage.getItem('api_key'))
+const currentUserEmail = ref('')
 const homeRenderKey = ref(0)
 
 function openApiKeyModal(tab = 'request') {
@@ -204,6 +205,7 @@ function goToPage(page, tab = null) {
 function onApiKeySaved() {
   hasApiKey.value = true
   homeRenderKey.value += 1
+  authService.me().then(r => { currentUserEmail.value = r.data.email || '' }).catch(() => {})
 }
 
 // Reflect key changes from the modal's "Use this key" button
@@ -270,6 +272,12 @@ onMounted(async () => {
   } catch {
     apiStatus.value = 'offline'
     apiStatusText.value = 'API Offline'
+  }
+  if (hasApiKey.value) {
+    try {
+      const res = await authService.me()
+      currentUserEmail.value = res.data.email || ''
+    } catch { /* key may be invalid — silently ignore */ }
   }
 })
 
@@ -339,6 +347,12 @@ onUnmounted(() => {
   color: #0a3a66;
   background: rgba(0, 201, 167, .14);
   border: 1px solid rgba(0, 201, 167, .3);
+}
+.user-email {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .status-dot {
   width: 7px;

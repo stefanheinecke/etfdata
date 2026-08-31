@@ -15,7 +15,7 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
-from app.core.auth import create_api_key, generate_api_key, hash_api_key
+from app.core.auth import create_api_key, generate_api_key, hash_api_key, verify_api_key
 from app.core.email import send_confirmation_email, send_api_key_email
 from app.schemas import APIKey, PendingKeyRequest
 
@@ -172,3 +172,12 @@ def confirm_key(token: str, db: Session = Depends(get_db)):
         ), status_code=500)
 
     return HTMLResponse(_success_page(email))
+
+
+@router.get("/me")
+def get_current_user(
+    db: Session = Depends(get_db),
+    api_key: APIKey = Depends(verify_api_key),
+):
+    """Return the name and email associated with the current API key."""
+    return {"name": api_key.name, "email": api_key.email}
