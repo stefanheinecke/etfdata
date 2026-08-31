@@ -50,6 +50,8 @@ class PDFExtractionService:
             "ter": PDFExtractionService._find_ter(text),
             "domicile": PDFExtractionService._find_domicile(text),
             "fund_size": PDFExtractionService._find_fund_size(text),
+            "replication_method": PDFExtractionService._find_replication_method(text),
+            "dividend_policy": PDFExtractionService._find_dividend_policy(text),
         }
         
         return {k: v for k, v in metadata.items() if v is not None}
@@ -169,23 +171,74 @@ class PDFExtractionService:
 
     @staticmethod
     def _find_fund_size(text: str) -> Optional[int]:
-        """Find fund asset size."""
-        # Look for "Total fund assets" pattern
-        match = re.search(r'(?:Total\s+)?fund\s+assets?[\s:]*([0-9.]+)\s*([a-z]*)', text, re.IGNORECASE)
+        """Find fund asset size (handles EN 'Total fund assets' and DE 'Gesamtfondsvermögen')."""
+        match = re.search(
+            r'(?:Total\s+fund\s+assets?|Gesamtfondsverm\u00f6gen)[^\n]*?'
+            r'(\d{1,3}(?:\s\d{3})*[.,]\d+|\d{1,3}(?:,\d{3})*\.\d+|\d+[.,]\d+|\d+)',
+            text, re.IGNORECASE
+        )
         if match:
             try:
-                value = float(match.group(1))
-                unit = match.group(2).strip().upper()
-                
-                if not unit or 'M' in unit or 'EUR' in unit or 'USD' in unit:
-                    unit = 'M'  # Default to millions
-                
-                multiplier = {'B': 1e9, 'M': 1e6, 'K': 1e3, 'T': 1e12}
-                mult = multiplier.get(unit[0] if unit else 'M', 1e6)
-                return int(value * mult)
-            except (ValueError, KeyError, IndexError):
+                raw = match.group(1).strip()
+                raw = re.sub(r'(?<=\d)\s(?=\d{3}\b)', '', raw)   # "7 473.77" → "7473.77"
+                raw = re.sub(r',(?=\d{3}[.,])', '', raw)           # "3,966.80" → "3966.80"
+                raw = raw.replace(',', '.')
+                value = float(raw)
+                # Determine unit from the parenthetical on the same line
+                line = re.search(r'(?:Total\s+fund\s+assets?|Gesamtfondsverm\u00f6gen)([^\n]*)', text, re.IGNORECASE)
+                unit_str = line.group(1) if line else ''
+                if re.search(r'\b(bn|billion)\b', unit_str, re.IGNORECASE):
+                    return int(value * 1_000_000_000)
+                return int(value * 1_000_000)  # default: millions (mn / mio / m)
+            except (ValueError, AttributeError):
                 pass
-        
+        return None
+
+    @staticmethod
+    def _find_replication_method(text: str) -> Optional[str]:
+        """Find replication method (EN 'Replication method/methodology' and DE 'Replikationsmethode')."""
+        match = re.search(
+            r'(?:Replication\s+method(?:ology)?|Replikationsmethode)[:\s]+([^\n]+)',
+            text, re.IGNORECASE
+        )
+        if match:
+            val = match.group(1).strip().lower()
+            if 'physical' in val or 'physisch' in val or 'voll' in val or 'full' in val:
+                return 'Physical (Full replication)'
+            if 'sampling' in val or 'stichprob' in val or 'optimis' in val or 'representative' in val:
+                return 'Physical (Sampling)'
+            if 'synthetic' in val or 'synthetisch' in val or 'swap' in val:
+                return 'Synthetic'
+            return match.group(1).strip()[:80]
+        return None
+
+    @staticmethod
+    def _find_dividend_policy(text: str) -> Optional[str]:
+        """Find dividend policy from explicit field or share class name."""
+        # Explicit field: EN 'Distribution' / DE 'Aussch\u00fcttung'
+        match = re.search(
+            r'(?:Distribution(?:\s+policy)?|Aussch\u00fcttung)[:\s]+([^\n]+)',
+            text, re.IGNORECASE
+        )
+        if match:
+            val = match.group(1).strip().lower()
+            if any(k in val for k in ('accum', 'thesauri', 'reinvest')):
+                return 'Accumulating'
+            if any(k in val for k in ('distrib', 'income', 'aussch')):
+                return 'Distributing'
+        # Fallback: last token of share class name
+        sc_match = re.search(r'(?:Share\s+class|Anteilsklasse)[:\s]+([^\n]+)', text, re.IGNORECASE)
+        if sc_match:
+            last = sc_match.group(1).strip().split()[-1].lower()
+            if last in ('acc', 'accumulating'):
+                return 'Accumulating'
+            if last in ('dis', 'dist', 'distributing', 'inc', 'income'):
+                return 'Distributing'
+        # Last resort: bare keyword in text
+        if re.search(r'\bacc\b', text):
+            return 'Accumulating'
+        if re.search(r'\b(?:dis|dist)\b', text, re.IGNORECASE):
+            return 'Distributing'
         return None
 
     @staticmethod

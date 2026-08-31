@@ -705,6 +705,8 @@ async def import_etf_data(
             fund_size=request.metadata.get('fund_size'),
             benchmark=request.metadata.get('benchmark'),
             currency=request.metadata.get('currency', 'USD'),
+            replication_method=request.metadata.get('replication_method'),
+            dividend_policy=request.metadata.get('dividend_policy'),
         )
         db.add(etf)
         db.flush()  # Get the ETF ID
