@@ -12,6 +12,7 @@ from datetime import datetime
 from decimal import Decimal
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 import threading
+import time
 
 from app.schemas import Performance
 
@@ -88,8 +89,15 @@ def fetch_prices_yfinance(
                     break
                 else:
                     print(f"[yfinance] No data for {candidate}, trying next...")
+                    time.sleep(1)  # Avoid rate limits between candidates
             except Exception as e:
-                print(f"[yfinance] ✗ {candidate} failed: {type(e).__name__}: {e}")
+                err = str(e)
+                print(f"[yfinance] \u2717 {candidate} failed: {type(e).__name__}: {e}")
+                if "rate" in err.lower() or "429" in err or "RateLimit" in type(e).__name__:
+                    print(f"[yfinance] Rate limited — waiting 5s before next candidate...")
+                    time.sleep(5)
+                else:
+                    time.sleep(1)
         
         if not ticker_used or len(prices) == 0:
             print(f"[yfinance] ✗ Failed to find prices for ISIN {isin}")
