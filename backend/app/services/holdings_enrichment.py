@@ -1,12 +1,14 @@
 """Service to enrich holdings data with country, sector, and ISIN information."""
-import os
 import re
+import threading
 from typing import Optional, Dict, Any
 import logging
 
 logger = logging.getLogger(__name__)
 
 _ISIN_RE = re.compile(r'^[A-Z]{2}[A-Z0-9]{9}[0-9]$')
+# Serialise all yfinance .info calls to avoid the cookie/session threading bug
+_yf_lock = threading.Lock()
 
 # Mapping of company names/parts to country NAMES (for matching)
 COUNTRY_PATTERNS = {
@@ -82,13 +84,14 @@ class HoldingsEnrichmentService:
         if not holding.get('sector'):
             holding['sector'] = HoldingsEnrichmentService._find_sector(name)
         
-        # Resolve ISIN: if not present, try raw_identifier (RIC/ticker) via EODHD search
+        # Resolve ISIN: try raw_identifier (RIC/ticker) first
         if not holding.get('instrument_isin'):
             raw_id = holding.pop('raw_identifier', None)
             if raw_id:
-                holding['instrument_isin'] = HoldingsEnrichmentService._lookup_isin_from_identifier(raw_id)
-            else:
-                holding.pop('raw_identifier', None)
+                print(f"[holdings] Looking up ISIN for ticker: {raw_id}")
+                holding['instrument_isin'] = HoldingsEnrichmentService._lookup_isin_from_ticker(raw_id)
+                print(f"[holdings] {raw_id} -> {holding['instrument_isin']}")
+            # Name-only holdings: no reliable free lookup — leave ISIN null
         else:
             holding.pop('raw_identifier', None)
         
@@ -145,34 +148,29 @@ class HoldingsEnrichmentService:
         return None
     
     @staticmethod
-    def _lookup_isin_from_identifier(identifier: str) -> Optional[str]:
+    def _lookup_isin_from_ticker(ticker: str) -> Optional[str]:
         """
-        Convert a ticker or RIC code (e.g. 'ALVG.DE', 'NESN.S') to an ISIN via EODHD search.
-        Returns the ISIN string or None if not found.
+        Fetch ISIN for a ticker/RIC (e.g. 'ALVG.DE') via yfinance .info.
+        Safe because a proper ticker string does NOT trigger yfinance's buggy
+        internal ISIN detection (only ISIN-format strings do).
         """
-        token = os.getenv("EODHD_TOKEN")
-        if not token or not identifier:
+        if not ticker:
             return None
         try:
-            import requests
-            resp = requests.get(
-                f"https://eodhd.com/api/search/{identifier}",
-                params={"api_token": token, "fmt": "json", "limit": 3},
-                timeout=10,
-            )
-            if resp.status_code != 200:
-                return None
-            results = resp.json()
-            if not results:
-                return None
-            # Prefer exact ticker match; fall back to first result
-            for r in results:
-                isin = r.get("ISIN") or r.get("isin")
-                if isin and _ISIN_RE.match(isin.upper()):
-                    return isin.upper()
+            import yfinance as yf
+            with _yf_lock:
+                info = yf.Ticker(ticker).info
+            isin = info.get("isin") or info.get("ISIN")
+            if isin and _ISIN_RE.match(str(isin).upper()):
+                return str(isin).upper()
         except Exception as e:
-            logger.debug(f"EODHD ISIN lookup failed for {identifier}: {e}")
+            logger.debug(f"yfinance ISIN lookup failed for {ticker}: {e}")
         return None
+
+    @staticmethod
+    def _lookup_isin_from_identifier(identifier: str) -> Optional[str]:
+        # Legacy alias
+        return HoldingsEnrichmentService._lookup_isin_from_ticker(identifier)
 
     @staticmethod
     def _lookup_isin(company_name: str) -> Optional[str]:

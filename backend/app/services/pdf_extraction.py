@@ -320,7 +320,9 @@ class PDFExtractionService:
         weight_idx = PDFExtractionService._find_column(header_lower, ['weight', 'weightage', 'proportion', '%', 'percentage', 'percent'])
         country_idx = PDFExtractionService._find_column(header_lower, ['country', 'country of issue', 'domicile'])
         sector_idx = PDFExtractionService._find_column(header_lower, ['sector', 'industry', 'classification'])
-        isin_idx = PDFExtractionService._find_column(header_lower, ['isin', 'cusip', 'id', 'code'])
+        isin_idx = PDFExtractionService._find_column(header_lower, ['isin', 'cusip', 'sedol', 'valoren', 'ticker', 'ric', 'reuters', 'bloomberg', 'id', 'code', 'symbol'])
+        print(f"[pdf] Table headers: {headers}")
+        print(f"[pdf] Column indices: name={name_idx}, weight={weight_idx}, isin/id={isin_idx}, country={country_idx}, sector={sector_idx}")
 
         # If we can't identify columns, try to infer from data
         if name_idx is None or weight_idx is None:
