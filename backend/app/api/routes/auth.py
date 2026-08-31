@@ -180,4 +180,6 @@ def get_current_user(
     api_key: APIKey = Depends(verify_api_key),
 ):
     """Return the name and email associated with the current API key."""
-    return {"name": api_key.name, "email": api_key.email}
+    admin_email = os.getenv("ADMIN_EMAIL", "").strip().lower()
+    is_admin = bool(admin_email and api_key.email and api_key.email.strip().lower() == admin_email)
+    return {"name": api_key.name, "email": api_key.email, "is_admin": is_admin}

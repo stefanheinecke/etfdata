@@ -9,7 +9,7 @@
           <li><a href="#" @click.prevent="goToPage('analytics', 'exposure')">Portfolio</a></li>
           <li><a href="#" :class="{ active: currentPage === 'docs' }" @click.prevent="goToPage('docs')">API</a></li>
           <li><a href="#" :class="{ active: currentPage === 'methodology' }" @click.prevent="goToPage('methodology')">Methodology</a></li>
-          <li v-if="adminActive"><a href="#" :class="{ active: currentPage === 'admin' }" @click.prevent="goToPage('admin')" style="color:#dc2626;font-weight:600">Admin</a></li>
+          <li v-if="adminActive || isAdminApiUser"><a href="#" :class="{ active: currentPage === 'admin' }" @click.prevent="goToPage('admin')" style="color:#dc2626;font-weight:600">Admin</a></li>
         </ul>
         <a v-if="!hasApiKey" href="#" class="btn btn-outline nav-cta" @click.prevent="openApiKeyModal('request')">Get API Key</a>
         <span v-else class="api-online-pill"><span class="status-dot"></span><span v-if="currentUserEmail" class="user-email">{{ currentUserEmail }}</span><span v-else>API Online</span></span>
@@ -27,7 +27,7 @@
         <a href="#" @click.prevent="goToPage('analytics', 'exposure')">Portfolio</a>
         <a href="#" @click.prevent="goToPage('docs')">API</a>
         <a href="#" @click.prevent="goToPage('methodology')">Methodology</a>
-        <a v-if="adminActive" href="#" @click.prevent="goToPage('admin'); mobileMenuOpen = false" style="color:#dc2626;font-weight:600">Admin</a>
+        <a v-if="adminActive || isAdminApiUser" href="#" @click.prevent="goToPage('admin'); mobileMenuOpen = false" style="color:#dc2626;font-weight:600">Admin</a>
         <a v-if="!hasApiKey" href="#" class="btn btn-primary" @click.prevent="openApiKeyModal('request'); mobileMenuOpen = false">Get API Key</a>
       </div>
     </div>
@@ -174,6 +174,7 @@ const apiKeyModalTab = ref('request')
 const mobileMenuOpen = ref(false)
 const hasApiKey = ref(!!localStorage.getItem('api_key'))
 const currentUserEmail = ref('')
+const isAdminApiUser = ref(false)
 const homeRenderKey = ref(0)
 
 function openApiKeyModal(tab = 'request') {
@@ -209,7 +210,10 @@ function goToPage(page, tab = null) {
 function onApiKeySaved() {
   hasApiKey.value = true
   homeRenderKey.value += 1
-  authService.me().then(r => { currentUserEmail.value = r.data.email || '' }).catch(() => {})
+  authService.me().then(r => {
+    currentUserEmail.value = r.data.email || ''
+    isAdminApiUser.value = !!r.data.is_admin
+  }).catch(() => {})
 }
 
 // Reflect key changes from the modal's "Use this key" button
@@ -286,6 +290,7 @@ onMounted(async () => {
     try {
       const res = await authService.me()
       currentUserEmail.value = res.data.email || ''
+      isAdminApiUser.value = !!res.data.is_admin
     } catch { /* key may be invalid — silently ignore */ }
   }
   // Re-verify stored admin secret on every load; clear it if it's no longer valid
