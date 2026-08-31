@@ -40,9 +40,9 @@
       <Analytics v-else-if="currentPage === 'analytics'" />
       <Methodology v-else-if="currentPage === 'methodology'" />
       <ApiDocs v-else-if="currentPage === 'docs'" />
-      <Admin v-else-if="currentPage === 'admin' && adminActive" />
+      <Admin v-else-if="currentPage === 'admin'" />
       <ETFUpload v-else-if="currentPage === 'etf-upload'" />
-      <Home v-else-if="currentPage === 'admin' && !adminActive" @navigate="currentPage = $event" />
+      <Home v-else />
     </main>
 
     <!-- Footer -->
