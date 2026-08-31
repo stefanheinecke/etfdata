@@ -328,9 +328,8 @@ class PDFExtractionService:
             # Weights are always in format XX.XX
             # Use regex to find all "name weight" pairs
             
-            # Pattern: (One or more uppercase letters/spaces followed by) (number.number)
-            # This matches: "ASML HLDG 8.67 ALLIANZ 3.72" -> [("ASML HLDG", "8.67"), ("ALLIANZ", "3.72")]
-            pattern = r'([A-Z][A-Z0-9\s]*?)\s+([0-9]{1,3}\.[0-9]{2})'
+            # Pattern: matches both ALL-CAPS (e.g. ASML HLDG) and Title Case (e.g. Taiwan Semiconductor)
+            pattern = r'([A-Za-z][A-Za-z0-9\s]*?)\s+([0-9]{1,3}\.[0-9]{2})'
             
             matches = re.findall(pattern, line)
             
