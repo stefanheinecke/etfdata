@@ -666,6 +666,7 @@ class ETFImportRequest(BaseModel):
     metadata: dict  # Must include 'isin' as the unique identifier
     holdings: List[dict]
     date: Optional[date_type] = None
+    eodhd_symbol: Optional[str] = None  # Optional: for fetching historical prices
 
 
 @router.post("/etf/import-data")
@@ -673,10 +674,14 @@ async def import_etf_data(
     request: ETFImportRequest,
     db: Session = Depends(get_db),
 ):
-    """Import extracted ETF data into the database."""
+    """Import extracted ETF data into the database.
+    
+    If eodhd_symbol is provided, also fetches historical prices from EODHD.
+    """
     from decimal import Decimal
     from app.schemas import ETF, Holding, Allocation
     from datetime import date as date_type
+    from app.services.etf_import_service import upsert_eodhd_prices, _eodhd_token, _fetch_eodhd_currency
     
     isin = (request.metadata.get('isin') or '').strip().upper()
     
@@ -749,6 +754,59 @@ async def import_etf_data(
         db.commit()
         db.refresh(etf)
         
+        # Fetch prices: try EODHD first (if symbol provided), then fall back to yfinance
+        price_count = 0
+        price_source = None
+        price_error = None
+        
+        if request.eodhd_symbol:
+            # Try EODHD first
+            try:
+                token = _eodhd_token()
+                if not token:
+                    price_error = "EODHD_TOKEN not set, trying yfinance..."
+                else:
+                    # Detect currency for this specific listing
+                    actual_currency = _fetch_eodhd_currency(request.eodhd_symbol, token, []) or etf.currency or "USD"
+                    price_count = upsert_eodhd_prices(
+                        etf_id=etf.id,
+                        eodhd_symbol=request.eodhd_symbol.strip().upper(),
+                        token=token,
+                        db=db,
+                        from_date="2000-01-01",
+                        currency=actual_currency,
+                    )
+                    db.commit()
+                    price_source = "EODHD"
+            except Exception as e:
+                price_error = f"EODHD failed ({str(e)}), trying yfinance..."
+        
+        # Fall back to yfinance if EODHD not used or failed
+        if price_count == 0:
+            try:
+                from app.services.price_fetcher_yfinance import fetch_prices_yfinance
+                result = fetch_prices_yfinance(
+                    etf_id=etf.id,
+                    isin=etf.isin,
+                    etf_name=etf.name,
+                    db=db,
+                    from_date="2000-01-01",
+                )
+                if result["success"]:
+                    price_count = result["price_count"]
+                    price_source = f"yfinance ({result['ticker']})"
+                    price_error = None
+                else:
+                    if not price_error:
+                        price_error = result["message"]
+                    else:
+                        price_error += f"; yfinance: {result['message']}"
+            except Exception as e:
+                if not price_error:
+                    price_error = f"yfinance error: {str(e)}"
+                else:
+                    price_error += f"; yfinance error: {str(e)}"
+        
         return {
             "status": "success",
             "etf": {
@@ -757,6 +815,9 @@ async def import_etf_data(
                 "name": etf.name,
                 "provider": etf.provider,
                 "holdings_count": len(request.holdings),
+                "price_count": price_count,
+                "price_source": price_source,
+                "price_error": price_error,
             }
         }
     except Exception as e:
