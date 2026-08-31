@@ -353,6 +353,25 @@ def delete_etfs(
     return {"deleted": deleted}
 
 
+@router.delete("/etfs/by-isin/{isin}", status_code=200)
+def delete_etf_by_isin(
+    isin: str,
+    db: Session = Depends(get_db),
+    _: None = Depends(verify_admin_secret),
+):
+    """Delete an ETF by ISIN and all its holdings, allocations, and performance data."""
+    from app.schemas import ETF
+    isin_upper = isin.strip().upper()
+    etf = db.query(ETF).filter(ETF.isin == isin_upper).first()
+    if not etf:
+        raise HTTPException(status_code=404, detail=f"ETF with ISIN {isin_upper} not found")
+    
+    # Delete cascades to holdings, allocations, performance via foreign keys
+    db.delete(etf)
+    db.commit()
+    return {"deleted": True, "isin": isin_upper, "message": f"ETF {isin_upper} and all related data removed"}
+
+
 @router.patch("/etfs/{etf_id}")
 def update_etf_metadata(
     etf_id: UUID,
