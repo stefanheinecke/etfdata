@@ -20,6 +20,7 @@ class ETF(Base):
     benchmark = Column(String(255))
     currency = Column(String(3), nullable=True)
     dividend_policy = Column(String(20))  # "Accumulating" | "Distributing"
+    replication_method = Column(String(50))  # "Physical (Full replication)" | "Physical (Sampling)" | "Synthetic"
     listings = Column(JSON)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
