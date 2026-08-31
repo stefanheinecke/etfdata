@@ -40,10 +40,22 @@ def fetch_prices_yfinance(
         }
     """
     try:
-        # Step 1: Try to find ticker by ISIN
-        ticker = _lookup_ticker_by_isin(isin)
+        # Step 1: Try to find ticker by ISIN (try direct ISIN first)
+        ticker = None
         
-        # Step 2: Fallback to name search if ISIN lookup fails
+        # Try direct ISIN first (this often works for yfinance)
+        try:
+            prices = _fetch_yfinance_prices(isin, from_date)
+            if prices and len(prices) > 0:
+                ticker = isin
+        except:
+            pass
+        
+        # Step 2: If direct ISIN didn't work, try exchange suffixes
+        if not ticker:
+            ticker = _lookup_ticker_by_isin(isin)
+        
+        # Step 3: Fallback to name search if ISIN lookup fails
         if not ticker and etf_name:
             ticker = _lookup_ticker_by_name(etf_name)
         
@@ -56,8 +68,11 @@ def fetch_prices_yfinance(
                 "error": "ticker_not_found",
             }
         
-        # Step 3: Fetch prices from Yahoo Finance
-        prices = _fetch_yfinance_prices(ticker, from_date)
+        # Step 3: Fetch prices from Yahoo Finance (if not already fetched above)
+        if ticker == isin:
+            prices = _fetch_yfinance_prices(isin, from_date)
+        else:
+            prices = _fetch_yfinance_prices(ticker, from_date)
         
         if not prices or len(prices) == 0:
             return {
@@ -95,21 +110,44 @@ def _lookup_ticker_by_isin(isin: str) -> str | None:
     Look up a Yahoo Finance ticker by ISIN code.
     
     Uses yfinance's Ticker lookup which accepts ISIN codes for many ETFs.
+    Tries multiple exchange suffixes to find the ticker.
     """
     if not isin or len(isin) < 12:
         return None
     
     try:
-        # Try direct ISIN lookup
+        # Try direct ISIN lookup first
         ticker_obj = yf.Ticker(isin)
         
         # Check if we got valid data (has info)
         if ticker_obj.info and ticker_obj.info.get("shortName"):
             return isin
         
-        # Try common US exchange suffixes for the ISIN
-        # Some ETFs are listed on multiple exchanges; try to find one with data
-        for suffix in [".L", ".AS", ".SW", ".MI", ".PA"]:
+        # Try common exchange suffixes for the ISIN
+        # Order: prefer liquid markets (LSE, Xetra, US, Amsterdam, Swiss, Milan, Paris, Madrid, Lisbon, etc.)
+        exchange_suffixes = [
+            ".L",    # London Stock Exchange
+            ".DE",   # Xetra (Germany)
+            ".US",   # NYSE/NASDAQ
+            ".AS",   # Euronext Amsterdam
+            ".SW",   # SIX Swiss Exchange
+            ".MI",   # Borsa Italiana
+            ".PA",   # Euronext Paris
+            ".MA",   # Euronext Madrid
+            ".LI",   # Euronext Lisbon
+            ".BR",   # Euronext Brussels
+            ".AX",   # ASX (Australia)
+            ".NZ",   # NZX (New Zealand)
+            ".TO",   # TSX (Toronto)
+            ".V",    # TSX Venture (Canada)
+            ".OL",   # Oslo Stock Exchange
+            ".ST",   # Nasdaq Stockholm
+            ".HE",   # Nasdaq Helsinki
+            ".CO",   # Nasdaq Copenhagen
+            ".VX",   # SIX (alternate)
+        ]
+        
+        for suffix in exchange_suffixes:
             test_ticker = isin + suffix
             try:
                 test_obj = yf.Ticker(test_ticker)
