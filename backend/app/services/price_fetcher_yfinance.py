@@ -1,21 +1,39 @@
 """
-price_fetcher_yfinance.py — Fetch historical prices from Yahoo Finance using ISIN lookup.
+price_fetcher_yfinance.py — Fetch historical prices from Yahoo Finance.
 
-Uses yf.Ticker(isin).history() for thread-safe ISIN lookups.
+Strategy: resolve ISIN -> real ticker via OpenFIGI (free, no auth), then fetch via
+yf.Ticker(ticker).history(). This bypasses yfinance's buggy internal ISIN detection
+that causes 'RuntimeError: release unlocked lock' in production.
 """
 
+import requests as _requests
 import yfinance as yf
 from datetime import datetime
 from decimal import Decimal
-from uuid import uuid4
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 import threading
 
 from app.schemas import Performance
 
-# Thread lock to ensure thread-safe access to yfinance
-# (yfinance has internal threading issues when called from multiple threads)
 _yfinance_lock = threading.Lock()
+
+# OpenFIGI exchange code → Yahoo Finance suffix
+_EXCH_TO_YF_SUFFIX = {
+    "GY": ".DE",  # Germany (XETRA)
+    "GR": ".DE",
+    "LN": ".L",   # London
+    "NA": ".AS",  # Amsterdam
+    "SW": ".SW",  # Switzerland
+    "FP": ".PA",  # France
+    "IM": ".MI",  # Italy
+    "SM": ".MC",  # Spain
+    "AV": ".VI",  # Austria
+    "BB": ".BR",  # Belgium
+    "DC": ".CO",  # Denmark
+    "SS": ".ST",  # Sweden
+    "HF": ".HE",  # Finland
+    "NO": ".OL",  # Norway
+}
 
 
 def fetch_prices_yfinance(
@@ -53,27 +71,25 @@ def fetch_prices_yfinance(
         prices = []
         ticker_used = None
         
-        # Step 1: Try ISIN lookup via yf.Ticker(isin).history()
-        # This avoids the buggy internal ISIN lookup in yf.download()
-        print(f"[yfinance] Step 1: Trying ISIN {isin}...")
-        try:
-            prices = _fetch_yfinance_prices_by_ticker(isin, from_date)
-            if prices and len(prices) > 0:
-                ticker_used = isin
-                print(f"[yfinance] ✓ ISIN lookup worked! Got {len(prices)} prices")
-        except Exception as e:
-            print(f"[yfinance] ✗ ISIN lookup failed: {type(e).__name__}: {e}")
+        # Step 1: Resolve ISIN → real tickers via OpenFIGI (free, no auth required).
+        # This avoids passing an ISIN to yf.Ticker(), which triggers a buggy internal
+        # ISIN lookup path causing 'RuntimeError: release unlocked lock' in production.
+        print(f"[yfinance] Step 1: Resolving ISIN {isin} via OpenFIGI...")
+        candidates = _get_openfigi_candidates(isin)
+        print(f"[yfinance] OpenFIGI returned {len(candidates)} candidates: {candidates}")
         
-        # Step 2: Fallback to name search if ISIN lookup fails
-        if not ticker_used and etf_name:
-            print(f"[yfinance] Step 2: Trying name lookup for '{etf_name}'...")
+        for candidate in candidates:
+            print(f"[yfinance] Trying {candidate}...")
             try:
-                prices = _fetch_yfinance_prices_by_ticker(etf_name, from_date)
-                if prices and len(prices) > 0:
-                    ticker_used = etf_name
-                    print(f"[yfinance] ✓ Name lookup worked! Got {len(prices)} prices")
+                prices = _fetch_yfinance_prices_by_ticker(candidate, from_date)
+                if prices:
+                    ticker_used = candidate
+                    print(f"[yfinance] ✓ Got {len(prices)} prices for {candidate}")
+                    break
+                else:
+                    print(f"[yfinance] No data for {candidate}, trying next...")
             except Exception as e:
-                print(f"[yfinance] ✗ Name lookup failed: {type(e).__name__}: {e}")
+                print(f"[yfinance] ✗ {candidate} failed: {type(e).__name__}: {e}")
         
         if not ticker_used or len(prices) == 0:
             print(f"[yfinance] ✗ Failed to find prices for ISIN {isin}")
@@ -112,7 +128,54 @@ def fetch_prices_yfinance(
         }
 
 
-# All ISIN lookups now use yf.Ticker(isin).history() which works directly
+def _get_openfigi_candidates(isin: str) -> list[str]:
+    """
+    Return all Yahoo Finance ticker candidates for an ISIN via OpenFIGI.
+    
+    OpenFIGI is free and requires no API key for basic usage.
+    Returns multiple candidates to try; caller iterates until one has data.
+    """
+    try:
+        resp = _requests.post(
+            "https://api.openfigi.com/v3/mapping",
+            json=[{"idType": "ID_ISIN", "idValue": isin}],
+            headers={"Content-Type": "application/json"},
+            timeout=15,
+        )
+        if resp.status_code != 200:
+            print(f"[yfinance] OpenFIGI HTTP {resp.status_code} for {isin}")
+            return []
+        
+        data = resp.json()
+        results = data[0].get("data") if data else None
+        if not results:
+            print(f"[yfinance] OpenFIGI: no results for {isin}")
+            return []
+        
+        # ETF/ETP entries first
+        ordered = sorted(results, key=lambda r: 0 if r.get("securityType") in ("ETP", "ETF") else 1)
+        
+        seen: set[str] = set()
+        candidates: list[str] = []
+        for result in ordered:
+            ticker = result.get("ticker")
+            exch = result.get("exchCode", "")
+            if not ticker:
+                continue
+            suffix = _EXCH_TO_YF_SUFFIX.get(exch)
+            if suffix is None and exch:
+                continue  # Unknown exchange — skip
+            yf_ticker = f"{ticker}{suffix}" if suffix else ticker
+            if yf_ticker not in seen:
+                seen.add(yf_ticker)
+                candidates.append(yf_ticker)
+                print(f"[yfinance] OpenFIGI candidate: {yf_ticker} ({result.get('name')}, exch={exch})")
+        
+        return candidates
+    except Exception as e:
+        print(f"[yfinance] OpenFIGI error: {e}")
+        return []
+
 
 
 
