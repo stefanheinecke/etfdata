@@ -9,7 +9,7 @@
           <li><a href="#" @click.prevent="goToPage('analytics', 'exposure')">Portfolio</a></li>
           <li><a href="#" :class="{ active: currentPage === 'docs' }" @click.prevent="goToPage('docs')">API</a></li>
           <li><a href="#" :class="{ active: currentPage === 'methodology' }" @click.prevent="goToPage('methodology')">Methodology</a></li>
-          <li><a href="#" :class="{ active: currentPage === 'admin' }" @click.prevent="goToPage('admin')" style="color:#dc2626;font-weight:600">Admin</a></li>
+          <li v-if="adminActive"><a href="#" :class="{ active: currentPage === 'admin' }" @click.prevent="goToPage('admin')" style="color:#dc2626;font-weight:600">Admin</a></li>
         </ul>
         <a v-if="!hasApiKey" href="#" class="btn btn-outline nav-cta" @click.prevent="openApiKeyModal('request')">Get API Key</a>
         <span v-else class="api-online-pill"><span class="status-dot"></span><span v-if="currentUserEmail" class="user-email">{{ currentUserEmail }}</span><span v-else>API Online</span></span>
@@ -27,7 +27,7 @@
         <a href="#" @click.prevent="goToPage('analytics', 'exposure')">Portfolio</a>
         <a href="#" @click.prevent="goToPage('docs')">API</a>
         <a href="#" @click.prevent="goToPage('methodology')">Methodology</a>
-        <a href="#" @click.prevent="goToPage('admin'); mobileMenuOpen = false" style="color:#dc2626;font-weight:600">Admin</a>
+        <a v-if="adminActive" href="#" @click.prevent="goToPage('admin'); mobileMenuOpen = false" style="color:#dc2626;font-weight:600">Admin</a>
         <a v-if="!hasApiKey" href="#" class="btn btn-primary" @click.prevent="openApiKeyModal('request'); mobileMenuOpen = false">Get API Key</a>
       </div>
     </div>
@@ -196,6 +196,10 @@ provide('analyticsInitTab', analyticsInitTab)
 provide('navigateTo', (page, tab) => { goToPage(page, tab) })
 
 function goToPage(page, tab = null) {
+  if (page === 'admin' && !adminActive.value) {
+    showAdminLogin.value = true
+    return
+  }
   currentPage.value = page
   if (tab) analyticsInitTab.value = tab
   mobileMenuOpen.value = false
@@ -215,6 +219,10 @@ window.addEventListener('storage', (e) => {
 
 function onScroll() {
   navScrolled.value = window.scrollY > 20
+}
+
+function onAdminShortcut(e) {
+  if (e.ctrlKey && e.shiftKey && e.key === 'A') goToPage('admin')
 }
 
 function applyPathRoute(pathname = window.location.pathname) {
@@ -264,6 +272,7 @@ onMounted(async () => {
   applyPathRoute(window.location.pathname)
   window.addEventListener('popstate', onPopState)
   window.addEventListener('scroll', onScroll, { passive: true })
+  window.addEventListener('keydown', onAdminShortcut)
   document.documentElement.setAttribute('data-theme', 'light')
   try {
     await healthService.checkHealth()
@@ -284,6 +293,7 @@ onMounted(async () => {
 onUnmounted(() => {
   window.removeEventListener('popstate', onPopState)
   window.removeEventListener('scroll', onScroll)
+  window.removeEventListener('keydown', onAdminShortcut)
 })
 </script>
 
