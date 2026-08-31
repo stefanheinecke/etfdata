@@ -5,7 +5,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# Mapping of company names/parts to country codes
+# Mapping of company names/parts to country NAMES (for matching)
 COUNTRY_PATTERNS = {
     'Germany': ['SIEMENS', 'SAP', 'ALLIANZ', 'DEUTSCHE', 'MERCK', 'BMW', 'BASF', 'DAIMLER', 'INFINEON'],
     'France': ['TOTALENERGIES', 'SANOFI', 'LVMH', 'L\'OREAL', 'AIRBUS', 'SAFRAN', 'SCHNEIDER', 'DANONE', 'EDF'],
@@ -14,6 +14,33 @@ COUNTRY_PATTERNS = {
     'Netherlands': ['ASML', 'SHELL', 'UNILEVER', 'AKZONOBEL', 'NN GROUP'],
     'Belgium': ['SOLVAY', 'INBEV', 'ADYEN', 'ARGENX'],
     'Finland': ['NOKIA', 'KONE', 'SAMPO', 'MAERSK'],
+}
+
+# Mapping from country name to ISO 3166-1 alpha-2 code
+COUNTRY_TO_ISO2 = {
+    'Germany': 'DE',
+    'France': 'FR',
+    'Spain': 'ES',
+    'Italy': 'IT',
+    'Netherlands': 'NL',
+    'Belgium': 'BE',
+    'Finland': 'FI',
+    'Luxembourg': 'LU',
+    'Switzerland': 'CH',
+    'Austria': 'AT',
+    'Denmark': 'DK',
+    'Sweden': 'SE',
+    'Norway': 'NO',
+    'Poland': 'PL',
+    'Portugal': 'PT',
+    'Greece': 'GR',
+    'Ireland': 'IE',
+    'United Kingdom': 'GB',
+    'United States': 'US',
+    'Canada': 'CA',
+    'Japan': 'JP',
+    'China': 'CN',
+    'Australia': 'AU',
 }
 
 # Mapping of company names/keywords to sectors
@@ -60,13 +87,15 @@ class HoldingsEnrichmentService:
     
     @staticmethod
     def _find_country(company_name: str) -> Optional[str]:
-        """Find company country based on name patterns."""
+        """Find company country ISO2 code based on name patterns."""
         company_upper = company_name.upper()
         
-        for country, patterns in COUNTRY_PATTERNS.items():
+        # Check pattern-based country matches
+        for country_name, patterns in COUNTRY_PATTERNS.items():
             for pattern in patterns:
                 if pattern.upper() in company_upper:
-                    return country
+                    # Return ISO2 code, not country name
+                    return COUNTRY_TO_ISO2.get(country_name, country_name[:2].upper())
         
         # Try yfinance lookup as fallback
         try:
@@ -75,7 +104,9 @@ class HoldingsEnrichmentService:
             if ticker:
                 info = yf.Ticker(ticker).info
                 if info and 'country' in info:
-                    return info.get('country')
+                    country_from_yf = info.get('country')
+                    # Convert country name to ISO2 if needed
+                    return COUNTRY_TO_ISO2.get(country_from_yf, country_from_yf[:2].upper() if country_from_yf else None)
         except Exception as e:
             logger.debug(f"yfinance country lookup failed for {company_name}: {e}")
         
