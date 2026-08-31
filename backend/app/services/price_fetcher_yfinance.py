@@ -9,8 +9,13 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 from uuid import uuid4
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+import threading
 
 from app.schemas import Performance
+
+# Thread lock to ensure thread-safe access to yfinance
+# (yfinance has internal threading issues when called from multiple threads)
+_yfinance_lock = threading.Lock()
 
 
 def fetch_prices_yfinance(
@@ -208,13 +213,24 @@ def _fetch_yfinance_prices(ticker: str, from_date: str) -> list[dict]:
     Fetch daily historical prices from Yahoo Finance.
     
     Returns list of dicts with keys: date, close_price, currency
+    Thread-safe: uses lock to prevent yfinance threading issues.
     """
     try:
         start = datetime.strptime(from_date, "%Y-%m-%d")
         end = datetime.now()
         
-        # Fetch daily data
-        data = yf.download(ticker, start=start, end=end, interval="1d", progress=False)
+        # Use lock to ensure thread-safe access to yfinance
+        # Set auto_adjust=False to skip problematic internal ISIN lookups
+        with _yfinance_lock:
+            print(f"[yfinance] Downloading data for {ticker}...")
+            data = yf.download(
+                ticker, 
+                start=start, 
+                end=end, 
+                interval="1d", 
+                progress=False,
+                auto_adjust=False  # Avoids yfinance's problematic cookie/session operations
+            )
         
         if data is None or data.empty:
             print(f"[yfinance] No data returned for {ticker}")
