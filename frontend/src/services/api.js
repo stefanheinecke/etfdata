@@ -49,7 +49,6 @@ export const analyticsService = {
   findAlternatives(etfId, portfolio, topN = 5) {
     return api.post(`/analytics/alternatives/${etfId}`, { portfolio }, { params: { top_n: topN } })
   },
-  },
 }
 
 export const scoreService = {
