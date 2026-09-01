@@ -5,10 +5,7 @@ import asyncio
 import httpx
 import uvicorn
 from mcp.server import MCPServer
-from starlette.applications import Starlette
-from starlette.middleware import Middleware
 from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.routing import Mount
 
 API_BASE_URL = os.getenv("GOETF_API_URL", "http://localhost:8000")
 PORT = int(os.getenv("PORT", 8080))
@@ -89,10 +86,8 @@ def main():
         """
         return await list_etfs_impl(provider, limit)
 
-    app = Starlette(
-        routes=[Mount("/", app=mcp.streamable_http_app)],
-        middleware=[Middleware(APIKeyMiddleware)],
-    )
+    app = mcp.streamable_http_app(host="0.0.0.0")
+    app.add_middleware(APIKeyMiddleware)
     uvicorn.run(app, host="0.0.0.0", port=PORT)
 
 
