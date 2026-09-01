@@ -134,8 +134,8 @@
                 &nbsp;TER: <span :style="{fontWeight:600, color: pair.best_replacement.candidate_ter != null && pair.best_replacement.replace_ter != null ? (pair.best_replacement.candidate_ter < pair.best_replacement.replace_ter ? '#22c55e' : pair.best_replacement.candidate_ter > pair.best_replacement.replace_ter ? '#ef4444' : 'inherit') : 'inherit'}">{{ pair.best_replacement.candidate_ter != null ? pair.best_replacement.candidate_ter.toFixed(2)+'%' : '—' }}</span>
                 &nbsp;Score: <span :style="{fontWeight:700, color: pair.best_replacement.candidate_goetf_score != null && pair.best_replacement.replace_goetf_score != null ? (pair.best_replacement.candidate_goetf_score > pair.best_replacement.replace_goetf_score ? '#22c55e' : pair.best_replacement.candidate_goetf_score < pair.best_replacement.replace_goetf_score ? '#ef4444' : 'inherit') : 'inherit'}">{{ pair.best_replacement.candidate_goetf_score?.toFixed(1) ?? '—' }}</span>
               </span>
-              <span style="margin-left:auto;font-style:italic" v-html="replacementSummary(pair.best_replacement)"></span>
             </div>
+            <div style="font-size:.8rem;font-weight:600;margin-top:.4rem" v-html="replacementSummary(pair.best_replacement)"></div>
           </div>
           <div v-else style="font-size:.8rem;color:var(--text-muted);font-style:italic">No replacement found in available ETFs</div>
         </div>
@@ -469,6 +469,7 @@ onMounted(() => {
 
 function replacementSummary(r) {
   const parts = []
+  parts.push('<span style="color:#22c55e">reduces overlap by ' + r.reduction.toFixed(1) + '%</span>')
   if (r.candidate_ter != null && r.replace_ter != null) {
     if (r.candidate_ter < r.replace_ter) parts.push('<span style="color:#22c55e">lower TER</span>')
     else if (r.candidate_ter > r.replace_ter) parts.push('<span style="color:#ef4444">higher TER</span>')
@@ -479,8 +480,7 @@ function replacementSummary(r) {
     else if (r.candidate_goetf_score < r.replace_goetf_score) parts.push('<span style="color:#ef4444">lower score</span>')
     else parts.push('same score')
   }
-  if (!parts.length) return ''
-  return 'Replacement has ' + parts.join(' and ')
+  return 'Replacement ' + parts.join(', ') + '.'
 }
 </script>
 
