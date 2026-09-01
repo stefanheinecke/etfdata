@@ -367,3 +367,65 @@ class AnalyticsService:
 
         results.sort(key=lambda x: x["overlap_with_portfolio"])
         return {"alternatives": results[:top_n], "replaced_etf_id": replace_etf_id}
+
+    @staticmethod
+    def suggest_pair_replacements(db: Session, portfolio: List[Dict], candidate_limit: int = 30):
+        """For each overlapping ETF pair, find the single replacement that gives the biggest overlap reduction."""
+        if len(portfolio) < 2:
+            return []
+
+        etf_ids = [UUID(p["etf_id"]) for p in portfolio]
+        candidates = db.query(ETF).filter(ETF.id.notin_(etf_ids)).limit(candidate_limit).all()
+
+        def get_overlap(id_a, id_b):
+            result = AnalyticsService.calculate_overlap(db, [id_a, id_b])
+            if "matrix" in result:
+                for v in result["matrix"].values():
+                    return float(v.get("weight_overlap", 0))
+            return 0.0
+
+        suggestions = []
+        for i, etf_a in enumerate(etf_ids):
+            for etf_b in etf_ids[i + 1:]:
+                current_overlap = get_overlap(etf_a, etf_b)
+                if current_overlap < 1:
+                    continue
+
+                etf_a_obj = db.query(ETF).filter(ETF.id == etf_a).first()
+                etf_b_obj = db.query(ETF).filter(ETF.id == etf_b).first()
+
+                best = None
+                best_reduction = 0.0
+
+                for c in candidates:
+                    # Try replacing ETF_A with candidate
+                    new_ov = get_overlap(c.id, etf_b)
+                    reduction = current_overlap - new_ov
+                    if reduction > best_reduction:
+                        best_reduction = reduction
+                        best = {"replace_etf_id": str(etf_a), "replace_isin": etf_a_obj.isin,
+                                "candidate_etf_id": str(c.id), "candidate_isin": c.isin,
+                                "candidate_name": c.name, "candidate_provider": c.provider,
+                                "candidate_ter": float(c.ter) if c.ter else None,
+                                "new_overlap": round(new_ov, 1), "reduction": round(reduction, 1)}
+
+                    # Try replacing ETF_B with candidate
+                    new_ov = get_overlap(etf_a, c.id)
+                    reduction = current_overlap - new_ov
+                    if reduction > best_reduction:
+                        best_reduction = reduction
+                        best = {"replace_etf_id": str(etf_b), "replace_isin": etf_b_obj.isin,
+                                "candidate_etf_id": str(c.id), "candidate_isin": c.isin,
+                                "candidate_name": c.name, "candidate_provider": c.provider,
+                                "candidate_ter": float(c.ter) if c.ter else None,
+                                "new_overlap": round(new_ov, 1), "reduction": round(reduction, 1)}
+
+                suggestions.append({
+                    "etf_a_id": str(etf_a), "etf_a_isin": etf_a_obj.isin,
+                    "etf_b_id": str(etf_b), "etf_b_isin": etf_b_obj.isin,
+                    "current_overlap": round(current_overlap, 1),
+                    "best_replacement": best,
+                })
+
+        suggestions.sort(key=lambda x: x["current_overlap"], reverse=True)
+        return suggestions
