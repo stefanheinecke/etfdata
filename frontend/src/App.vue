@@ -12,7 +12,10 @@
           <li v-if="adminActive || isAdminApiUser"><a href="#" :class="{ active: currentPage === 'admin' }" @click.prevent="goToPage('admin')" style="color:#dc2626;font-weight:600">Admin</a></li>
         </ul>
         <a v-if="!hasApiKey" href="#" class="btn btn-outline nav-cta" @click.prevent="openApiKeyModal('request')">Get API Key</a>
-        <span v-else class="api-online-pill"><span class="status-dot"></span><span v-if="currentUserEmail" class="user-email">{{ currentUserEmail }}</span><span v-else>API Online</span></span>
+        <template v-else>
+          <span class="api-online-pill"><span class="status-dot"></span><span v-if="currentUserEmail" class="user-email">{{ currentUserEmail }}</span><span v-else>API Online</span></span>
+          <button class="switch-key-btn" @click="logout" title="Log out">Log out</button>
+        </template>
         <button class="hamburger" @click="mobileMenuOpen = true" aria-label="Open menu">
           <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
         </button>
@@ -216,6 +219,17 @@ function onApiKeySaved() {
   }).catch(() => {})
 }
 
+function logout() {
+  localStorage.removeItem('api_key')
+  sessionStorage.removeItem('admin_secret')
+  hasApiKey.value = false
+  currentUserEmail.value = ''
+  isAdminApiUser.value = false
+  setAdminActive(false)
+  goToPage('home')
+  openApiKeyModal('enter')
+}
+
 // Reflect key changes from the modal's "Use this key" button
 window.addEventListener('storage', (e) => {
   if (e.key === 'api_key') hasApiKey.value = !!e.newValue
@@ -379,6 +393,18 @@ onUnmounted(() => {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.switch-key-btn {
+  margin-left: 6px;
+  background: none;
+  border: none;
+  font-size: .75rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px 0;
+  text-decoration: underline;
+  white-space: nowrap;
+}
+.switch-key-btn:hover { color: var(--text); }
 .status-dot {
   width: 7px;
   height: 7px;
