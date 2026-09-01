@@ -296,3 +296,74 @@ class AnalyticsService:
             holding["weight"] = round(holding["weight"], 2)
 
         return {"top_holdings": sorted_holdings}
+
+    @staticmethod
+    def calculate_allocation_overlap(db: Session, etf_ids: List[UUID], alloc_type: str = "sector"):
+        """Overlap in sector or country allocations between each pair of ETFs."""
+        alloc_data = {}
+        etf_meta = {}
+        for etf_id in etf_ids:
+            etf = db.query(ETF).filter(ETF.id == etf_id).first()
+            etf_meta[str(etf_id)] = {"isin": etf.isin if etf else str(etf_id)[:8], "name": etf.name if etf else ""}
+            latest = db.query(func.max(Allocation.date)).filter(
+                Allocation.etf_id == etf_id, Allocation.type == alloc_type
+            ).scalar()
+            if latest:
+                allocs = db.query(Allocation).filter(
+                    Allocation.etf_id == etf_id, Allocation.type == alloc_type, Allocation.date == latest
+                ).all()
+                total = sum(float(a.weight) for a in allocs) or 1
+                alloc_data[str(etf_id)] = {a.bucket: float(a.weight) / total * 100 for a in allocs}
+            else:
+                alloc_data[str(etf_id)] = {}
+
+        pairs = []
+        for i, etf_a in enumerate(etf_ids):
+            for etf_b in etf_ids[i + 1:]:
+                a_str, b_str = str(etf_a), str(etf_b)
+                data_a, data_b = alloc_data[a_str], alloc_data[b_str]
+                all_buckets = set(data_a) | set(data_b)
+                weight_overlap = sum(min(data_a.get(b, 0), data_b.get(b, 0)) for b in all_buckets)
+                top_buckets = sorted(
+                    [{"bucket": b, "etf_a_weight": round(data_a.get(b, 0), 1), "etf_b_weight": round(data_b.get(b, 0), 1), "overlap": round(min(data_a.get(b, 0), data_b.get(b, 0)), 1)} for b in all_buckets],
+                    key=lambda x: -(x["etf_a_weight"] + x["etf_b_weight"])
+                )[:8]
+                pairs.append({
+                    "etf_a": a_str, "etf_b": b_str,
+                    "etf_a_isin": etf_meta[a_str]["isin"], "etf_b_isin": etf_meta[b_str]["isin"],
+                    "type": alloc_type,
+                    "weight_overlap": round(weight_overlap, 1),
+                    "buckets": top_buckets,
+                })
+        return pairs
+
+    @staticmethod
+    def suggest_lower_overlap_alternatives(db: Session, portfolio: List[Dict], replace_etf_id: str, top_n: int = 5):
+        """Find ETFs not in portfolio that would have the least holdings overlap with the rest of portfolio."""
+        rest = [p for p in portfolio if p["etf_id"] != replace_etf_id]
+        if not rest:
+            return {"alternatives": [], "replaced_etf_id": replace_etf_id}
+
+        portfolio_ids = {UUID(p["etf_id"]) for p in portfolio}
+        candidates = db.query(ETF).filter(ETF.id.notin_(portfolio_ids)).limit(50).all()
+        total_rest_weight = sum(p["weight"] for p in rest) or 1
+
+        results = []
+        for candidate in candidates:
+            weighted_overlap = 0.0
+            for p in rest:
+                ov = AnalyticsService.calculate_overlap(db, [UUID(p["etf_id"]), candidate.id])
+                if "matrix" in ov:
+                    for v in ov["matrix"].values():
+                        weighted_overlap += v.get("weight_overlap", 0) * p["weight"] / total_rest_weight
+            results.append({
+                "etf_id": str(candidate.id),
+                "isin": candidate.isin,
+                "name": candidate.name,
+                "provider": candidate.provider,
+                "ter": float(candidate.ter) if candidate.ter else None,
+                "overlap_with_portfolio": round(weighted_overlap, 1),
+            })
+
+        results.sort(key=lambda x: x["overlap_with_portfolio"])
+        return {"alternatives": results[:top_n], "replaced_etf_id": replace_etf_id}

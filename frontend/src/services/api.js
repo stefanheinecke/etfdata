@@ -46,6 +46,10 @@ export const analyticsService = {
   calculateExposure(portfolio, date = null, rfRate = 0.04) {
     return api.post('/analytics/exposure', { portfolio }, { params: { date, rf_rate: rfRate } })
   },
+  findAlternatives(etfId, portfolio, topN = 5) {
+    return api.post(`/analytics/alternatives/${etfId}`, { portfolio }, { params: { top_n: topN } })
+  },
+  },
 }
 
 export const scoreService = {

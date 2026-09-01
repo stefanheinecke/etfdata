@@ -21,7 +21,9 @@
             <option v-for="e in allEtfs" :key="e.id" :value="e.id">{{ e.isin }} - {{ e.name }}</option>
           </select>
           <input class="input" type="number" v-model.number="item.weight" placeholder="Weight %" style="flex:1;max-width:120px" min="0" max="100" />
-          <button class="btn btn-outline" @click="portfolio.splice(i,1)" style="flex-shrink:0">✕</button>
+          <button v-if="item.etf_id && exposureResult" class="btn btn-outline" style="flex-shrink:0;font-size:.75rem" @click="findAlternatives(item.etf_id)"
+            :disabled="alternativesLoading === item.etf_id">{{ alternativesLoading === item.etf_id ? '…' : 'Alternatives' }}</button>
+          <button class="btn btn-outline" @click="portfolio.splice(i,1);alternativesResult=null" style="flex-shrink:0">✕</button>
         </div>
         <div style="display:flex;gap:.75rem;margin-top:.75rem;align-items:center;flex-wrap:wrap">
           <button class="btn btn-outline" @click="portfolio.push({etf_id:'',weight:0})">+ Add ETF</button>
@@ -76,10 +78,55 @@
           </div>
           <div v-else style="font-size:.85rem;color:var(--text-muted);padding:.5rem 0">No overlap pairs</div>
         </div>
+        <!-- Sector & Country allocation overlap -->
+        <template v-if="allocationOverlap.sector?.length || allocationOverlap.country?.length">
+          <div v-for="(pairs, type) in allocationOverlap" :key="type" style="margin-bottom:1rem">
+            <div style="font-size:.8rem;font-weight:600;color:var(--text-muted);margin-bottom:.5rem">{{ type === 'sector' ? 'Sector' : 'Country' }} Overlap by Pair</div>
+            <div v-for="pair in pairs" :key="pair.etf_a+pair.etf_b" style="margin-bottom:.75rem">
+              <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.35rem">
+                <span style="font-size:.85rem;font-weight:600;color:var(--green-600)">{{ pair.etf_a_isin }}</span>
+                <span style="font-size:.75rem;color:var(--text-muted)">↔</span>
+                <span style="font-size:.85rem;font-weight:600;color:var(--green-600)">{{ pair.etf_b_isin }}</span>
+                <span style="font-size:.8rem;color:var(--text-muted);margin-left:auto">{{ pair.weight_overlap.toFixed(1) }}% shared</span>
+              </div>
+              <div v-for="b in pair.buckets.filter(x=>x.overlap>0)" :key="b.bucket" style="display:flex;align-items:center;gap:.5rem;margin-bottom:.2rem;font-size:.78rem">
+                <span style="width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-muted)">{{ b.bucket }}</span>
+                <div style="flex:1;height:6px;background:var(--border);border-radius:3px;position:relative">
+                  <div :style="{width:b.etf_a_weight+'%',height:'100%',background:'rgba(15,76,129,0.3)',borderRadius:'3px',position:'absolute'}"></div>
+                  <div :style="{width:b.overlap+'%',height:'100%',background:'#ef4444',borderRadius:'3px',position:'absolute'}"></div>
+                </div>
+                <span style="width:36px;text-align:right;color:#ef4444;font-weight:600">{{ b.overlap.toFixed(1) }}%</span>
+              </div>
+            </div>
+          </div>
+        </template>
         <p style="font-size:.7rem;color:var(--text-muted);margin-top:.75rem;margin-bottom:0">
           Base = weighted avg of individual GoETF Scores &nbsp;·&nbsp; Overlap Penalty: max −2 pts for 100% overlap &nbsp;·&nbsp; Bonus: portfolio country diversification vs individual weighted avg
           &nbsp;<button class="meth-link" @click="navigateTo('methodology')">→ Methodology</button>
         </p>
+      </div>
+      <!-- Alternatives panel -->
+      <div v-if="alternativesResult" class="card" style="margin-bottom:1.5rem">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">
+          <h3 class="card-title" style="margin:0">Alternative ETFs with Lower Overlap</h3>
+          <button class="btn btn-outline" style="font-size:.75rem" @click="alternativesResult=null">Close</button>
+        </div>
+        <p style="font-size:.8rem;color:var(--text-muted);margin-bottom:.75rem">ETFs sorted by lowest holdings overlap with the rest of your portfolio. Lower overlap = more diversification.</p>
+        <div class="table-wrap">
+          <table class="holdings-table">
+            <thead><tr><th>ISIN</th><th>Name</th><th>Provider</th><th>TER</th><th style="text-align:right">Overlap with Portfolio</th></tr></thead>
+            <tbody>
+              <tr v-for="alt in alternativesResult.alternatives" :key="alt.etf_id">
+                <td><strong style="color:var(--green-600)">{{ alt.isin }}</strong></td>
+                <td>{{ alt.name }}</td>
+                <td style="color:var(--text-muted)">{{ alt.provider }}</td>
+                <td :class="terClass(alt.ter)">{{ alt.ter != null ? alt.ter.toFixed(2)+'%' : '—' }}</td>
+                <td style="text-align:right" :class="alt.overlap_with_portfolio > 50 ? 'cell-red' : alt.overlap_with_portfolio > 20 ? 'cell-yellow' : 'cell-green'">{{ alt.overlap_with_portfolio.toFixed(1) }}%</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p style="font-size:.7rem;color:var(--text-muted);margin-top:.5rem">Overlap is weighted by ETF position size in remaining portfolio &nbsp;·&nbsp; Final choice is yours — consider tracking index, TER, and replication method before switching.</p>
       </div>
       <div v-if="exposureError" class="error-box" style="margin-bottom:1rem">{{ exposureError }}</div>
       <div v-if="exposureResult" class="portfolio-donut-grid">
@@ -237,6 +284,8 @@ const topHoldings = ref(null)
 const portfolioRiskResult = ref(null)
 const portfolioScoreResult = ref(null)
 const portfolioScoreLoading = ref(false)
+const alternativesResult = ref(null)
+const alternativesLoading = ref(null)
 
 const portfolioSummary = computed(() => {
   if (!portfolioRiskResult.value?.length) return null
@@ -322,6 +371,10 @@ const filteredPairwiseOverlaps = computed(() => {
   return portfolioScoreResult.value?.pairwise_overlaps?.filter(ov => ov.weight_overlap_pct > 0) || []
 })
 
+const allocationOverlap = computed(() => {
+  return exposureResult.value?.allocation_overlap || {}
+})
+
 const portfolioDonutOptions = {
   responsive: true,
   maintainAspectRatio: false,
@@ -348,7 +401,7 @@ async function loadETFs() {
   try { const r=await etfService.getETFs(0,50); allEtfs.value=r.data } catch(e){console.error(e)} finally{etfsLoading.value=false}
 }
 async function runExposure() {
-  exposureLoading.value=true; exposureError.value=''; exposureResult.value=null; topHoldings.value=null; portfolioRiskResult.value=null; portfolioScoreResult.value=null
+  exposureLoading.value=true; exposureError.value=''; exposureResult.value=null; topHoldings.value=null; portfolioRiskResult.value=null; portfolioScoreResult.value=null; alternativesResult.value=null
   const p=portfolio.value.filter(x=>x.etf_id)
   try {
     const r = await analyticsService.calculateExposure(p, null, riskFreeRate.value / 100)
@@ -390,6 +443,17 @@ onMounted(() => {
   }
   analyticsInitTab.value = null
 })
+
+async function findAlternatives(etfId) {
+  alternativesLoading.value = etfId
+  alternativesResult.value = null
+  try {
+    const p = portfolio.value.filter(x => x.etf_id)
+    const r = await analyticsService.findAlternatives(etfId, p)
+    alternativesResult.value = r.data
+  } catch(e) { console.warn('Alternatives failed:', e.message) }
+  finally { alternativesLoading.value = null }
+}
 </script>
 
 <style scoped>
