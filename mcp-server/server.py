@@ -14,14 +14,24 @@ request_api_key: contextvars.ContextVar[str] = contextvars.ContextVar("request_a
 
 
 class APIKeyMiddleware:
-    """Extracts x-api-key from incoming request headers and stores it in context."""
+    """Extracts API key from x-api-key header, Authorization header, or ?api_key= query param."""
     def __init__(self, app: ASGIApp) -> None:
         self.app = app
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] == "http":
             headers = dict(scope.get("headers", []))
+            # Try x-api-key header first, then Authorization: Bearer, then ?api_key= query param
             api_key = headers.get(b"x-api-key", b"").decode()
+            if not api_key:
+                auth = headers.get(b"authorization", b"").decode()
+                if auth.startswith("Bearer "):
+                    api_key = auth[7:]
+            if not api_key:
+                query = scope.get("query_string", b"").decode()
+                for part in query.split("&"):
+                    if part.startswith("api_key="):
+                        api_key = part[8:]
             token = request_api_key.set(api_key)
             try:
                 await self.app(scope, receive, send)
