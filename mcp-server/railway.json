@@ -1,0 +1,10 @@
+{
+  "build": {
+    "builder": "DOCKERFILE",
+    "dockerfilePath": "mcp-server/Dockerfile"
+  },
+  "deploy": {
+    "startCommand": "python server.py",
+    "healthcheckPath": "/health"
+  }
+}
