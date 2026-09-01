@@ -126,14 +126,15 @@
             </div>
             <div style="display:flex;gap:1.5rem;flex-wrap:wrap;color:var(--text-muted);font-size:.78rem;padding-top:.25rem;border-top:1px solid var(--border)">
               <span><strong style="color:var(--text)">{{ pair.best_replacement.replace_isin }}</strong>
-                &nbsp;TER: <span :class="terClass(pair.best_replacement.replace_ter)">{{ pair.best_replacement.replace_ter != null ? pair.best_replacement.replace_ter.toFixed(2)+'%' : '—' }}</span>
-                &nbsp;Score: <span :class="scoreBadgeClass(pair.best_replacement.replace_goetf_score)" style="font-weight:700">{{ pair.best_replacement.replace_goetf_score?.toFixed(1) ?? '—' }}</span>
+                &nbsp;TER: <span>{{ pair.best_replacement.replace_ter != null ? pair.best_replacement.replace_ter.toFixed(2)+'%' : '—' }}</span>
+                &nbsp;Score: <span style="font-weight:700">{{ pair.best_replacement.replace_goetf_score?.toFixed(1) ?? '—' }}</span>
               </span>
               <span style="color:var(--text-muted)">→</span>
               <span><strong style="color:var(--text)">{{ pair.best_replacement.candidate_isin }}</strong>
-                &nbsp;TER: <span :class="terClass(pair.best_replacement.candidate_ter)">{{ pair.best_replacement.candidate_ter != null ? pair.best_replacement.candidate_ter.toFixed(2)+'%' : '—' }}</span>
-                &nbsp;Score: <span :class="scoreBadgeClass(pair.best_replacement.candidate_goetf_score)" style="font-weight:700">{{ pair.best_replacement.candidate_goetf_score?.toFixed(1) ?? '—' }}</span>
+                &nbsp;TER: <span :style="{fontWeight:600, color: pair.best_replacement.candidate_ter != null && pair.best_replacement.replace_ter != null ? (pair.best_replacement.candidate_ter < pair.best_replacement.replace_ter ? '#22c55e' : pair.best_replacement.candidate_ter > pair.best_replacement.replace_ter ? '#ef4444' : 'inherit') : 'inherit'}">{{ pair.best_replacement.candidate_ter != null ? pair.best_replacement.candidate_ter.toFixed(2)+'%' : '—' }}</span>
+                &nbsp;Score: <span :style="{fontWeight:700, color: pair.best_replacement.candidate_goetf_score != null && pair.best_replacement.replace_goetf_score != null ? (pair.best_replacement.candidate_goetf_score > pair.best_replacement.replace_goetf_score ? '#22c55e' : pair.best_replacement.candidate_goetf_score < pair.best_replacement.replace_goetf_score ? '#ef4444' : 'inherit') : 'inherit'}">{{ pair.best_replacement.candidate_goetf_score?.toFixed(1) ?? '—' }}</span>
               </span>
+              <span style="margin-left:auto;font-style:italic" v-html="replacementSummary(pair.best_replacement)"></span>
             </div>
           </div>
           <div v-else style="font-size:.8rem;color:var(--text-muted);font-style:italic">No replacement found in available ETFs</div>
@@ -465,6 +466,22 @@ onMounted(() => {
   }
   analyticsInitTab.value = null
 })
+
+function replacementSummary(r) {
+  const parts = []
+  if (r.candidate_ter != null && r.replace_ter != null) {
+    if (r.candidate_ter < r.replace_ter) parts.push('<span style="color:#22c55e">lower TER</span>')
+    else if (r.candidate_ter > r.replace_ter) parts.push('<span style="color:#ef4444">higher TER</span>')
+    else parts.push('same TER')
+  }
+  if (r.candidate_goetf_score != null && r.replace_goetf_score != null) {
+    if (r.candidate_goetf_score > r.replace_goetf_score) parts.push('<span style="color:#22c55e">higher score</span>')
+    else if (r.candidate_goetf_score < r.replace_goetf_score) parts.push('<span style="color:#ef4444">lower score</span>')
+    else parts.push('same score')
+  }
+  if (!parts.length) return ''
+  return 'Replacement has ' + parts.join(' and ')
+}
 </script>
 
 <style scoped>
