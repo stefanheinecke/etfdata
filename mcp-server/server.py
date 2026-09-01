@@ -1,59 +1,17 @@
 """MCP server for GoETF — lists available ETFs via the public API."""
 import os
-import json
 import httpx
-from mcp.server import Server
-from mcp.types import Tool, TextContent, ToolResult
+from mcp.server import MCPServer
+
 
 # Configuration
 API_BASE_URL = os.getenv("GOETF_API_URL", "http://localhost:8000")
 API_KEY = os.getenv("GOETF_API_KEY", "")
 
-server = Server("goetf-mcp")
 
-
-@server.list_tools()
-async def list_tools() -> list[Tool]:
-    """List available tools."""
-    return [
-        Tool(
-            name="list_etfs",
-            description="List available ETFs in GoETF database",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "provider": {
-                        "type": "string",
-                        "description": "Filter by provider (e.g., 'UBS', 'iShares')",
-                    },
-                    "limit": {
-                        "type": "integer",
-                        "description": "Maximum number of ETFs to return (default 50)",
-                        "default": 50,
-                    },
-                },
-            },
-        )
-    ]
-
-
-@server.call_tool()
-async def call_tool(name: str, arguments: dict) -> ToolResult:
-    """Handle tool calls."""
-    if name == "list_etfs":
-        return await handle_list_etfs(arguments)
-    return ToolResult(
-        content=[TextContent(type="text", text=f"Unknown tool: {name}")],
-        isError=True,
-    )
-
-
-async def handle_list_etfs(arguments: dict) -> ToolResult:
+async def list_etfs_impl(provider: str = None, limit: int = 50) -> str:
     """Fetch and return ETFs from GoETF API."""
     try:
-        provider = arguments.get("provider")
-        limit = arguments.get("limit", 50)
-
         headers = {}
         if API_KEY:
             headers["x-api-key"] = API_KEY
@@ -70,37 +28,47 @@ async def handle_list_etfs(arguments: dict) -> ToolResult:
 
         # Format output
         if not etfs:
-            text = "No ETFs found."
-        else:
-            lines = [f"Found {len(etfs)} ETF(s):\n"]
-            for etf in etfs:
-                isin = etf.get("isin", "N/A")
-                name = etf.get("name", "N/A")
-                provider = etf.get("provider", "N/A")
-                ter = etf.get("ter")
-                ter_str = f" | TER: {ter}%" if ter else ""
-                lines.append(f"  • {isin} — {name} ({provider}){ter_str}")
-            text = "\n".join(lines)
-
-        return ToolResult(content=[TextContent(type="text", text=text)])
+            return "No ETFs found."
+        
+        lines = [f"Found {len(etfs)} ETF(s):\n"]
+        for etf in etfs:
+            isin = etf.get("isin", "N/A")
+            name = etf.get("name", "N/A")
+            provider_name = etf.get("provider", "N/A")
+            ter = etf.get("ter")
+            ter_str = f" | TER: {ter}%" if ter else ""
+            lines.append(f"  • {isin} — {name} ({provider_name}){ter_str}")
+        
+        return "\n".join(lines)
 
     except httpx.HTTPError as e:
-        return ToolResult(
-            content=[
-                TextContent(
-                    type="text",
-                    text=f"API error: {e.response.status_code if hasattr(e, 'response') else 'unknown'}\nURL: {API_BASE_URL}/etfs\nMake sure GOETF_API_URL and GOETF_API_KEY are set correctly.",
-                )
-            ],
-            isError=True,
-        )
+        return f"API error: {e.response.status_code if hasattr(e, 'response') else 'unknown'}\nURL: {API_BASE_URL}/etfs\nMake sure GOETF_API_URL and GOETF_API_KEY are set correctly."
     except Exception as e:
-        return ToolResult(
-            content=[TextContent(type="text", text=f"Error: {str(e)}")],
-            isError=True,
-        )
+        return f"Error: {str(e)}"
+
+
+def main():
+    server = MCPServer(
+        name="goetf-mcp",
+        title="GoETF API",
+        description="MCP server for GoETF — lists available ETFs via the public API",
+        version="1.0.0"
+    )
+
+    @server.tool()
+    async def list_etfs(provider: str = None, limit: int = 50) -> str:
+        """
+        List available ETFs in GoETF database.
+        
+        Args:
+            provider: Filter by provider (e.g., 'UBS', 'iShares')
+            limit: Maximum number of ETFs to return (default 50)
+        """
+        return await list_etfs_impl(provider, limit)
+
+    import asyncio
+    asyncio.run(server.run_stdio_async())
 
 
 if __name__ == "__main__":
-    import asyncio
-    server.run_stdio()
+    main()
