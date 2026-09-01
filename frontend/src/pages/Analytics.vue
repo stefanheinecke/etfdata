@@ -115,14 +115,26 @@
             <span style="font-weight:700;font-size:.95rem;color:var(--green-600)">{{ pair.etf_b_isin }}</span>
             <span style="margin-left:auto;font-size:.85rem;font-weight:700" :class="pair.current_overlap > 50 ? 'cell-red' : pair.current_overlap > 20 ? 'cell-yellow' : 'cell-green'">{{ pair.current_overlap.toFixed(1) }}% overlap</span>
           </div>
-          <div v-if="pair.best_replacement" style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;background:rgba(11,106,165,0.06);border-radius:6px;padding:.5rem .75rem;font-size:.82rem">
-            <span style="color:var(--text-muted)">Replace</span>
-            <strong style="color:var(--green-600)">{{ pair.best_replacement.replace_isin }}</strong>
-            <span style="color:var(--text-muted)">with</span>
-            <strong>{{ pair.best_replacement.candidate_isin }}</strong>
-            <span style="color:var(--text-muted)">{{ pair.best_replacement.candidate_name }}</span>
-            <span v-if="pair.best_replacement.candidate_ter != null" style="color:var(--text-muted)">· TER {{ pair.best_replacement.candidate_ter.toFixed(2) }}%</span>
-            <span style="margin-left:auto;color:#22c55e;font-weight:700">→ {{ pair.best_replacement.new_overlap.toFixed(1) }}% overlap (−{{ pair.best_replacement.reduction.toFixed(1) }}%)</span>
+          <div v-if="pair.best_replacement" style="display:flex;flex-direction:column;gap:.4rem;background:rgba(11,106,165,0.06);border-radius:6px;padding:.5rem .75rem;font-size:.82rem">
+            <div style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap">
+              <span style="color:var(--text-muted)">Replace</span>
+              <strong style="color:var(--green-600)">{{ pair.best_replacement.replace_isin }}</strong>
+              <span style="color:var(--text-muted)">with</span>
+              <strong>{{ pair.best_replacement.candidate_isin }}</strong>
+              <span style="color:var(--text-muted)">{{ pair.best_replacement.candidate_name }}</span>
+              <span style="margin-left:auto;color:#22c55e;font-weight:700">→ {{ pair.best_replacement.new_overlap.toFixed(1) }}% overlap (−{{ pair.best_replacement.reduction.toFixed(1) }}%)</span>
+            </div>
+            <div style="display:flex;gap:1.5rem;flex-wrap:wrap;color:var(--text-muted);font-size:.78rem;padding-top:.25rem;border-top:1px solid var(--border)">
+              <span><strong style="color:var(--text)">{{ pair.best_replacement.replace_isin }}</strong>
+                &nbsp;TER: <span :class="terClass(pair.best_replacement.replace_ter)">{{ pair.best_replacement.replace_ter != null ? pair.best_replacement.replace_ter.toFixed(2)+'%' : '—' }}</span>
+                &nbsp;Score: <span :class="scoreBadgeClass(pair.best_replacement.replace_goetf_score)" style="font-weight:700">{{ pair.best_replacement.replace_goetf_score?.toFixed(1) ?? '—' }}</span>
+              </span>
+              <span style="color:var(--text-muted)">→</span>
+              <span><strong style="color:var(--text)">{{ pair.best_replacement.candidate_isin }}</strong>
+                &nbsp;TER: <span :class="terClass(pair.best_replacement.candidate_ter)">{{ pair.best_replacement.candidate_ter != null ? pair.best_replacement.candidate_ter.toFixed(2)+'%' : '—' }}</span>
+                &nbsp;Score: <span :class="scoreBadgeClass(pair.best_replacement.candidate_goetf_score)" style="font-weight:700">{{ pair.best_replacement.candidate_goetf_score?.toFixed(1) ?? '—' }}</span>
+              </span>
+            </div>
           </div>
           <div v-else style="font-size:.8rem;color:var(--text-muted);font-style:italic">No replacement found in available ETFs</div>
         </div>

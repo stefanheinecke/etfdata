@@ -374,6 +374,10 @@ class AnalyticsService:
         if len(portfolio) < 2:
             return []
 
+        from app.services.scoring_service import compute_goetf_scores
+        all_scores = compute_goetf_scores(db)
+        score_map = {s["etf_id"]: s.get("goetf_score") for s in all_scores}
+
         etf_ids = [UUID(p["etf_id"]) for p in portfolio]
         candidates = db.query(ETF).filter(ETF.id.notin_(etf_ids)).limit(candidate_limit).all()
 
@@ -404,9 +408,12 @@ class AnalyticsService:
                     if reduction > best_reduction:
                         best_reduction = reduction
                         best = {"replace_etf_id": str(etf_a), "replace_isin": etf_a_obj.isin,
+                                "replace_ter": float(etf_a_obj.ter) if etf_a_obj.ter else None,
+                                "replace_goetf_score": score_map.get(str(etf_a)),
                                 "candidate_etf_id": str(c.id), "candidate_isin": c.isin,
                                 "candidate_name": c.name, "candidate_provider": c.provider,
                                 "candidate_ter": float(c.ter) if c.ter else None,
+                                "candidate_goetf_score": score_map.get(str(c.id)),
                                 "new_overlap": round(new_ov, 1), "reduction": round(reduction, 1)}
 
                     # Try replacing ETF_B with candidate
@@ -415,9 +422,12 @@ class AnalyticsService:
                     if reduction > best_reduction:
                         best_reduction = reduction
                         best = {"replace_etf_id": str(etf_b), "replace_isin": etf_b_obj.isin,
+                                "replace_ter": float(etf_b_obj.ter) if etf_b_obj.ter else None,
+                                "replace_goetf_score": score_map.get(str(etf_b)),
                                 "candidate_etf_id": str(c.id), "candidate_isin": c.isin,
                                 "candidate_name": c.name, "candidate_provider": c.provider,
                                 "candidate_ter": float(c.ter) if c.ter else None,
+                                "candidate_goetf_score": score_map.get(str(c.id)),
                                 "new_overlap": round(new_ov, 1), "reduction": round(reduction, 1)}
 
                 suggestions.append({
