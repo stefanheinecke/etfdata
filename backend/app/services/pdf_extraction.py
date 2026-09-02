@@ -528,9 +528,13 @@ class PDFExtractionService:
     @staticmethod
     def _parse_holdings_table(table: List[List[str]]) -> List[Dict[str, Any]]:
         """Parse a holdings table extracted from PDF."""
+        import logging
+        log = logging.getLogger(__name__)
+        
         holdings = []
 
         if not table or len(table) < 2:
+            log.warning(f"[pdf] Table too small: {len(table)} rows")
             return holdings
 
         # Try to identify column headers
@@ -549,7 +553,10 @@ class PDFExtractionService:
         # If we can't identify columns, try to infer from data
         if name_idx is None or weight_idx is None:
             # Try to detect based on row patterns
-            return PDFExtractionService._parse_holdings_auto(table)
+            log.info(f"[pdf] Column detection failed, falling back to auto-detect. Table has {len(table)} rows")
+            result = PDFExtractionService._parse_holdings_auto(table)
+            log.info(f"[pdf] Auto-detect returned {len(result)} holdings")
+            return result
 
         # Parse data rows
         for row in table[1:]:
@@ -605,14 +612,19 @@ class PDFExtractionService:
         
         holdings = []
         
+        log.info(f"[pdf] Auto-detect: starting, table has {len(table)} rows, first row: {table[0] if table else 'empty'}")
+        
         if not table or len(table) < 2:
+            log.warning("[pdf] Auto-detect: table too small")
             return holdings
         
         # Skip header row(s) that are all empty/None
         data_start = 1
         while data_start < len(table):
             row = table[data_start]
-            if row and any(cell and str(cell).strip() for cell in row):
+            has_content = row and any(cell and str(cell).strip() for cell in row)
+            if has_content:
+                log.info(f"[pdf] Auto-detect: first non-empty row at index {data_start}: {row}")
                 break
             data_start += 1
         
@@ -650,7 +662,7 @@ class PDFExtractionService:
                 break
         
         if weight_col is None:
-            log.warning("[pdf] Auto-detect: could not find weight column")
+            log.warning("[pdf] Auto-detect: could not find weight column (no float values 0-100 found)")
             return holdings
         
         # Name is typically in a column before or near the weight column, often the first few columns
@@ -659,9 +671,10 @@ class PDFExtractionService:
         if name_col < 0:
             name_col = 0
         
-        log.info(f"[pdf] Auto-detect: attempting name_col={name_col}, weight_col={weight_col}")
+        log.info(f"[pdf] Auto-detect: using name_col={name_col}, weight_col={weight_col}")
         
         # Now parse holdings using detected columns
+        parsed_count = 0
         for row in table[data_start:]:
             if not row or len(row) <= max(name_col, weight_col):
                 continue
@@ -685,11 +698,14 @@ class PDFExtractionService:
                     "sector": None,
                 }
                 holdings.append(holding)
-                log.info(f"[pdf] Auto-detect: parsed {name} {weight}%")
-            except (ValueError, TypeError, AttributeError, IndexError):
+                parsed_count += 1
+                if parsed_count <= 5:
+                    log.info(f"[pdf] Auto-detect: parsed {name} {weight}%")
+            except (ValueError, TypeError, AttributeError, IndexError) as e:
+                log.debug(f"[pdf] Auto-detect: error parsing row: {e}")
                 continue
         
-        log.info(f"[pdf] Auto-detect: parsed {len(holdings)} holdings total")
+        log.info(f"[pdf] Auto-detect: finished, parsed {len(holdings)} holdings total")
         return holdings
 
     @staticmethod
