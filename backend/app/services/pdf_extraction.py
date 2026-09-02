@@ -536,6 +536,10 @@ class PDFExtractionService:
                         name = name[len(sector):].strip()
                         break
                 
+                # Also remove the sector percentage that follows (e.g., "36.8 ", "12.5 ")
+                # Pattern: 1-3 digits, dot, 1 digit, then whitespace
+                name = re.sub(r'^\d{1,3}\.\d\s+', '', name).strip()
+                
                 # Skip if name is empty or too short
                 if not name or len(name) < 3:
                     continue
