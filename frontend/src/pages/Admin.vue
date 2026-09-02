@@ -440,6 +440,71 @@
           </div>
           <div v-if="pdfError" class="error-box">{{ pdfError }}</div>
         </div>
+
+        <!-- Review & Edit extracted data -->
+        <div v-if="importStep === 'review'" style="display:flex;flex-direction:column;gap:1rem">
+          <div class="grid-2">
+            <div>
+              <label class="label">ISIN</label>
+              <input class="input" v-model="pdfFormData.isin" placeholder="e.g. IE00BKM4GZ66" style="text-transform:uppercase" />
+            </div>
+            <div>
+              <label class="label">Name</label>
+              <input class="input" v-model="pdfFormData.name" />
+            </div>
+            <div>
+              <label class="label">Provider</label>
+              <input class="input" v-model="pdfFormData.provider" />
+            </div>
+            <div>
+              <label class="label">TER %</label>
+              <input class="input" type="number" step="0.01" v-model.number="pdfFormData.ter" />
+            </div>
+          </div>
+
+          <div>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem">
+              <label class="label" style="margin:0">Holdings ({{ pdfFormData.holdings.length }})</label>
+              <button class="btn btn-outline" @click="pdfFormData.holdings.push({ instrument_name: '', instrument_isin: '', weight: 0, sector: '', country: '' })">+ Add Holding</button>
+            </div>
+            <div class="log-table-wrap" style="max-height:400px;overflow-y:auto">
+              <table class="log-table">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>ISIN</th>
+                    <th style="text-align:right">Weight %</th>
+                    <th>Sector</th>
+                    <th>Country</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(h, idx) in pdfFormData.holdings" :key="idx">
+                    <td><input class="input" v-model="h.instrument_name" style="min-width:160px" /></td>
+                    <td><input class="input" v-model="h.instrument_isin" style="width:110px;text-transform:uppercase" /></td>
+                    <td><input class="input" type="number" step="0.01" v-model.number="h.weight" style="width:80px;text-align:right" /></td>
+                    <td><input class="input" v-model="h.sector" style="width:120px" /></td>
+                    <td><input class="input" v-model="h.country" style="width:70px;text-transform:uppercase" /></td>
+                    <td><button class="btn btn-danger" @click="pdfFormData.holdings.splice(idx, 1)">✕</button></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div v-if="pdfSubmitError" class="error-box">{{ pdfSubmitError }}</div>
+          <div style="display:flex;gap:.75rem">
+            <button class="btn btn-primary" @click="savePdfImport" :disabled="pdfSaving" style="flex:1">
+              {{ pdfSaving ? 'Saving…' : '✓ Save & Import' }}
+            </button>
+            <button class="btn btn-outline" @click="resetPdfImport">Cancel</button>
+          </div>
+        </div>
+
+        <div v-if="pdfSuccess" class="success-msg" style="margin-top:.75rem">
+          ✓ Imported {{ pdfSuccess.name || pdfSuccess.isin || 'ETF' }} successfully.
+        </div>
       </div>
     </template><!-- /import tab -->
 
