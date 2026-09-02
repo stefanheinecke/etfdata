@@ -61,77 +61,101 @@ class PDFExtractionService:
     def _flatten_cell(s: Optional[str]) -> str:
         return re.sub(r'\s+', ' ', s or '').strip()
 
-    # Known key-facts row labels, used to tell a wrapped label continuation
-    # (e.g. "Company" continuing "Name of the Management") apart from the
-    # start of a genuinely new field.
+    # Known key-facts row labels, used to tell a genuinely new field apart from
+    # a wrapped label continuation (e.g. "Company" continuing "Name of the
+    # Management") when stitching multi-line rows back together.
     _KEY_FACTS_LABEL_STARTS = [
         'name of fund', 'share class', 'isin', 'securities no', 'ucits v',
         'launch date', 'currency of fund', 'ter', 'name of the management',
         'accounting year end', 'distribution', 'replication method',
         'portfolio management', 'fund domicile', 'sfdr alignment', 'fund statistics',
+        'net asset value', 'last 12 months', 'total fund assets', 'share class assets',
     ]
 
     @staticmethod
-    def _find_key_facts_column(lines: List[str]) -> Optional[int]:
-        """Determine the value column's character offset using a reliable anchor row.
+    def _group_words_into_lines(words: List[dict], y_tolerance: float = 3.0) -> List[List[dict]]:
+        """Group words into visual lines by their vertical ('top') position."""
+        if not words:
+            return []
+        ordered = sorted(words, key=lambda w: (round(w['top']), w['x0']))
+        lines: List[List[dict]] = []
+        current: List[dict] = []
+        current_top = None
+        for w in ordered:
+            if current_top is None or abs(w['top'] - current_top) > y_tolerance:
+                if current:
+                    lines.append(sorted(current, key=lambda w: w['x0']))
+                current = [w]
+                current_top = w['top']
+            else:
+                current.append(w)
+        if current:
+            lines.append(sorted(current, key=lambda w: w['x0']))
+        return lines
 
-        The key-facts section is a fixed two-column table rendered with
-        layout-preserved spacing, so every row's value starts at the same
-        character column. 'ISIN' is a short, virtually universal, single-line
-        label that makes a reliable anchor.
+    @staticmethod
+    def _line_segments(line_words: List[dict], gap_threshold: float = 10.0) -> List[List[dict]]:
+        """Split a line's words into column segments wherever a large horizontal gap occurs.
+
+        Two-column factsheet pages place unrelated content (e.g. a performance
+        chart) at the same vertical position as key-facts rows. Normal word
+        spacing is ~2pt; a real column boundary leaves a much larger gap, so
+        splitting on gaps > gap_threshold isolates label / value / other-column
+        content into separate segments.
         """
-        for anchor in ('ISIN', 'UCITS V', 'SFDR Alignment', 'Fund domicile'):
-            pat = re.compile(rf'^\s{{0,3}}{re.escape(anchor)}\s{{2,}}', re.IGNORECASE)
-            for line in lines:
-                m = pat.match(line)
-                if m:
-                    return m.end()
-        return None
+        if not line_words:
+            return []
+        segments: List[List[dict]] = [[line_words[0]]]
+        for prev, cur in zip(line_words, line_words[1:]):
+            if cur['x0'] - prev['x1'] > gap_threshold:
+                segments.append([cur])
+            else:
+                segments[-1].append(cur)
+        return segments
 
     @staticmethod
     def _find_key_facts_value(pdf, label_re) -> Optional[str]:
-        """Read a label's value from the key-facts table using its fixed value column.
+        """Read a label's value from the key-facts table using word-level coordinates.
 
-        Restricting the label search to the label column (left of the value
-        column boundary) avoids false matches such as 'share class' inside
-        'Currency of fund / share class', since long labels wrap onto a second
-        line rather than spilling into the value column. Also stitches in one
-        continuation line for labels/values that wrap (e.g. 'Name of the
-        Management' / 'Company').
+        Splits each visual line into column segments by horizontal gap so that
+        a label's own value column is isolated from unrelated content sharing
+        the same row (e.g. a performance chart's x-axis labels). Also stitches
+        in one continuation line for labels/values that wrap onto two lines
+        (e.g. 'Name of the Management' / 'Company').
         """
         for page in pdf.pages[:3]:
             try:
-                text = page.extract_text(layout=True)
+                words = page.extract_words()
             except Exception:
-                text = None
-            if not text:
+                words = None
+            if not words:
                 continue
-            lines = text.split('\n')
-            col = PDFExtractionService._find_key_facts_column(lines)
-            if col is None:
-                continue
-            for idx, line in enumerate(lines):
-                label_part = line[:col] if len(line) > col else line
-                if not label_re.search(label_part):
+            lines = PDFExtractionService._group_words_into_lines(words)
+            line_segments = [PDFExtractionService._line_segments(line) for line in lines]
+            for idx, segments in enumerate(line_segments):
+                if not segments:
+                    continue
+                label_text = ' '.join(w['text'] for w in segments[0]).strip()
+                if not label_re.match(label_text):
                     continue
                 value_parts = []
-                v = line[col:].strip() if len(line) > col else ''
-                if v:
-                    value_parts.append(v)
-                if idx + 1 < len(lines):
-                    next_line = lines[idx + 1]
-                    next_label = PDFExtractionService._flatten_cell(
-                        next_line[:col] if len(next_line) > col else next_line
-                    ).lower()
-                    is_new_label = any(
-                        next_label.startswith(k) for k in PDFExtractionService._KEY_FACTS_LABEL_STARTS
-                    ) if next_label else False
-                    if not is_new_label:
-                        nv = next_line[col:].strip() if len(next_line) > col else ''
-                        if nv:
-                            value_parts.append(nv)
+                if len(segments) > 1:
+                    value_parts.append(' '.join(w['text'] for w in segments[1]))
+                if idx + 1 < len(line_segments):
+                    next_segments = line_segments[idx + 1]
+                    if next_segments:
+                        next_label = PDFExtractionService._flatten_cell(
+                            ' '.join(w['text'] for w in next_segments[0])
+                        ).lower()
+                        is_new_label = any(
+                            next_label == k or next_label.startswith(k)
+                            for k in PDFExtractionService._KEY_FACTS_LABEL_STARTS
+                        )
+                        if not is_new_label and len(next_segments) > 1:
+                            value_parts.append(' '.join(w['text'] for w in next_segments[1]))
+                value_parts = [v for v in value_parts if v]
                 if value_parts:
-                    return ' '.join(value_parts)
+                    return ' '.join(value_parts).strip()
         return None
 
     @staticmethod
@@ -212,10 +236,11 @@ class PDFExtractionService:
     @staticmethod
     def _find_provider(text: str, pdf=None) -> Optional[str]:
         """Find fund provider - the full "Name of the Management Company" value."""
-        # Preferred: read the value from the key-facts table row
+        # Preferred: read the value from the key-facts table row. "Company" is
+        # optional here since long labels often wrap onto a second line.
         if pdf is not None:
             company = PDFExtractionService._find_key_facts_value(
-                pdf, re.compile(r'Name\s+of\s+(?:the\s+)?Management\s+Company', re.IGNORECASE)
+                pdf, re.compile(r'Name\s+of\s+(?:the\s+)?Management(?:\s+Company)?', re.IGNORECASE)
             )
             if company:
                 return company
