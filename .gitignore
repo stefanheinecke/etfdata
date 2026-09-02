@@ -31,3 +31,4 @@ wheels/
 node_modules/
 dist/
 .DS_Store
+*.pdf
