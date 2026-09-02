@@ -166,5 +166,13 @@ export const adminService = {
     }
     return api.post('/admin/preview-import', null, config)
   },
+  uploadFactsheet(pdfFile) {
+    const form = new FormData()
+    form.append('file', pdfFile)
+    return api.post('/admin/etf/upload-factsheet', form)
+  },
+  importPdfData(adminSecret, metadata, holdings) {
+    return api.post('/admin/etf/import-data', { metadata, holdings }, { headers: { 'x-admin-secret': adminSecret } })
+  },
 }
 

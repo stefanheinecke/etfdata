@@ -1307,18 +1307,9 @@ async function extractPdfData() {
   pdfExtracting.value = true
   pdfError.value = ''
   try {
-    const formData = new FormData()
-    formData.append('file', selectedPdfFile.value)
-    formData.append('admin_secret', adminSecret.value)
-    const r = await fetch(import.meta.env.VITE_API_URL + '/admin/etf/upload-factsheet', {
-      method: 'POST',
-      body: formData
-    })
-    if (!r.ok) {
-      const errorData = await r.json()
-      throw new Error(errorData.detail || errorData.message || 'Extraction failed')
-    }
-    const data = await r.json()
+    const r = await adminService.uploadFactsheet(selectedPdfFile.value)
+    const data = r.data
+    if (data.status === 'error') throw new Error(data.message || 'Extraction failed')
     pdfFormData.value = { 
       isin: data.metadata?.isin || '', 
       name: data.metadata?.name || '', 
@@ -1328,7 +1319,7 @@ async function extractPdfData() {
     }
     importStep.value = 'review'
   } catch(e) {
-    pdfError.value = e.message
+    pdfError.value = e.response?.data?.detail || e.message
   } finally {
     pdfExtracting.value = false
   }
@@ -1342,32 +1333,18 @@ async function savePdfImport() {
   pdfSaving.value = true
   pdfSubmitError.value = ''
   try {
-    const r = await fetch(import.meta.env.VITE_API_URL + '/admin/etf/import-data', {
-      method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        'x-admin-secret': adminSecret.value
-      },
-      body: JSON.stringify({ 
-        metadata: {
-          isin: pdfFormData.value.isin,
-          name: pdfFormData.value.name,
-          provider: pdfFormData.value.provider,
-          ter: pdfFormData.value.ter
-        },
-        holdings: pdfFormData.value.holdings
-      })
-    })
-    if (!r.ok) {
-      const errorData = await r.json()
-      throw new Error(errorData.detail || 'Import failed')
+    const metadata = {
+      isin: pdfFormData.value.isin,
+      name: pdfFormData.value.name,
+      provider: pdfFormData.value.provider,
+      ter: pdfFormData.value.ter
     }
-    const result = await r.json()
-    pdfSuccess.value = result
+    const r = await adminService.importPdfData(adminSecret.value, metadata, pdfFormData.value.holdings)
+    pdfSuccess.value = r.data
     resetPdfImport()
     setTimeout(() => { pdfSuccess.value = null }, 4000)
   } catch(e) {
-    pdfSubmitError.value = e.message
+    pdfSubmitError.value = e.response?.data?.detail || e.message
   } finally {
     pdfSaving.value = false
   }
