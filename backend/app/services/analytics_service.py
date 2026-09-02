@@ -182,7 +182,7 @@ class AnalyticsService:
                 .order_by(Performance.date)
                 .all()
             )
-            prices = [float(p.close_price) for p in perf if p.close_price is not None]
+            prices = [float(p.close_price) for p in perf if p.close_price is not None and p.close_price > 0]
             row["data_points"] = len(prices)
 
             if len(prices) >= 20:

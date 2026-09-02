@@ -30,7 +30,21 @@ class RequestLogMiddleware(BaseHTTPMiddleware):
         # a permanent hang on any endpoint that reads a JSON body (POST/PATCH/PUT).
         # Instead we read the cached _body attribute AFTER call_next — FastAPI will
         # have populated it while parsing endpoint parameters.
-        response = await call_next(request)
+        try:
+            response = await call_next(request)
+        except Exception:
+            # Catch here (inside CORSMiddleware) rather than relying on FastAPI's
+            # app.exception_handler(Exception): that gets wired into Starlette's
+            # ServerErrorMiddleware, which sits OUTSIDE CORSMiddleware, so any
+            # response it builds never gets CORS headers attached. Catching the
+            # exception here (inside CORSMiddleware) lets the JSON response we
+            # build below flow back out through CORSMiddleware normally.
+            import logging
+            import traceback
+            logging.getLogger(__name__).error(
+                "Unhandled exception on %s: %s", request.url.path, traceback.format_exc()
+            )
+            return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
         body_str = None
         content_type = request.headers.get("content-type", "")

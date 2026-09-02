@@ -61,7 +61,7 @@ def _compute_raw_metrics(db: Session, etf: ETF, rf_annual: float) -> Optional[Di
         .order_by(Performance.date)
         .all()
     )
-    prices = [float(p.close_price) for p in perf if p.close_price is not None]
+    prices = [float(p.close_price) for p in perf if p.close_price is not None and p.close_price > 0]
 
     if len(prices) < MIN_PRICE_OBSERVATIONS:
         return None
