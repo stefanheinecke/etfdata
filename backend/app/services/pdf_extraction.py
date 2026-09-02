@@ -461,154 +461,71 @@ class PDFExtractionService:
 
     @staticmethod
     def _parse_holdings_from_text(text: str) -> List[Dict[str, Any]]:
-        """Parse holdings from text patterns like 'NAME WEIGHT'."""
+        """Parse holdings from text after 'Index 10 largest equity positions' header."""
         import logging
         log = logging.getLogger(__name__)
         
-        holdings = []
         import re
+        holdings = []
         
         lines = text.split('\n')
         
-        # First pass: try to find a marked holdings section
-        in_holdings_section = False
-        holdings_lines = []
-        
+        # Find the consistent header: "Index 10 largest equity positions" or similar variants
+        holdings_start = None
         for idx, line in enumerate(lines):
-            line_lower = line.lower()
+            if 'index' in line.lower() and 'largest' in line.lower():
+                log.info(f"[pdf] Found holdings header at line {idx}: {line.strip()}")
+                holdings_start = idx + 1
+                break
+        
+        if holdings_start is None:
+            log.warning("[pdf] Could not find 'Index ... largest' header")
+            return holdings
+        
+        # Parse the table rows after the header
+        # Format is typically: "COMPANY NAME    XX.XX" or "COMPANY NAME XX.XX %"
+        for idx in range(holdings_start, len(lines)):
+            line = lines[idx].strip()
             
-            # Check if we're entering a holdings section (English or German)
-            if any(keyword in line_lower for keyword in [
-                    'largest equity positions', 'largest holdings', 'top holdings', 'top positions',
-                    'grösste aktienposition', 'top 10', 'composition', 'portfolio composition']):
-                in_holdings_section = True
-                log.info(f"[pdf] Text: found holdings section header at line {idx}: {line.strip()}")
+            if not line:
                 continue
             
-            # Check if we're leaving the section (English or German)
-            if in_holdings_section and any(keyword in line_lower for keyword in [
-                    'benefits', 'risks', 'disclaimer', 'vorteile', 'risiken', 'fund statistics',
-                    'fund performance', 'fund characteristics', 'key facts', 'profile']):
-                log.info(f"[pdf] Text: leaving holdings section at line {idx}: {line.strip()}")
-                in_holdings_section = False
-                continue
-            
-            if in_holdings_section:
-                holdings_lines.append(line)
-        
-        # Try to parse holdings from the section we found
-        if holdings_lines:
-            log.info(f"[pdf] Text: found {len(holdings_lines)} lines in marked holdings section")
-            parsed = PDFExtractionService._parse_holdings_from_lines(holdings_lines)
-            if parsed and len(parsed) > 1:  # Only accept if we found multiple holdings
-                log.info(f"[pdf] Text: marked section parsing found {len(parsed)} holdings")
-                return parsed
-            elif parsed:
-                log.info(f"[pdf] Text: marked section only found {len(parsed)} holding(s), continuing scan")
-        
-        # Second pass: if no marked section or only 1 holding found, 
-        # look for pages that have multiple percentage values in sequence
-        # (likely a holdings table), but skip first page (usually front matter)
-        log.info(f"[pdf] Text: scanning for holdings in full text (skipping first page)")
-        
-        # Split by common page break indicators
-        pages = re.split(r'\n\s*(?:Page \d+|^\s*\d+\s*$)', text, flags=re.MULTILINE)
-        
-        # Skip first page (usually front matter with key facts)
-        for page_idx, page in enumerate(pages[1:], start=2):
-            candidate_lines = []
-            page_lines = page.split('\n')
-            
-            # Look for lines with percentage patterns
-            for line in page_lines:
-                # Look for lines with format: "COMPANY_NAME   XX.XX" or similar
-                # Percentage pattern: 1-3 digits, decimal point, 2 digits
-                if re.search(r'\d{1,3}\.\d{2}(?:\s|%|$)', line) and len(line.strip()) > 5:
-                    candidate_lines.append(line)
-            
-            if len(candidate_lines) >= 3:  # Need at least 3 lines with percentages to be a holdings table
-                log.info(f"[pdf] Text: page {page_idx} has {len(candidate_lines)} candidate holdings lines")
-                parsed = PDFExtractionService._parse_holdings_from_lines(candidate_lines)
-                if parsed and len(parsed) >= 3:  # Only accept if we found at least 3 valid holdings
-                    log.info(f"[pdf] Text: page {page_idx} parsing found {len(parsed)} holdings")
-                    return parsed
-        
-        log.warning(f"[pdf] Text: could not find a valid holdings section with multiple holdings")
-        return holdings
-    
-    @staticmethod
-    def _parse_holdings_from_lines(lines: List[str]) -> List[Dict[str, Any]]:
-        """Parse holdings from a list of text lines."""
-        import logging
-        log = logging.getLogger(__name__)
-        
-        holdings = []
-        import re
-        
-        # Keywords that indicate non-holdings content
-        skip_keywords = [
-            'benchmark', 'fund', 'as of', 'date', 'total', 'index', 'portfolio',
-            'dividend', 'yield', 'reduced', 'was', 'from', 'to', 'the', 'this',
-            'cash', 'other', 'distribution', 'expense', 'ratio', 'ter',
-            'performance', 'return', 'risk', 'disclaimer', 'source', 'note',
-            'currency', 'sector', 'country', 'allocation', 'statistics',
-            'name', 'weight', 'position', 'holdings', 'largest', 'top'
-        ]
-        
-        for line in lines:
-            line = line.strip()
-            if not line or len(line) < 5:
-                continue
+            # Stop at end-of-section markers
+            if any(keyword in line.lower() for keyword in [
+                    'fund statistics', 'key facts', 'costs', 'fund performance',
+                    'fund data', 'disclaimer', 'important information', 'risks']):
+                log.info(f"[pdf] Found section end at line {idx}")
+                break
             
             # Skip header rows
-            if 'table_captions' in line.lower() or line.startswith('Index'):
+            if any(kw in line.upper() for kw in ['NAME', 'WEIGHT', 'ISIN', '%']):
                 continue
             
-            # Parse holdings from lines with pattern: "NAME1 WEIGHT1 NAME2 WEIGHT2"
-            # Weights are always in format XX.XX
-            # Use regex to find all "name weight" pairs
-            
-            # Pattern: matches both ALL-CAPS (e.g. ASML HLDG) and Title Case (e.g. Taiwan Semiconductor)
-            pattern = r'([A-Za-z][A-Za-z0-9\s\-\.&,]*?)\s+([0-9]{1,3}\.[0-9]{2})'
-            
-            matches = re.findall(pattern, line)
-            
-            for name, weight_str in matches:
-                name = name.strip()
-                
-                # Filter out invalid names
-                if not name or len(name) < 3 or len(name) > 100:
-                    continue
-                
-                # Skip if the name is a known non-holding keyword
-                name_lower = name.lower()
-                if any(keyword in name_lower for keyword in skip_keywords):
-                    log.debug(f"[pdf] Skipping '{name}' (matched skip keyword)")
-                    continue
-                
-                # Skip rows that are clearly not holdings (all caps but very short like "OF")
-                if name.isupper() and len(name) <= 2:
-                    continue
+            # Parse: company name followed by percentage
+            # Anchor on the percentage (XX.XX) and everything before it is the name
+            match = re.search(r'^(.{3,100}?)\s+(\d{1,3}\.\d{2})(?:\s|%|$)', line)
+            if match:
+                name = match.group(1).strip()
+                weight_str = match.group(2)
                 
                 try:
                     weight = float(weight_str)
-                    if weight <= 0 or weight > 100:
-                        continue
-                    
-                    holding = {
-                        'instrument_name': name,
-                        'weight': weight,
-                        'instrument_isin': None,
-                        'country': None,
-                        'sector': None,
-                    }
-                    holdings.append(holding)
-                    log.debug(f"[pdf] Parsed holding: {name} {weight}%")
+                    if 0 < weight <= 100:
+                        holding = {
+                            'instrument_name': name,
+                            'weight': weight,
+                            'instrument_isin': None,
+                            'country': None,
+                            'sector': None,
+                        }
+                        holdings.append(holding)
+                        log.info(f"[pdf] Parsed: {name} ({weight}%)")
                 except ValueError:
-                    continue
+                    pass
         
-        log.info(f"[pdf] _parse_holdings_from_lines: extracted {len(holdings)} holdings from {len(lines)} lines")
+        log.info(f"[pdf] Total parsed: {len(holdings)} holdings")
         return holdings
+    
 
     @staticmethod
     def _parse_holdings_table(table: List[List[str]]) -> List[Dict[str, Any]]:
