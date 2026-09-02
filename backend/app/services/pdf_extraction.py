@@ -600,28 +600,80 @@ class PDFExtractionService:
     @staticmethod
     def _parse_holdings_auto(table: List[List[str]]) -> List[Dict[str, Any]]:
         """Auto-detect and parse holdings when headers are unclear."""
+        import logging
+        log = logging.getLogger(__name__)
+        
         holdings = []
         
-        # For simple tables, assume first column is name, second is weight
-        for row in table[1:]:
+        if not table or len(table) < 2:
+            return holdings
+        
+        # Skip header row(s) that are all empty/None
+        data_start = 1
+        while data_start < len(table):
+            row = table[data_start]
+            if row and any(cell and str(cell).strip() for cell in row):
+                break
+            data_start += 1
+        
+        if data_start >= len(table):
+            log.warning("[pdf] Auto-detect: all rows appear to be headers/empty")
+            return holdings
+        
+        # Scan through data rows to find which columns likely contain names vs weights
+        name_col = None
+        weight_col = None
+        
+        for row in table[data_start:]:
             if not row or len(row) < 2:
                 continue
             
-            try:
-                # Get first two non-empty elements
-                name = None
-                weight_str = None
+            for col_idx, cell in enumerate(row):
+                if not cell:
+                    continue
                 
-                for cell in row:
-                    if cell and name is None:
-                        name = str(cell).strip()
-                    elif cell and weight_str is None:
-                        weight_str = str(cell).strip()
+                cell_str = str(cell).strip()
+                if not cell_str:
+                    continue
+                
+                # Check if this looks like a weight percentage (e.g., "2.86", "45.23")
+                try:
+                    val = float(cell_str.replace('%', '').replace(',', '.'))
+                    if 0 < val <= 100 and weight_col is None:
+                        weight_col = col_idx
+                        log.info(f"[pdf] Auto-detect: found weight column at index {weight_col} with value {cell_str}")
+                        break
+                except ValueError:
+                    pass
+            
+            if weight_col is not None:
+                break
+        
+        if weight_col is None:
+            log.warning("[pdf] Auto-detect: could not find weight column")
+            return holdings
+        
+        # Name is typically in a column before or near the weight column, often the first few columns
+        # Try columns before weight first
+        name_col = weight_col - 1
+        if name_col < 0:
+            name_col = 0
+        
+        log.info(f"[pdf] Auto-detect: attempting name_col={name_col}, weight_col={weight_col}")
+        
+        # Now parse holdings using detected columns
+        for row in table[data_start:]:
+            if not row or len(row) <= max(name_col, weight_col):
+                continue
+            
+            try:
+                name = str(row[name_col]).strip() if row[name_col] else None
+                weight_str = str(row[weight_col]).strip() if row[weight_col] else '0'
                 
                 if not name or name.lower() in ['total', 'name', '']:
                     continue
                 
-                weight = PDFExtractionService._parse_weight(weight_str or '0')
+                weight = PDFExtractionService._parse_weight(weight_str)
                 if weight is None or weight <= 0:
                     continue
                 
@@ -633,9 +685,11 @@ class PDFExtractionService:
                     "sector": None,
                 }
                 holdings.append(holding)
-            except (ValueError, TypeError, AttributeError):
+                log.info(f"[pdf] Auto-detect: parsed {name} {weight}%")
+            except (ValueError, TypeError, AttributeError, IndexError):
                 continue
         
+        log.info(f"[pdf] Auto-detect: parsed {len(holdings)} holdings total")
         return holdings
 
     @staticmethod
