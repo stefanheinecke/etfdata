@@ -43,15 +43,16 @@ class PDFExtractionService:
     @staticmethod
     def _extract_metadata(text: str, pdf) -> Dict[str, Any]:
         """Extract ETF metadata from PDF text."""
+        dividend_policy = PDFExtractionService._find_dividend_policy(text)
         metadata = {
-            "name": PDFExtractionService._find_etf_name(text),
+            "name": PDFExtractionService._find_etf_name(text, dividend_policy),
             "isin": PDFExtractionService._find_isin(text),
             "provider": PDFExtractionService._find_provider(text),
             "ter": PDFExtractionService._find_ter(text),
             "domicile": PDFExtractionService._find_domicile(text),
             "fund_size": PDFExtractionService._find_fund_size(text),
             "replication_method": PDFExtractionService._find_replication_method(text),
-            "dividend_policy": PDFExtractionService._find_dividend_policy(text),
+            "dividend_policy": dividend_policy,
         }
         
         return {k: v for k, v in metadata.items() if v is not None}
@@ -70,28 +71,68 @@ class PDFExtractionService:
         return match.group(1) if match else None
 
     @staticmethod
-    def _find_etf_name(text: str) -> Optional[str]:
-        """Find ETF name - usually appears in first few lines or after 'Name of fund'."""
+    def _find_etf_name(text: str, dividend_policy: Optional[str] = None) -> Optional[str]:
+        """Find ETF share class name - e.g. 'UBS Core EURO STOXX 50 UCITS ETF EUR dis'.
+
+        Uses the fund name plus share class currency/distribution suffix so that
+        different currency or distributing/accumulating variants are distinguishable.
+        """
+        base_name = None
         # First try to find after "Name of fund" label
         match = re.search(r'Name\s+of\s+fund\s+([^\n]+)', text, re.IGNORECASE)
         if match:
-            return match.group(1).strip()
-        
-        # Look for lines with "UCITS ETF" or similar fund indicators
-        lines = text.split('\n')
-        for line in lines[:20]:
-            line = line.strip()
-            if 'UCITS ETF' in line or 'ETF' in line.upper():
-                # Remove leading/trailing metadata
-                if len(line) > 10 and len(line) < 200:
-                    return line
-        
+            base_name = match.group(1).strip()
+        else:
+            # Look for lines with "UCITS ETF" or similar fund indicators
+            lines = text.split('\n')
+            for line in lines[:20]:
+                line = line.strip()
+                if 'UCITS ETF' in line or 'ETF' in line.upper():
+                    # Remove leading/trailing metadata
+                    if len(line) > 10 and len(line) < 200:
+                        base_name = line
+                        break
+
+        if not base_name:
+            return None
+
+        # Append share class suffix (currency + dis/acc) if not already present
+        suffix_parts = []
+        currency = PDFExtractionService._find_share_class_currency(text)
+        if currency and currency.upper() not in base_name.upper():
+            suffix_parts.append(currency.upper())
+        if dividend_policy:
+            short = 'acc' if dividend_policy == 'Accumulating' else 'dis'
+            if not re.search(r'\b(acc|dis|dist|inc)\b', base_name, re.IGNORECASE):
+                suffix_parts.append(short)
+
+        if suffix_parts:
+            return f"{base_name} {' '.join(suffix_parts)}"
+        return base_name
+
+    @staticmethod
+    def _find_share_class_currency(text: str) -> Optional[str]:
+        """Find the share class trading currency (e.g. 'Share class currency: EUR')."""
+        match = re.search(
+            r'(?:Share\s+class\s+currency|Trading\s+currency|Currency\s+of\s+share\s+class|W\u00e4hrung\s+der\s+Anteilsklasse)'
+            r'[:\s]+([A-Z]{3})\b',
+            text, re.IGNORECASE
+        )
+        if match:
+            return match.group(1).upper()
         return None
 
     @staticmethod
     def _find_provider(text: str) -> Optional[str]:
-        """Find fund provider/management company name."""
-        # Look for "Management Company" or "Manager" patterns
+        """Find fund provider - the Management Company name."""
+        # Preferred: explicit "Name of the Management Company" field
+        match = re.search(r'Name\s+of\s+(?:the\s+)?Management\s+Company[\s:]*([^\n]+)', text, re.IGNORECASE)
+        if match:
+            company_match = re.match(r'([^,()\n]+)', match.group(1).strip())
+            if company_match:
+                return company_match.group(1).strip()
+
+        # Fallback: "Management Company" / "Fund Manager" / "Provider" patterns
         match = re.search(r'(?:Management\s+Company|Fund\s+Manager|Provider)[\s:]*([^\n]+)', text, re.IGNORECASE)
         if match:
             provider_text = match.group(1).strip()
