@@ -400,25 +400,33 @@ class PDFExtractionService:
     def _extract_holdings(pdf) -> List[Dict[str, Any]]:
         """Extract holdings from PDF - try both tables and text patterns."""
         from app.services.holdings_enrichment import HoldingsEnrichmentService
+        import logging
+        log = logging.getLogger(__name__)
         
         holdings = []
 
         # First try to extract from tables
-        for page in pdf.pages:
+        for page_idx, page in enumerate(pdf.pages):
             tables = page.extract_tables()
             if tables:
-                for table in tables:
+                log.info(f"[pdf] Page {page_idx}: found {len(tables)} table(s)")
+                for table_idx, table in enumerate(tables):
                     extracted = PDFExtractionService._parse_holdings_table(table)
+                    log.info(f"[pdf]   Table {table_idx}: parsed {len(extracted) if extracted else 0} holdings")
                     if extracted:  # Only use if we got results
                         holdings.extend(extracted)
+            else:
+                log.info(f"[pdf] Page {page_idx}: no tables found")
 
         # If no holdings found in tables, try to parse from text
         if not holdings:
-            for page in pdf.pages:
+            log.info(f"[pdf] No holdings from tables, falling back to text extraction")
+            for page_idx, page in enumerate(pdf.pages):
                 text = page.extract_text()
                 if text:
                     extracted = PDFExtractionService._parse_holdings_from_text(text)
                     if extracted:
+                        log.info(f"[pdf] Page {page_idx}: text extraction found {len(extracted)} holdings")
                         holdings.extend(extracted)
 
         # Remove duplicates and sort by weight
