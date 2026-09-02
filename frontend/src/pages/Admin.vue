@@ -1310,13 +1310,22 @@ async function extractPdfData() {
     const formData = new FormData()
     formData.append('file', selectedPdfFile.value)
     formData.append('admin_secret', adminSecret.value)
-    const r = await fetch(import.meta.env.VITE_API_URL + '/admin/etf/extract-pdf', {
+    const r = await fetch(import.meta.env.VITE_API_URL + '/admin/etf/upload-factsheet', {
       method: 'POST',
       body: formData
     })
-    if (!r.ok) throw new Error((await r.json()).detail || 'Extraction failed')
+    if (!r.ok) {
+      const errorData = await r.json()
+      throw new Error(errorData.detail || errorData.message || 'Extraction failed')
+    }
     const data = await r.json()
-    pdfFormData.value = { isin: data.isin || '', name: data.name || '', provider: data.provider || '', ter: data.ter, holdings: data.holdings || [] }
+    pdfFormData.value = { 
+      isin: data.metadata?.isin || '', 
+      name: data.metadata?.name || '', 
+      provider: data.metadata?.provider || '', 
+      ter: data.metadata?.ter, 
+      holdings: data.holdings || [] 
+    }
     importStep.value = 'review'
   } catch(e) {
     pdfError.value = e.message
@@ -1335,10 +1344,24 @@ async function savePdfImport() {
   try {
     const r = await fetch(import.meta.env.VITE_API_URL + '/admin/etf/import-data', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...pdfFormData.value, admin_secret: adminSecret.value })
+      headers: { 
+        'Content-Type': 'application/json',
+        'x-admin-secret': adminSecret.value
+      },
+      body: JSON.stringify({ 
+        metadata: {
+          isin: pdfFormData.value.isin,
+          name: pdfFormData.value.name,
+          provider: pdfFormData.value.provider,
+          ter: pdfFormData.value.ter
+        },
+        holdings: pdfFormData.value.holdings
+      })
     })
-    if (!r.ok) throw new Error((await r.json()).detail || 'Import failed')
+    if (!r.ok) {
+      const errorData = await r.json()
+      throw new Error(errorData.detail || 'Import failed')
+    }
     const result = await r.json()
     pdfSuccess.value = result
     resetPdfImport()

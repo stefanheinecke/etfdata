@@ -673,6 +673,7 @@ class ETFImportRequest(BaseModel):
 async def import_etf_data(
     request: ETFImportRequest,
     db: Session = Depends(get_db),
+    _: None = Depends(verify_admin_secret),
 ):
     """Import extracted ETF data into the database.
     
