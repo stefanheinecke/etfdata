@@ -468,7 +468,7 @@ class PDFExtractionService:
         import re
         holdings = []
         
-        # Known sector names from the left "Index Sector exposure" table that we need to skip
+        # Known sector names that we need to detect and skip (when they appear alone)
         sector_names = [
             'Information Technology', 'Financials', 'Communication Services',
             'Consumer Discretionary', 'Health Care', 'Industrials',
@@ -504,25 +504,40 @@ class PDFExtractionService:
                 log.info(f"[pdf] Found section end at line {idx}")
                 break
             
-            # Skip header rows and sector names (from left table)
+            # Skip header rows and pure sector lines
             line_upper = line.upper()
             if any(kw in line_upper for kw in ['NAME', 'WEIGHT', 'ISIN', '%', 'INDEX']):
                 continue
             
-            # Skip known sector names that appear in the left "Sector exposure" table
+            # Skip lines that are ONLY sectors (no company holdings)
+            # Check if this is a pure sector line by seeing if it's one of our sector names
+            # (possibly with a number, but no company identifier like "CORP", "INC", "COMMON STOCK")
+            is_pure_sector = False
             if any(sector in line for sector in sector_names):
-                log.debug(f"[pdf] Skipping sector line: {line}")
+                # It has a sector name, but does it also have company/stock indicators?
+                if not any(indicator in line.upper() for indicator in ['CORP', 'INC', 'COMMON STOCK', 'CLASS', 'STOCK USD']):
+                    # No company indicators, so this is a pure sector line
+                    log.debug(f"[pdf] Skipping pure sector line: {line}")
+                    is_pure_sector = True
+            
+            if is_pure_sector:
                 continue
             
             # Parse: company name followed by percentage
-            # Pattern: anything ending with XX.XX percentage
+            # Pattern: anything ending with XX.XX percentage, but prioritize lines with company indicators
             match = re.search(r'^(.{5,150}?)\s+(\d{1,3}\.\d{2})(?:\s|%|$)', line)
             if match:
                 name = match.group(1).strip()
                 weight_str = match.group(2)
                 
-                # Skip if name is a sector or too short
-                if any(sector in name for sector in sector_names) or len(name) < 5:
+                # Clean up the name by removing sector names that might be at the start
+                for sector in sector_names:
+                    if name.startswith(sector):
+                        name = name[len(sector):].strip()
+                        break
+                
+                # Skip if name is empty or too short
+                if not name or len(name) < 3:
                     continue
                 
                 try:
