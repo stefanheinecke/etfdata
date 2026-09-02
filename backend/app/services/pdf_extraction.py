@@ -561,21 +561,37 @@ class PDFExtractionService:
         header_lower = [str(h).lower() if h else '' for h in headers]
 
         # Find relevant column indices with more flexible matching
-        name_idx = PDFExtractionService._find_column(header_lower, ['name', 'holding', 'stock', 'isin', 'security', 'position'])
+        name_idx = PDFExtractionService._find_column(header_lower, ['name', 'holding', 'stock', 'isin', 'security', 'position', 'company'])
         weight_idx = PDFExtractionService._find_column(header_lower, ['weight', 'weightage', 'proportion', '%', 'percentage', 'percent'])
-        country_idx = PDFExtractionService._find_column(header_lower, ['country', 'country of issue', 'domicile'])
-        sector_idx = PDFExtractionService._find_column(header_lower, ['sector', 'industry', 'classification'])
-        isin_idx = PDFExtractionService._find_column(header_lower, ['isin', 'cusip', 'sedol', 'valoren', 'ticker', 'ric', 'reuters', 'bloomberg', 'id', 'code', 'symbol'])
+        
         print(f"[pdf] Table headers: {headers}")
-        print(f"[pdf] Column indices: name={name_idx}, weight={weight_idx}, isin/id={isin_idx}, country={country_idx}, sector={sector_idx}")
+        print(f"[pdf] Column indices: name={name_idx}, weight={weight_idx}")
 
-        # If we can't identify columns, try to infer from data
+        # If we can't identify columns reliably, skip this table (it might be the sector table)
         if name_idx is None or weight_idx is None:
-            # Try to detect based on row patterns
-            log.info(f"[pdf] Column detection failed, falling back to auto-detect. Table has {len(table)} rows")
-            result = PDFExtractionService._parse_holdings_auto(table)
-            log.info(f"[pdf] Auto-detect returned {len(result)} holdings")
-            return result
+            log.info(f"[pdf] Could not identify name/weight columns, skipping this table")
+            return holdings
+
+        # Quick scan: if this table has sector names (Financials, Technology, etc) it's the sector table
+        # Check first 10 data rows for sector keywords
+        sector_keywords = [
+            'information technology', 'financials', 'communication services',
+            'consumer discretionary', 'health care', 'industrials',
+            'consumer staples', 'energy', 'utilities', 'real estate', 'materials'
+        ]
+        
+        sector_count = 0
+        for row in table[1:min(11, len(table))]:
+            if name_idx < len(row) and row[name_idx]:
+                cell_text = str(row[name_idx]).lower()
+                if any(sector in cell_text for sector in sector_keywords):
+                    sector_count += 1
+        
+        if sector_count >= 5:
+            log.info(f"[pdf] This table appears to be the sector exposure table (has {sector_count} sector names), skipping")
+            return holdings
+        
+        log.info(f"[pdf] Parsing as holdings table with name_idx={name_idx}, weight_idx={weight_idx}")
 
         # Parse data rows
         for row in table[1:]:
@@ -583,8 +599,7 @@ class PDFExtractionService:
                 continue
             
             # Skip if row is too short
-            max_idx = max(filter(lambda x: x is not None, 
-                                [name_idx, weight_idx, country_idx, sector_idx, isin_idx]))
+            max_idx = max(filter(lambda x: x is not None, [name_idx, weight_idx]))
             if len(row) <= max_idx:
                 continue
 
@@ -600,27 +615,20 @@ class PDFExtractionService:
                 if weight is None or weight <= 0:
                     continue
 
-                raw_id = row[isin_idx].strip() if isin_idx and isin_idx < len(row) and row[isin_idx] else None
-                # Only keep value as ISIN if it matches the format; otherwise treat it as a ticker/RIC for enrichment lookup
-                if raw_id and _ISIN_RE.match(raw_id.upper()):
-                    instrument_isin = raw_id.upper()
-                    raw_identifier = None
-                else:
-                    instrument_isin = None
-                    raw_identifier = raw_id  # e.g. Reuters RIC like "NESN.S"
-
                 holding = {
                     "instrument_name": name,
-                    "instrument_isin": instrument_isin,
-                    "raw_identifier": raw_identifier,
+                    "instrument_isin": None,
+                    "raw_identifier": None,
                     "weight": weight,
-                    "country": row[country_idx].strip() if country_idx and country_idx < len(row) and row[country_idx] else None,
-                    "sector": row[sector_idx].strip() if sector_idx and sector_idx < len(row) and row[sector_idx] else None,
+                    "country": None,
+                    "sector": None,
                 }
                 holdings.append(holding)
+                log.info(f"[pdf] Parsed holding: {name} {weight}%")
             except (ValueError, IndexError, AttributeError, TypeError):
                 continue
 
+        log.info(f"[pdf] _parse_holdings_table: extracted {len(holdings)} holdings")
         return holdings
     
     @staticmethod
