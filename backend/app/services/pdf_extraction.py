@@ -411,6 +411,15 @@ class PDFExtractionService:
             if tables:
                 log.info(f"[pdf] Page {page_idx}: found {len(tables)} table(s)")
                 for table_idx, table in enumerate(tables):
+                    # Check if table is actually empty (all cells are None or '')
+                    is_empty = all(
+                        not row or all(not cell or not str(cell).strip() for cell in row)
+                        for row in table
+                    )
+                    if is_empty:
+                        log.info(f"[pdf]   Table {table_idx}: appears empty, skipping")
+                        continue
+                    
                     extracted = PDFExtractionService._parse_holdings_table(table)
                     log.info(f"[pdf]   Table {table_idx}: parsed {len(extracted) if extracted else 0} holdings")
                     if extracted:  # Only use if we got results
@@ -453,32 +462,76 @@ class PDFExtractionService:
     @staticmethod
     def _parse_holdings_from_text(text: str) -> List[Dict[str, Any]]:
         """Parse holdings from text patterns like 'NAME WEIGHT'."""
+        import logging
+        log = logging.getLogger(__name__)
+        
         holdings = []
         import re
         
         lines = text.split('\n')
+        
+        # First pass: try to find a marked holdings section
         in_holdings_section = False
+        holdings_lines = []
         
         for line in lines:
-            # Check if we're entering a holdings section (English or German)
             line_lower = line.lower()
-            if ('largest equity positions' in line_lower
-                    or 'gr\u00f6sste' in line_lower
-                    or 'aktienpositionen' in line_lower
-                    or 'top holdings' in line_lower
-                    or 'top 10' in line_lower):
+            
+            # Check if we're entering a holdings section (English or German)
+            if any(keyword in line_lower for keyword in [
+                    'largest equity positions', 'largest holdings', 'top holdings', 'top positions',
+                    'grösste aktienposition', 'top 10', 'composition', 'portfolio composition']):
                 in_holdings_section = True
+                log.info(f"[pdf] Text: found holdings section header: {line.strip()}")
                 continue
             
             # Check if we're leaving the section (English or German)
             if in_holdings_section and any(keyword in line_lower for keyword in [
-                    'benefits', 'risks', 'disclaimer', 'vorteile', 'risiken', 'disclaimer']):
+                    'benefits', 'risks', 'disclaimer', 'vorteile', 'risiken', 'fund statistics',
+                    'fund performance', 'fund characteristics']):
+                log.info(f"[pdf] Text: leaving holdings section at: {line.strip()}")
                 in_holdings_section = False
                 continue
             
-            if not in_holdings_section:
-                continue
-            
+            if in_holdings_section:
+                holdings_lines.append(line)
+        
+        # Try to parse holdings from the section we found
+        if holdings_lines:
+            log.info(f"[pdf] Text: found {len(holdings_lines)} lines in holdings section")
+            parsed = PDFExtractionService._parse_holdings_from_lines(holdings_lines)
+            if parsed:
+                log.info(f"[pdf] Text: section parsing found {len(parsed)} holdings")
+                return parsed
+        
+        # Second pass: if no section found, try to find lines with percentage patterns anywhere
+        log.info(f"[pdf] Text: no marked section, scanning all lines for percentage patterns")
+        candidate_lines = []
+        for line in lines:
+            # Look for lines with format: "COMPANY_NAME   XX.XX" or similar
+            # Percentage pattern: 1-3 digits, decimal point, 2 digits
+            if re.search(r'\d{1,3}\.\d{2}(?:\s|%|$)', line):
+                candidate_lines.append(line)
+        
+        if candidate_lines:
+            log.info(f"[pdf] Text: found {len(candidate_lines)} candidate lines with percentages")
+            parsed = PDFExtractionService._parse_holdings_from_lines(candidate_lines)
+            if parsed:
+                log.info(f"[pdf] Text: pattern matching found {len(parsed)} holdings")
+                return parsed
+        
+        return holdings
+    
+    @staticmethod
+    def _parse_holdings_from_lines(lines: List[str]) -> List[Dict[str, Any]]:
+        """Parse holdings from a list of text lines."""
+        import logging
+        log = logging.getLogger(__name__)
+        
+        holdings = []
+        import re
+        
+        for line in lines:
             line = line.strip()
             if not line or len(line) < 5:
                 continue
@@ -612,11 +665,16 @@ class PDFExtractionService:
         
         holdings = []
         
-        log.info(f"[pdf] Auto-detect: starting, table has {len(table)} rows, first row: {table[0] if table else 'empty'}")
+        log.info(f"[pdf] Auto-detect: starting, table has {len(table)} rows")
         
         if not table or len(table) < 2:
             log.warning("[pdf] Auto-detect: table too small")
             return holdings
+        
+        # Dump first 5 rows to see raw structure
+        log.info(f"[pdf] Auto-detect: raw table structure (first 5 rows):")
+        for i in range(min(5, len(table))):
+            log.info(f"[pdf]   row {i}: {repr(table[i][:8] if len(table[i]) > 8 else table[i])}")
         
         # Skip header row(s) that are all empty/None
         data_start = 1
@@ -629,7 +687,7 @@ class PDFExtractionService:
             data_start += 1
         
         if data_start >= len(table):
-            log.warning("[pdf] Auto-detect: all rows appear to be headers/empty")
+            log.warning("[pdf] Auto-detect: all rows appear to be headers/empty - table extraction failed, should fallback to text")
             return holdings
         
         # Scan through data rows to find which columns likely contain names vs weights
