@@ -460,6 +460,22 @@
               <label class="label">TER %</label>
               <input class="input" type="number" step="0.01" v-model.number="pdfFormData.ter" />
             </div>
+            <div>
+              <label class="label">Domicile</label>
+              <input class="input" v-model="pdfFormData.domicile" placeholder="e.g. Luxembourg" />
+            </div>
+            <div>
+              <label class="label">Fund Size</label>
+              <input class="input" type="number" step="1" v-model.number="pdfFormData.fund_size" placeholder="e.g. 7473770000" />
+            </div>
+            <div>
+              <label class="label">Dividend Policy</label>
+              <select class="input" v-model="pdfFormData.dividend_policy">
+                <option value="">— select —</option>
+                <option value="Accumulating">Accumulating</option>
+                <option value="Distributing">Distributing</option>
+              </select>
+            </div>
           </div>
 
           <div>
@@ -764,7 +780,7 @@ const selectedPdfFile = ref(null)
 const pdfDragOver = ref(false)
 const pdfExtracting = ref(false)
 const pdfError = ref('')
-const pdfFormData = ref({ isin: '', name: '', provider: '', ter: null, holdings: [] })
+const pdfFormData = ref({ isin: '', name: '', provider: '', ter: null, domicile: '', fund_size: null, dividend_policy: '', holdings: [] })
 const pdfSaving = ref(false)
 const pdfSuccess = ref(null)
 const pdfSubmitError = ref('')
@@ -1380,6 +1396,9 @@ async function extractPdfData() {
       name: data.metadata?.name || '', 
       provider: data.metadata?.provider || '', 
       ter: data.metadata?.ter, 
+      domicile: data.metadata?.domicile || '',
+      fund_size: data.metadata?.fund_size ?? null,
+      dividend_policy: data.metadata?.dividend_policy || '',
       holdings: data.holdings || [] 
     }
     importStep.value = 'review'
@@ -1402,7 +1421,10 @@ async function savePdfImport() {
       isin: pdfFormData.value.isin,
       name: pdfFormData.value.name,
       provider: pdfFormData.value.provider,
-      ter: pdfFormData.value.ter
+      ter: pdfFormData.value.ter,
+      domicile: pdfFormData.value.domicile,
+      fund_size: pdfFormData.value.fund_size,
+      dividend_policy: pdfFormData.value.dividend_policy
     }
     const r = await adminService.importPdfData(adminSecret.value, metadata, pdfFormData.value.holdings)
     pdfSuccess.value = r.data
@@ -1418,7 +1440,7 @@ async function savePdfImport() {
 function resetPdfImport() {
   importStep.value = 'upload'
   selectedPdfFile.value = null
-  pdfFormData.value = { isin: '', name: '', provider: '', ter: null, holdings: [] }
+  pdfFormData.value = { isin: '', name: '', provider: '', ter: null, domicile: '', fund_size: null, dividend_policy: '', holdings: [] }
   pdfError.value = ''
 }
 
