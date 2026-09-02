@@ -19,6 +19,7 @@ COUNTRY_PATTERNS = {
     'Netherlands': ['ASML', 'SHELL', 'UNILEVER', 'AKZONOBEL', 'NN GROUP'],
     'Belgium': ['SOLVAY', 'INBEV', 'ADYEN', 'ARGENX'],
     'Finland': ['NOKIA', 'KONE', 'SAMPO', 'MAERSK'],
+    'United States': ['APPLE', 'MICROSOFT', 'NVIDIA', 'AMAZON', 'ALPHABET', 'TESLA', 'META', 'BROADCOM', 'JPMORGAN', 'BERKSHIRE', 'GOLDMAN', 'MORGAN STANLEY', 'BANK OF AMERICA', 'WELLS FARGO', 'COCA COLA', 'PEPSI', 'INTEL', 'AMD', 'QUALCOMM', 'CISCO', 'IBM', 'ORACLE', 'SALESFORCE'],
 }
 
 # Mapping from country name to ISO 3166-1 alpha-2 code
@@ -50,12 +51,12 @@ COUNTRY_TO_ISO2 = {
 
 # Mapping of company names/keywords to sectors
 SECTOR_PATTERNS = {
-    'Financials': ['ALLIANZ', 'SANTANDER', 'BBVA', 'BILBAO', 'VIZCAYA', 'AXA', 'INTESA', 'BANCO', 'STANDARD', 'UBS', 'CREDIT'],
-    'Technology': ['SAP', 'SIEMENS', 'ASML', 'INFINEON', 'NOKIA', 'ADYEN'],
+    'Financials': ['ALLIANZ', 'SANTANDER', 'BBVA', 'BILBAO', 'VIZCAYA', 'AXA', 'INTESA', 'BANCO', 'STANDARD', 'UBS', 'CREDIT', 'JPMORGAN', 'GOLDMAN', 'MORGAN STANLEY', 'BANK OF AMERICA', 'WELLS FARGO', 'BERKSHIRE'],
+    'Technology': ['SAP', 'SIEMENS', 'ASML', 'INFINEON', 'NOKIA', 'ADYEN', 'APPLE', 'MICROSOFT', 'NVIDIA', 'ALPHABET', 'INTEL', 'AMD', 'QUALCOMM', 'CISCO', 'IBM', 'ORACLE', 'SALESFORCE', 'BROADCOM'],
     'Industrials': ['SCHNEIDER', 'AIRBUS', 'SAFRAN', 'LEGRAND', 'KONE', 'ATLAS', 'ERICSSON'],
     'Energy': ['TOTALENERGIES', 'SHELL', 'ENI', 'IBERDROLA', 'ENDESA', 'EDF', 'ENEL'],
     'Healthcare': ['SANOFI', 'ROCHE', 'NOVO', 'MERCK', 'ARGENX', 'MORPHIX'],
-    'Consumer': ['LVMH', 'L\'OREAL', 'UNILEVER', 'DANONE', 'REMY', 'NESTLÉ'],
+    'Consumer': ['LVMH', 'L\'OREAL', 'UNILEVER', 'DANONE', 'REMY', 'NESTLÉ', 'COCA COLA', 'PEPSI', 'AMAZON', 'META', 'TESLA'],
     'Materials': ['BASF', 'LINDE', 'SOLVAY', 'RIO TINTO'],
     'Telecommunications': ['DEUTSCHE TELEKOM', 'TELEFONICA', 'BT', 'VODAFONE', 'SWISSCOM', 'ERICSSON'],
 }

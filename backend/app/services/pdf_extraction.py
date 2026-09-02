@@ -303,9 +303,12 @@ class PDFExtractionService:
     def _find_domicile(text: str) -> Optional[str]:
         """Find fund domicile country."""
         # Look for "Fund domicile" or "Domicile" pattern
-        match = re.search(r'(?:Fund\s+)?Domicile[\s:]*([^\n]+)', text, re.IGNORECASE)
+        match = re.search(r'(?:Fund\s+)?Domicile[\s:]*([^\s\n]+)', text, re.IGNORECASE)
         if match:
-            return match.group(1).strip()
+            value = match.group(1).strip()
+            # Only return if it looks like a country (a word, not a percentage or number)
+            if value and not re.match(r'^\d', value) and not value.startswith('in'):
+                return value
         
         # Also check for country codes and names
         countries = {
