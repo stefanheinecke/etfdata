@@ -583,6 +583,7 @@ class PDFExtractionService:
                     "country": row[country_idx].strip() if country_idx and country_idx < len(row) and row[country_idx] else None,
                     "sector": row[sector_idx].strip() if sector_idx and sector_idx < len(row) and row[sector_idx] else None,
                 }
+                holdings.append(holding)
             except (ValueError, IndexError, AttributeError, TypeError):
                 continue
 
