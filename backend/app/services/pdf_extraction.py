@@ -61,38 +61,78 @@ class PDFExtractionService:
     def _flatten_cell(s: Optional[str]) -> str:
         return re.sub(r'\s+', ' ', s or '').strip()
 
-    @staticmethod
-    def _find_field_from_tables(pdf, *label_keywords: str) -> Optional[str]:
-        """Look up a value in a two-column key-facts table (label cell, value cell).
+    # Known key-facts row labels, used to tell a wrapped label continuation
+    # (e.g. "Company" continuing "Name of the Management") apart from the
+    # start of a genuinely new field.
+    _KEY_FACTS_LABEL_STARTS = [
+        'name of fund', 'share class', 'isin', 'securities no', 'ucits v',
+        'launch date', 'currency of fund', 'ter', 'name of the management',
+        'accounting year end', 'distribution', 'replication method',
+        'portfolio management', 'fund domicile', 'sfdr alignment', 'fund statistics',
+    ]
 
-        Factsheets typically list 'Name of fund', 'Share class', 'Name of the
-        Management Company', etc. as row labels with the value in the next cell.
-        Both label and value can wrap across multiple lines within the same row.
-        Picks the closest-matching label (e.g. 'Share class' over 'Currency of
-        fund / share class') by preferring the shortest label containing all keywords.
+    @staticmethod
+    def _find_key_facts_column(lines: List[str]) -> Optional[int]:
+        """Determine the value column's character offset using a reliable anchor row.
+
+        The key-facts section is a fixed two-column table rendered with
+        layout-preserved spacing, so every row's value starts at the same
+        character column. 'ISIN' is a short, virtually universal, single-line
+        label that makes a reliable anchor.
         """
-        keywords = [k.lower() for k in label_keywords]
-        best_value, best_label_len = None, None
+        for anchor in ('ISIN', 'UCITS V', 'SFDR Alignment', 'Fund domicile'):
+            pat = re.compile(rf'^\s{{0,3}}{re.escape(anchor)}\s{{2,}}', re.IGNORECASE)
+            for line in lines:
+                m = pat.match(line)
+                if m:
+                    return m.end()
+        return None
+
+    @staticmethod
+    def _find_key_facts_value(pdf, label_re) -> Optional[str]:
+        """Read a label's value from the key-facts table using its fixed value column.
+
+        Restricting the label search to the label column (left of the value
+        column boundary) avoids false matches such as 'share class' inside
+        'Currency of fund / share class', since long labels wrap onto a second
+        line rather than spilling into the value column. Also stitches in one
+        continuation line for labels/values that wrap (e.g. 'Name of the
+        Management' / 'Company').
+        """
         for page in pdf.pages[:3]:
             try:
-                tables = page.extract_tables()
+                text = page.extract_text(layout=True)
             except Exception:
-                tables = None
-            if not tables:
+                text = None
+            if not text:
                 continue
-            for table in tables:
-                for row in table:
-                    if not row or len(row) < 2:
-                        continue
-                    label = PDFExtractionService._flatten_cell(row[0]).lower()
-                    if not label or not all(k in label for k in keywords):
-                        continue
-                    for cell in row[1:]:
-                        value = PDFExtractionService._flatten_cell(cell)
-                        if value and (best_label_len is None or len(label) < best_label_len):
-                            best_value, best_label_len = value, len(label)
-                        break
-        return best_value
+            lines = text.split('\n')
+            col = PDFExtractionService._find_key_facts_column(lines)
+            if col is None:
+                continue
+            for idx, line in enumerate(lines):
+                label_part = line[:col] if len(line) > col else line
+                if not label_re.search(label_part):
+                    continue
+                value_parts = []
+                v = line[col:].strip() if len(line) > col else ''
+                if v:
+                    value_parts.append(v)
+                if idx + 1 < len(lines):
+                    next_line = lines[idx + 1]
+                    next_label = PDFExtractionService._flatten_cell(
+                        next_line[:col] if len(next_line) > col else next_line
+                    ).lower()
+                    is_new_label = any(
+                        next_label.startswith(k) for k in PDFExtractionService._KEY_FACTS_LABEL_STARTS
+                    ) if next_label else False
+                    if not is_new_label:
+                        nv = next_line[col:].strip() if len(next_line) > col else ''
+                        if nv:
+                            value_parts.append(nv)
+                if value_parts:
+                    return ' '.join(value_parts)
+        return None
 
     @staticmethod
     def _find_isin(text: str) -> Optional[str]:
@@ -117,14 +157,14 @@ class PDFExtractionService:
         """
         # Preferred: the "Share class" row already has the full share-class name
         if pdf is not None:
-            share_class = PDFExtractionService._find_field_from_tables(pdf, 'share class')
+            share_class = PDFExtractionService._find_key_facts_value(pdf, re.compile(r'\bShare\s+class\b', re.IGNORECASE))
             if share_class:
                 return share_class
 
         base_name = None
         # Fallback: "Name of fund" row (base fund name, no share-class suffix)
         if pdf is not None:
-            base_name = PDFExtractionService._find_field_from_tables(pdf, 'name of', 'fund')
+            base_name = PDFExtractionService._find_key_facts_value(pdf, re.compile(r'Name\s+of\s+fund\b', re.IGNORECASE))
         if not base_name:
             match = re.search(r'Name\s+of\s+(?:the\s+)?fund\s+([^\n]+)', text, re.IGNORECASE)
             if match:
@@ -174,7 +214,9 @@ class PDFExtractionService:
         """Find fund provider - the full "Name of the Management Company" value."""
         # Preferred: read the value from the key-facts table row
         if pdf is not None:
-            company = PDFExtractionService._find_field_from_tables(pdf, 'management company')
+            company = PDFExtractionService._find_key_facts_value(
+                pdf, re.compile(r'Name\s+of\s+(?:the\s+)?Management\s+Company', re.IGNORECASE)
+            )
             if company:
                 return company
 
