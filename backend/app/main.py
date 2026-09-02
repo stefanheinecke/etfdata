@@ -3,6 +3,7 @@ import time
 from datetime import datetime
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from sqlalchemy.orm import Session
@@ -94,6 +95,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.add_middleware(RequestLogMiddleware)
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    # Without this, an unhandled exception skips CORSMiddleware entirely and the
+    # browser reports an opaque "CORS policy" / Network Error instead of the real 500.
+    import logging
+    import traceback
+    logging.getLogger(__name__).error("Unhandled exception on %s: %s\n%s", request.url.path, exc, traceback.format_exc())
+    return JSONResponse(status_code=500, content={"detail": "Internal server error"})
+
 
 @app.on_event("startup")
 async def startup():

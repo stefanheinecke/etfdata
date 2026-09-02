@@ -374,7 +374,7 @@ def compute_portfolio_score(
             individual_scores.append(
                 {
                     "etf_id": s["etf_id"],
-                    "ticker": s["ticker"],
+                    "ticker": s["isin"],
                     "name": s["name"],
                     "goetf_score": s.get("goetf_score"),
                     "weight_pct": round(p["weight"] / total_w * 100, 1),
