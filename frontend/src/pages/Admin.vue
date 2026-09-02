@@ -8,6 +8,7 @@
     <!-- Tab Navigation -->
     <div class="tab-bar">
       <button :class="['tab-btn', { active: activeTab === 'management' }]" @click="activeTab = 'management'">Management</button>
+      <button :class="['tab-btn', { active: activeTab === 'import' }]" @click="activeTab = 'import'">Import ETF</button>
       <button :class="['tab-btn', { active: activeTab === 'etfvalues' }]" @click="switchToValues">ETF Values</button>
       <button :class="['tab-btn', { active: activeTab === 'etfeditor' }]" @click="switchToEditor">ETF Editor</button>
     </div>
@@ -420,6 +421,28 @@
 
     </template><!-- /management tab -->
 
+    <!-- Import ETF Tab -->
+    <template v-if="activeTab === 'import'">
+      <!-- PDF Upload Section -->
+      <div class="card" style="margin-bottom:1.5rem">
+        <h2 class="card-title">Import from PDF Factsheet</h2>
+        <p style="font-size:.875rem;color:var(--text-muted);margin-bottom:1rem">Upload a PDF factsheet to extract ETF metadata and holdings. Edit and review before importing.</p>
+        <div v-if="importStep === 'upload'" style="display:flex;flex-direction:column;gap:1rem">
+          <div class="upload-area" @click="$refs.pdfInput.click()" :class="{ 'drag-over': pdfDragOver }" style="border:2px dashed var(--border);border-radius:8px;padding:2rem;text-align:center;cursor:pointer">
+            <input ref="pdfInput" type="file" accept=".pdf" @change="handlePdfSelect" @dragover.prevent="pdfDragOver = true" @dragleave.prevent="pdfDragOver = false" @drop.prevent="handlePdfDrop" style="display:none" />
+            <div style="font-size:2rem;margin-bottom:.5rem">📄</div>
+            <p style="font-weight:600;margin-bottom:.25rem">Click to upload or drag and drop</p>
+            <p style="color:var(--text-muted);font-size:.875rem">PDF files only</p>
+          </div>
+          <div v-if="selectedPdfFile" style="display:flex;align-items:center;justify-content:space-between;gap:1rem;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:.75rem 1rem">
+            <span><strong>{{ selectedPdfFile.name }}</strong><br><span style="color:var(--text-muted);font-size:.8rem">{{ (selectedPdfFile.size / 1024).toFixed(0) }} KB</span></span>
+            <button class="btn btn-primary" @click="extractPdfData" :disabled="pdfExtracting">{{ pdfExtracting ? 'Extracting…' : 'Extract Data' }}</button>
+          </div>
+          <div v-if="pdfError" class="error-box">{{ pdfError }}</div>
+        </div>
+      </div>
+    </template><!-- /import tab -->
+
     <!-- ETF Values Tab -->
     <template v-if="activeTab === 'etfvalues'">
       <div class="card" style="margin-bottom:1.5rem">
@@ -669,6 +692,17 @@ const setAdminActive = inject('setAdminActive')
 
 // ─── Tab state ────────────────────────────────────────────────
 const activeTab = ref('management')
+
+// PDF Import state
+const importStep = ref('upload')
+const selectedPdfFile = ref(null)
+const pdfDragOver = ref(false)
+const pdfExtracting = ref(false)
+const pdfError = ref('')
+const pdfFormData = ref({ isin: '', name: '', provider: '', ter: null, holdings: [] })
+const pdfSaving = ref(false)
+const pdfSuccess = ref(null)
+const pdfSubmitError = ref('')
 
 function switchToValues() {
   activeTab.value = 'etfvalues'
@@ -1245,6 +1279,84 @@ function generateChartPoints(prices) {
   
   return points.join(' ')
 }
+
+// ─── PDF Import handlers ────────────────────────────────────────
+function handlePdfSelect(e) {
+  const file = e.target.files[0]
+  if (file && file.type === 'application/pdf') {
+    selectedPdfFile.value = file
+    pdfError.value = ''
+  } else {
+    pdfError.value = 'Please select a valid PDF file'
+  }
+}
+
+function handlePdfDrop(e) {
+  const file = e.dataTransfer.files[0]
+  if (file && file.type === 'application/pdf') {
+    selectedPdfFile.value = file
+    pdfDragOver.value = false
+    pdfError.value = ''
+  } else {
+    pdfError.value = 'Please drag and drop a PDF file'
+  }
+}
+
+async function extractPdfData() {
+  if (!selectedPdfFile.value || !adminVerified.value) return
+  pdfExtracting.value = true
+  pdfError.value = ''
+  try {
+    const formData = new FormData()
+    formData.append('file', selectedPdfFile.value)
+    formData.append('admin_secret', adminSecret.value)
+    const r = await fetch(import.meta.env.VITE_API_URL + '/admin/etf/extract-pdf', {
+      method: 'POST',
+      body: formData
+    })
+    if (!r.ok) throw new Error((await r.json()).detail || 'Extraction failed')
+    const data = await r.json()
+    pdfFormData.value = { isin: data.isin || '', name: data.name || '', provider: data.provider || '', ter: data.ter, holdings: data.holdings || [] }
+    importStep.value = 'review'
+  } catch(e) {
+    pdfError.value = e.message
+  } finally {
+    pdfExtracting.value = false
+  }
+}
+
+async function savePdfImport() {
+  if (!pdfFormData.value.isin) {
+    pdfSubmitError.value = 'ISIN is required'
+    return
+  }
+  pdfSaving.value = true
+  pdfSubmitError.value = ''
+  try {
+    const r = await fetch(import.meta.env.VITE_API_URL + '/admin/etf/import-data', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...pdfFormData.value, admin_secret: adminSecret.value })
+    })
+    if (!r.ok) throw new Error((await r.json()).detail || 'Import failed')
+    const result = await r.json()
+    pdfSuccess.value = result
+    resetPdfImport()
+    setTimeout(() => { pdfSuccess.value = null }, 4000)
+  } catch(e) {
+    pdfSubmitError.value = e.message
+  } finally {
+    pdfSaving.value = false
+  }
+}
+
+function resetPdfImport() {
+  importStep.value = 'upload'
+  selectedPdfFile.value = null
+  pdfFormData.value = { isin: '', name: '', provider: '', ter: null, holdings: [] }
+  pdfError.value = ''
+}
+
 </script>
 
 <style scoped>

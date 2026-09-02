@@ -1,6 +1,6 @@
 <template>
   <div :data-theme="theme">
-    <nav v-if="currentPage !== 'home' && currentPage !== 'etf-upload'" class="navbar" :class="{ scrolled: navScrolled }">
+    <nav v-if="currentPage !== 'home'" class="navbar" :class="{ scrolled: navScrolled }">
       <div class="nav-inner">
         <a href="#" class="logo" @click.prevent="goToPage('home')">Go<span>ETF</span></a>
         <ul class="nav-links">
@@ -44,12 +44,12 @@
       <Methodology v-else-if="currentPage === 'methodology'" />
       <ApiDocs v-else-if="currentPage === 'docs'" />
       <Admin v-else-if="currentPage === 'admin'" />
-      <ETFUpload v-else-if="currentPage === 'etf-upload'" />
+
       <Home v-else />
     </main>
 
     <!-- Footer -->
-    <footer v-if="currentPage !== 'home' && currentPage !== 'etf-upload'" class="footer">
+    <footer v-if="currentPage !== 'home'" class="footer">
       <div class="container">
         <div class="footer-inner">
           <div class="footer-top">
@@ -164,7 +164,6 @@ import Analytics from './pages/Analytics.vue'
 import ApiDocs from './pages/ApiDocs.vue'
 import Methodology from './pages/Methodology.vue'
 import Admin from './pages/Admin.vue'
-import ETFUpload from './pages/ETFUpload.vue'
 import GetApiKeyModal from './components/GetApiKeyModal.vue'
 
 const currentPage = ref('home')
@@ -270,10 +269,7 @@ function applyPathRoute(pathname = window.location.pathname) {
     currentPage.value = 'methodology'
     return
   }
-  if (path === '/etf-import') {
-    currentPage.value = 'etf-upload'
-    return
-  }
+
   if (path === '/api-key') {
     currentPage.value = 'home'
     showApiKeyModal.value = true
