@@ -468,9 +468,16 @@ class PDFExtractionService:
         import re
         holdings = []
         
+        # Known sector names from the left "Index Sector exposure" table that we need to skip
+        sector_names = [
+            'Information Technology', 'Financials', 'Communication Services',
+            'Consumer Discretionary', 'Health Care', 'Industrials',
+            'Consumer Staples', 'Energy', 'Utilities', 'Real Estate', 'Materials'
+        ]
+        
         lines = text.split('\n')
         
-        # Find the consistent header: "Index 10 largest equity positions" or similar variants
+        # Find the consistent header: "Index 10 largest equity positions"
         holdings_start = None
         for idx, line in enumerate(lines):
             if 'index' in line.lower() and 'largest' in line.lower():
@@ -483,7 +490,6 @@ class PDFExtractionService:
             return holdings
         
         # Parse the table rows after the header
-        # Format is typically: "COMPANY NAME    XX.XX" or "COMPANY NAME XX.XX %"
         for idx in range(holdings_start, len(lines)):
             line = lines[idx].strip()
             
@@ -493,20 +499,31 @@ class PDFExtractionService:
             # Stop at end-of-section markers
             if any(keyword in line.lower() for keyword in [
                     'fund statistics', 'key facts', 'costs', 'fund performance',
-                    'fund data', 'disclaimer', 'important information', 'risks']):
+                    'fund data', 'disclaimer', 'important information', 'risks',
+                    'benefits']):
                 log.info(f"[pdf] Found section end at line {idx}")
                 break
             
-            # Skip header rows
-            if any(kw in line.upper() for kw in ['NAME', 'WEIGHT', 'ISIN', '%']):
+            # Skip header rows and sector names (from left table)
+            line_upper = line.upper()
+            if any(kw in line_upper for kw in ['NAME', 'WEIGHT', 'ISIN', '%', 'INDEX']):
+                continue
+            
+            # Skip known sector names that appear in the left "Sector exposure" table
+            if any(sector in line for sector in sector_names):
+                log.debug(f"[pdf] Skipping sector line: {line}")
                 continue
             
             # Parse: company name followed by percentage
-            # Anchor on the percentage (XX.XX) and everything before it is the name
-            match = re.search(r'^(.{3,100}?)\s+(\d{1,3}\.\d{2})(?:\s|%|$)', line)
+            # Pattern: anything ending with XX.XX percentage
+            match = re.search(r'^(.{5,150}?)\s+(\d{1,3}\.\d{2})(?:\s|%|$)', line)
             if match:
                 name = match.group(1).strip()
                 weight_str = match.group(2)
+                
+                # Skip if name is a sector or too short
+                if any(sector in name for sector in sector_names) or len(name) < 5:
+                    continue
                 
                 try:
                     weight = float(weight_str)
