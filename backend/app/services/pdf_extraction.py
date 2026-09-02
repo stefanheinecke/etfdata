@@ -58,39 +58,41 @@ class PDFExtractionService:
         return {k: v for k, v in metadata.items() if v is not None}
 
     @staticmethod
-    def _find_field_by_column(pdf, label_re) -> Optional[str]:
-        """Read a labeled value from a multi-column key-facts table.
+    def _flatten_cell(s: Optional[str]) -> str:
+        return re.sub(r'\s+', ' ', s or '').strip()
 
-        Many factsheets lay out two labels side by side (e.g. 'Name of the fund'
-        and 'Name of the Management Company') with their values on the line(s)
-        below, also side by side. A plain regex on flattened text can't tell where
-        one column ends and the next begins, so this locates the label's column
-        position using layout-preserved text and reads the value directly below
-        at that same column offset.
+    @staticmethod
+    def _find_field_from_tables(pdf, *label_keywords: str) -> Optional[str]:
+        """Look up a value in a two-column key-facts table (label cell, value cell).
+
+        Factsheets typically list 'Name of fund', 'Share class', 'Name of the
+        Management Company', etc. as row labels with the value in the next cell.
+        Both label and value can wrap across multiple lines within the same row.
+        Picks the closest-matching label (e.g. 'Share class' over 'Currency of
+        fund / share class') by preferring the shortest label containing all keywords.
         """
+        keywords = [k.lower() for k in label_keywords]
+        best_value, best_label_len = None, None
         for page in pdf.pages[:3]:
             try:
-                text = page.extract_text(layout=True)
+                tables = page.extract_tables()
             except Exception:
-                text = None
-            if not text:
+                tables = None
+            if not tables:
                 continue
-            lines = text.split('\n')
-            for idx, line in enumerate(lines):
-                m = label_re.search(line)
-                if not m:
-                    continue
-                col = m.start()
-                for value_line in lines[idx + 1: idx + 4]:
-                    if not value_line.strip():
+            for table in tables:
+                for row in table:
+                    if not row or len(row) < 2:
                         continue
-                    candidate = value_line[col:] if len(value_line) > col else value_line
-                    # A run of 3+ spaces marks the start of the next column
-                    candidate = re.split(r'\s{3,}', candidate.strip())[0].strip()
-                    if candidate:
-                        return candidate
-                break
-        return None
+                    label = PDFExtractionService._flatten_cell(row[0]).lower()
+                    if not label or not all(k in label for k in keywords):
+                        continue
+                    for cell in row[1:]:
+                        value = PDFExtractionService._flatten_cell(cell)
+                        if value and (best_label_len is None or len(label) < best_label_len):
+                            best_value, best_label_len = value, len(label)
+                        break
+        return best_value
 
     @staticmethod
     def _find_isin(text: str) -> Optional[str]:
@@ -107,19 +109,23 @@ class PDFExtractionService:
 
     @staticmethod
     def _find_etf_name(text: str, pdf=None, dividend_policy: Optional[str] = None) -> Optional[str]:
-        """Find ETF share class name - e.g. 'UBS Core EURO STOXX 50 UCITS ETF EUR dis'.
+        """Find ETF share class name - e.g. 'UBS Core MSCI EMU UCITS ETF EUR dis'.
 
-        Uses the fund name plus share class currency/distribution suffix so that
-        different currency or distributing/accumulating variants are distinguishable.
+        Prefers the 'Share class' row, which already includes the currency and
+        distribution suffix, so different variants of the same fund are
+        distinguishable.
         """
-        base_name = None
-        # Preferred: read the value below the "Name of the fund" column heading
+        # Preferred: the "Share class" row already has the full share-class name
         if pdf is not None:
-            base_name = PDFExtractionService._find_field_by_column(
-                pdf, re.compile(r'Name\s+of\s+(?:the\s+)?fund', re.IGNORECASE)
-            )
+            share_class = PDFExtractionService._find_field_from_tables(pdf, 'share class')
+            if share_class:
+                return share_class
+
+        base_name = None
+        # Fallback: "Name of fund" row (base fund name, no share-class suffix)
+        if pdf is not None:
+            base_name = PDFExtractionService._find_field_from_tables(pdf, 'name of', 'fund')
         if not base_name:
-            # Fallback: find after "Name of the fund" label on flattened text
             match = re.search(r'Name\s+of\s+(?:the\s+)?fund\s+([^\n]+)', text, re.IGNORECASE)
             if match:
                 base_name = match.group(1).strip()
@@ -165,30 +171,22 @@ class PDFExtractionService:
 
     @staticmethod
     def _find_provider(text: str, pdf=None) -> Optional[str]:
-        """Find fund provider - the Management Company name."""
-        # Preferred: read the value below the "Name of the Management Company" column heading
+        """Find fund provider - the full "Name of the Management Company" value."""
+        # Preferred: read the value from the key-facts table row
         if pdf is not None:
-            company = PDFExtractionService._find_field_by_column(
-                pdf, re.compile(r'Name\s+of\s+(?:the\s+)?Management\s+Company', re.IGNORECASE)
-            )
+            company = PDFExtractionService._find_field_from_tables(pdf, 'management company')
             if company:
                 return company
 
         # Fallback: explicit "Name of the Management Company" field on flattened text
         match = re.search(r'Name\s+of\s+(?:the\s+)?Management\s+Company[\s:]*([^\n]+)', text, re.IGNORECASE)
         if match:
-            company_match = re.match(r'([^,()\n]+)', match.group(1).strip())
-            if company_match:
-                return company_match.group(1).strip()
+            return match.group(1).strip()
 
         # Fallback: "Management Company" / "Fund Manager" / "Provider" patterns
         match = re.search(r'(?:Management\s+Company|Fund\s+Manager|Provider)[\s:]*([^\n]+)', text, re.IGNORECASE)
         if match:
-            provider_text = match.group(1).strip()
-            # Extract just the company name (before country/city info)
-            company_match = re.match(r'([^,()]+)', provider_text)
-            if company_match:
-                return company_match.group(1).strip()
+            return match.group(1).strip()
         
         # Also look for specific known providers
         providers = ['UBS', 'iShares', 'Vanguard', 'Amundi', 'Fidelity', 'BlackRock', 
