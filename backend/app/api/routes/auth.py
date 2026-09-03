@@ -12,12 +12,13 @@ from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import HTMLResponse
+from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
 from app.core.auth import create_api_key, generate_api_key, hash_api_key, verify_api_key
-from app.core.email import send_confirmation_email, send_api_key_email
-from app.schemas import APIKey, PendingKeyRequest
+from app.core.email import send_confirmation_email, send_api_key_email, is_email_configured
+from app.schemas import APIKey, PendingKeyRequest, ContactMessage, Settings
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -202,10 +203,6 @@ def submit_contact_form(contact: ContactFormRequest, db: Session = Depends(get_d
     an email to the configured contact email address.
     """
     try:
-        from app.schemas import ContactMessage, Settings
-        from app.core.email import is_email_configured
-        import requests as _requests
-        
         # Validate input
         if not contact.name or len(contact.name.strip()) < 2:
             raise HTTPException(status_code=422, detail="Name is required (at least 2 characters)")
@@ -219,7 +216,7 @@ def submit_contact_form(contact: ContactFormRequest, db: Session = Depends(get_d
         # Store the contact message
         msg = ContactMessage(
             name=contact.name.strip()[:255],
-            email=contact.email.strip().lower()[:255],
+            email=str(contact.email).strip().lower()[:255],
             message=contact.message.strip()
         )
         db.add(msg)
