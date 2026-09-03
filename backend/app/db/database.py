@@ -112,8 +112,8 @@ def init_db():
         
         # Insert default contact email if not already set
         conn.execute(text("""
-            INSERT INTO settings (key, value) 
-            VALUES ('contact_email', 'stefan.heinecke1@gmail.com')
+            INSERT INTO settings (id, key, value) 
+            VALUES (gen_random_uuid(), 'contact_email', 'stefan.heinecke1@gmail.com')
             ON CONFLICT (key) DO NOTHING
         """))
         
