@@ -228,12 +228,19 @@ def submit_contact_form(contact: ContactFormRequest, db: Session = Depends(get_d
         # Try to send email to the contact email address (from settings)
         if is_email_configured():
             try:
+                import logging
+                logger = logging.getLogger(__name__)
+                
                 contact_email_setting = db.query(Settings).filter(Settings.key == "contact_email").first()
                 contact_email = contact_email_setting.value if contact_email_setting else "stefan.heinecke1@gmail.com"
+                
+                logger.info(f"📧 Sending contact form email to: {contact_email}")
                 
                 # Send email using Resend
                 resend_key = os.getenv("RESEND_API_KEY", "")
                 from_addr  = os.getenv("RESEND_FROM_EMAIL", "")
+                
+                logger.info(f"📧 Resend API key present: {bool(resend_key)}, From addr: {from_addr}")
                 
                 if resend_key and from_addr:
                     response = _requests.post(
@@ -259,11 +266,15 @@ def submit_contact_form(contact: ContactFormRequest, db: Session = Depends(get_d
 </html>"""
                         }
                     )
+                    logger.info(f"📧 Resend response: {response.status_code} - {response.text}")
                     response.raise_for_status()
+                    logger.info(f"✅ Email sent successfully to {contact_email}")
+                else:
+                    logger.warning("📧 Resend credentials not available")
             except Exception as e:
                 # Log the error but don't fail the request — the message was stored
                 import logging
-                logging.getLogger(__name__).error(f"Failed to send contact email: {e}")
+                logging.getLogger(__name__).error(f"❌ Failed to send contact email: {e}", exc_info=True)
         
         return {
             "message": "Thank you! Your message has been sent. We'll get back to you soon.",
