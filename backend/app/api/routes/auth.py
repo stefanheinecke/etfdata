@@ -194,7 +194,12 @@ class ContactFormRequest(BaseModel):
     message: str
 
 
-@router.post("/contact")
+class ContactFormResponse(BaseModel):
+    message: str
+    success: bool
+
+
+@router.post("/contact", response_model=ContactFormResponse)
 def submit_contact_form(contact: ContactFormRequest, db: Session = Depends(get_db)):
     """
     Submit a contact form message. Stores it in the database and attempts to send
