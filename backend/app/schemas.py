@@ -143,3 +143,22 @@ class ETLJob(Base):
     error_message = Column(Text)
     records_processed = Column(Integer)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class Settings(Base):
+    __tablename__ = "settings"
+
+    id = Column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    key = Column(String(100), unique=True, nullable=False, index=True)
+    value = Column(Text)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class ContactMessage(Base):
+    __tablename__ = "contact_messages"
+
+    id = Column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    name = Column(String(255), nullable=False)
+    email = Column(String(255), nullable=False, index=True)
+    message = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)

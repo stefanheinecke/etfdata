@@ -183,3 +183,96 @@ def get_current_user(
     admin_email = os.getenv("ADMIN_EMAIL", "").strip().lower()
     is_admin = bool(admin_email and api_key.email and api_key.email.strip().lower() == admin_email)
     return {"name": api_key.name, "email": api_key.email, "is_admin": is_admin}
+
+
+# ── Contact Form ──────────────────────────────────────────────────────────────
+
+from pydantic import BaseModel, EmailStr
+
+class ContactFormRequest(BaseModel):
+    name: str
+    email: EmailStr
+    message: str
+
+
+@router.post("/contact")
+def submit_contact_form(contact: ContactFormRequest, db: Session = Depends(get_db)):
+    """
+    Submit a contact form message. Stores it in the database and attempts to send
+    an email to the configured contact email address.
+    """
+    try:
+        from app.schemas import ContactMessage, Settings
+        from app.core.email import is_email_configured
+        import requests as _requests
+        
+        # Validate input
+        if not contact.name or len(contact.name.strip()) < 2:
+            raise HTTPException(status_code=422, detail="Name is required (at least 2 characters)")
+        
+        if not contact.email or "@" not in contact.email:
+            raise HTTPException(status_code=422, detail="Valid email address is required")
+        
+        if not contact.message or len(contact.message.strip()) < 10:
+            raise HTTPException(status_code=422, detail="Message is required (at least 10 characters)")
+        
+        # Store the contact message
+        msg = ContactMessage(
+            name=contact.name.strip()[:255],
+            email=contact.email.strip().lower()[:255],
+            message=contact.message.strip()
+        )
+        db.add(msg)
+        db.commit()
+        
+        # Try to send email to the contact email address (from settings)
+        if is_email_configured():
+            try:
+                contact_email_setting = db.query(Settings).filter(Settings.key == "contact_email").first()
+                contact_email = contact_email_setting.value if contact_email_setting else "stefan.heinecke1@gmail.com"
+                
+                # Send email using Resend
+                resend_key = os.getenv("RESEND_API_KEY", "")
+                from_addr  = os.getenv("RESEND_FROM_EMAIL", "")
+                
+                if resend_key and from_addr:
+                    response = _requests.post(
+                        "https://api.resend.com/emails",
+                        headers={"Authorization": f"Bearer {resend_key}"},
+                        json={
+                            "from": from_addr,
+                            "to": contact_email,
+                            "subject": f"New contact form submission from {contact.name}",
+                            "html": f"""<!DOCTYPE html>
+<html>
+<body style="font-family:sans-serif;color:#111;max-width:520px;margin:2rem auto;padding:0 1rem">
+  <h2>New Contact Form Submission</h2>
+  <p><strong>From:</strong> {contact.name} ({contact.email})</p>
+  <hr style="border:none;border-top:1px solid #e4e4e7;margin:1.5rem 0">
+  <p><strong>Message:</strong></p>
+  <p style="white-space:pre-wrap">{contact.message}</p>
+  <hr style="border:none;border-top:1px solid #e4e4e7;margin:1.5rem 0">
+  <p style="font-size:.85rem;color:#888">
+    Reply to: <a href="mailto:{contact.email}">{contact.email}</a>
+  </p>
+</body>
+</html>"""
+                        }
+                    )
+                    response.raise_for_status()
+            except Exception as e:
+                # Log the error but don't fail the request — the message was stored
+                import logging
+                logging.getLogger(__name__).error(f"Failed to send contact email: {e}")
+        
+        return {
+            "message": "Thank you! Your message has been sent. We'll get back to you soon.",
+            "success": True
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as exc:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Internal error: {exc}")

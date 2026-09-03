@@ -832,6 +832,77 @@ overlap = r.<span class="fn">json</span>()
   </div>
 </section>
 
+<!-- ── Contact Section ───────────────────────────────────────────────── -->
+<section class="section" style="background:#fff;border-top:1px solid var(--border);border-bottom:1px solid var(--border)">
+  <div class="container">
+    <div class="api-grid">
+      <!-- Left: Contact Form -->
+      <div class="animate-on-scroll">
+        <p class="section-label light">Get in Touch</p>
+        <h2>Questions? Let's talk</h2>
+        <p style="color:var(--text-muted);margin-bottom:1.5rem">Got feedback, questions, or partnership ideas? We'd love to hear from you.</p>
+        
+        <form id="contactForm" style="display:flex;flex-direction:column;gap:1rem">
+          <div>
+            <label for="contactName" style="display:block;font-size:.85rem;font-weight:600;margin-bottom:.4rem">Name</label>
+            <input type="text" id="contactName" name="name" required placeholder="Your name" 
+                   style="width:100%;padding:.75rem;border:1px solid var(--border);border-radius:8px;font-size:.95rem;font-family:inherit;box-sizing:border-box">
+          </div>
+          <div>
+            <label for="contactEmail" style="display:block;font-size:.85rem;font-weight:600;margin-bottom:.4rem">Email</label>
+            <input type="email" id="contactEmail" name="email" required placeholder="your@email.com" 
+                   style="width:100%;padding:.75rem;border:1px solid var(--border);border-radius:8px;font-size:.95rem;font-family:inherit;box-sizing:border-box">
+          </div>
+          <div>
+            <label for="contactMessage" style="display:block;font-size:.85rem;font-weight:600;margin-bottom:.4rem">Message</label>
+            <textarea id="contactMessage" name="message" required placeholder="Tell us what's on your mind..." rows="5"
+                      style="width:100%;padding:.75rem;border:1px solid var(--border);border-radius:8px;font-size:.95rem;font-family:inherit;resize:vertical;box-sizing:border-box"></textarea>
+          </div>
+          <button type="submit" class="btn btn-accent" style="width:100%">Send Message</button>
+          <div id="contactFeedback" style="display:none;padding:1rem;border-radius:8px;font-size:.9rem"></div>
+        </form>
+      </div>
+
+      <!-- Right: Contact Info -->
+      <div class="animate-on-scroll">
+        <div style="padding:2rem;background:var(--surface);border-radius:12px">
+          <h3 style="margin-top:0">What we can help with:</h3>
+          <ul style="list-style:none;padding:0;margin:0">
+            <li style="display:flex;align-items:flex-start;gap:1rem;margin-bottom:1rem">
+              <span style="font-size:1.25rem;flex-shrink:0">🔌</span>
+              <div>
+                <strong>API Integration</strong><br>
+                <span style="font-size:.9rem;color:var(--text-muted)">Help with REST API integration, authentication, or rate limits.</span>
+              </div>
+            </li>
+            <li style="display:flex;align-items:flex-start;gap:1rem;margin-bottom:1rem">
+              <span style="font-size:1.25rem;flex-shrink:0">📊</span>
+              <div>
+                <strong>Data & Methodology</strong><br>
+                <span style="font-size:.9rem;color:var(--text-muted)">Questions about scoring, overlap calculation, or data sources.</span>
+              </div>
+            </li>
+            <li style="display:flex;align-items:flex-start;gap:1rem;margin-bottom:1rem">
+              <span style="font-size:1.25rem;flex-shrink:0">🤝</span>
+              <div>
+                <strong>Partnerships</strong><br>
+                <span style="font-size:.9rem;color:var(--text-muted)">Interested in collaborating or embedding GoETF in your platform?</span>
+              </div>
+            </li>
+            <li style="display:flex;align-items:flex-start;gap:1rem">
+              <span style="font-size:1.25rem;flex-shrink:0">💡</span>
+              <div>
+                <strong>Feature Requests</strong><br>
+                <span style="font-size:.9rem;color:var(--text-muted)">Have an idea to make GoETF better? We'd love to hear it.</span>
+              </div>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- ── Footer ─────────────────────────────────────────────── -->
 <footer class="footer">
   <div class="container">
@@ -1060,6 +1131,59 @@ const gaugeObserver = new IntersectionObserver((entries) => {
 
 const scoreCard = document.querySelector('.score-card');
 if (scoreCard) gaugeObserver.observe(scoreCard);
+
+/* ── Contact Form ──────────────────────────────────────── */
+const contactForm = document.getElementById('contactForm');
+if (contactForm) {
+  contactForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const feedback = document.getElementById('contactFeedback');
+    const submitBtn = contactForm.querySelector('button[type="submit"]');
+    const formData = new FormData(contactForm);
+    
+    // Show loading state
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Sending...';
+    feedback.style.display = 'none';
+    
+    try {
+      const response = await fetch('/auth/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: formData.get('name'),
+          email: formData.get('email'),
+          message: formData.get('message')
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        feedback.style.background = 'rgba(34, 197, 94, 0.08)';
+        feedback.style.borderLeft = '4px solid #22c55e';
+        feedback.style.color = '#166534';
+        feedback.textContent = '✓ ' + data.message;
+        contactForm.reset();
+      } else {
+        feedback.style.background = 'rgba(239, 68, 68, 0.08)';
+        feedback.style.borderLeft = '4px solid #ef4444';
+        feedback.style.color = '#991b1b';
+        feedback.textContent = '✗ Error: ' + (data.detail || 'Failed to send message');
+      }
+    } catch (err) {
+      feedback.style.background = 'rgba(239, 68, 68, 0.08)';
+      feedback.style.borderLeft = '4px solid #ef4444';
+      feedback.style.color = '#991b1b';
+      feedback.textContent = '✗ Network error: ' + err.message;
+    } finally {
+      feedback.style.display = 'block';
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Send Message';
+    }
+  });
+}
 
 /* ── Open Internal Links In Top Window ─────────────────── */
 document.querySelectorAll('a[href^="/"]').forEach(a => {

@@ -855,3 +855,93 @@ async def import_etf_data(
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=f"Failed to import ETF: {str(e)}")
+
+
+# ── Settings Management ────────────────────────────────────────────────────────
+
+class SettingsUpdateBody(BaseModel):
+    contact_email: Optional[str] = None
+
+
+@router.get("/settings")
+def get_settings(
+    db: Session = Depends(get_db),
+    _: None = Depends(verify_admin_secret),
+):
+    """Retrieve all application settings."""
+    from app.schemas import Settings
+    
+    settings = db.query(Settings).all()
+    result = {}
+    for setting in settings:
+        result[setting.key] = setting.value
+    
+    # Ensure contact_email has a default
+    if "contact_email" not in result:
+        result["contact_email"] = "stefan.heinecke1@gmail.com"
+    
+    return result
+
+
+@router.patch("/settings")
+def update_settings(
+    body: SettingsUpdateBody,
+    db: Session = Depends(get_db),
+    _: None = Depends(verify_admin_secret),
+):
+    """Update application settings."""
+    from app.schemas import Settings
+    from datetime import datetime
+    
+    updated = {}
+    
+    if body.contact_email is not None:
+        # Validate email format
+        if not body.contact_email or "@" not in body.contact_email:
+            raise HTTPException(status_code=422, detail="Invalid email address")
+        
+        setting = db.query(Settings).filter(Settings.key == "contact_email").first()
+        if not setting:
+            setting = Settings(key="contact_email", value=body.contact_email)
+            db.add(setting)
+        else:
+            setting.value = body.contact_email
+            setting.updated_at = datetime.utcnow()
+        db.commit()
+        updated["contact_email"] = body.contact_email
+    
+    return {"updated": updated, "message": "Settings updated successfully"}
+
+
+@router.get("/contact-messages")
+def get_contact_messages(
+    db: Session = Depends(get_db),
+    _: None = Depends(verify_admin_secret),
+    limit: int = 50,
+    offset: int = 0,
+):
+    """Retrieve contact form submissions."""
+    from app.schemas import ContactMessage
+    
+    messages = db.query(ContactMessage).order_by(
+        ContactMessage.created_at.desc()
+    ).limit(limit).offset(offset).all()
+    
+    total = db.query(ContactMessage).count()
+    
+    return {
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+        "messages": [
+            {
+                "id": str(m.id),
+                "name": m.name,
+                "email": m.email,
+                "message": m.message,
+                "created_at": m.created_at.isoformat() if m.created_at else None,
+            }
+            for m in messages
+        ]
+    }
+

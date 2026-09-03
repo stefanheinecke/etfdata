@@ -100,4 +100,40 @@ def init_db():
             CREATE INDEX IF NOT EXISTS idx_holdings_isin ON holdings (instrument_isin)
         """))
         
+        # Create settings table if it doesn't exist and initialize default contact email
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS settings (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                key VARCHAR(100) UNIQUE NOT NULL,
+                value TEXT,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """))
+        
+        # Insert default contact email if not already set
+        conn.execute(text("""
+            INSERT INTO settings (key, value) 
+            VALUES ('contact_email', 'stefan.heinecke1@gmail.com')
+            ON CONFLICT (key) DO NOTHING
+        """))
+        
+        # Create contact_messages table if it doesn't exist
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS contact_messages (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                name VARCHAR(255) NOT NULL,
+                email VARCHAR(255) NOT NULL,
+                message TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """))
+        
+        conn.execute(text("""
+            CREATE INDEX IF NOT EXISTS idx_contact_messages_email ON contact_messages (email)
+        """))
+        
+        conn.execute(text("""
+            CREATE INDEX IF NOT EXISTS idx_contact_messages_created_at ON contact_messages (created_at)
+        """))
+        
         conn.commit()
