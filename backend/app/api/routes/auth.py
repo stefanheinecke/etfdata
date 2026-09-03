@@ -240,7 +240,9 @@ def submit_contact_form(contact: ContactFormRequest, db: Session = Depends(get_d
                 resend_key = os.getenv("RESEND_API_KEY", "")
                 from_addr  = os.getenv("RESEND_FROM_EMAIL", "")
                 
-                logger.info(f"📧 Resend API key present: {bool(resend_key)}, From addr: {from_addr}")
+                # Log without exposing full API key
+                key_preview = (resend_key[:20] + "...") if resend_key else "(not set)"
+                logger.info(f"📧 Email config - From: {from_addr}, API key: {key_preview}")
                 
                 if resend_key and from_addr:
                     response = _requests.post(
@@ -266,7 +268,9 @@ def submit_contact_form(contact: ContactFormRequest, db: Session = Depends(get_d
 </html>"""
                         }
                     )
-                    logger.info(f"📧 Resend response: {response.status_code} - {response.text}")
+                    logger.info(f"📧 Resend response: {response.status_code}")
+                    if response.status_code != 200:
+                        logger.error(f"📧 Resend error response: {response.text}")
                     response.raise_for_status()
                     logger.info(f"✅ Email sent successfully to {contact_email}")
                 else:
