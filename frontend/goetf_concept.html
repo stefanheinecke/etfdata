@@ -1122,19 +1122,25 @@ if (scoreCard) gaugeObserver.observe(scoreCard);
 
 /* ── API Configuration ───────────────────────────────────── */
 const API_BASE_URL = (() => {
+  const hostname = window.location.hostname;
+  const isDev = hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('192.168.');
+  
+  console.log('🔧 Hostname detected:', hostname);
+  console.log('🔧 Is development?:', isDev);
+  
   // In development, use relative URLs (proxied by Vite dev server)
-  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+  if (isDev) {
+    console.log('🔧 Using relative URLs for development');
     return '';
   }
-  // In production, use the Railway backend URL
-  if (window.location.hostname === 'goetf.ch' || window.location.hostname === 'www.goetf.ch') {
-    return 'https://etfdata-production.up.railway.app';
-  }
-  // For other environments, use relative URL and hope it's proxied
-  return '';
+  
+  // In production, always use Railway backend
+  const railwayUrl = 'https://etfdata-production.up.railway.app';
+  console.log('🔧 Using production backend:', railwayUrl);
+  return railwayUrl;
 })();
 
-console.log('🔧 Contact Form Debug - API_BASE_URL:', API_BASE_URL, 'Hostname:', window.location.hostname);
+console.log('🔧 Contact Form Debug - API_BASE_URL:', API_BASE_URL);
 
 /* ── Contact Form ──────────────────────────────────────── */
 const contactForm = document.getElementById('contactForm');
