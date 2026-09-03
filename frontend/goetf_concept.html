@@ -836,11 +836,36 @@ overlap = r.<span class="fn">json</span>()
 <section class="section" style="background:#fff;border-top:1px solid var(--border);border-bottom:1px solid var(--border)">
   <div class="container">
     <div class="api-grid">
-      <!-- Left: Contact Form -->
+      <!-- Left: Contact Info -->
+      <div class="animate-on-scroll">
+        <div style="padding:2rem;background:var(--surface);border-radius:12px">
+          <h3 style="margin-top:0">What we can help with:</h3>
+          <ul style="list-style:none;padding:0;margin:0">
+            <li style="margin-bottom:1.5rem">
+              <strong style="display:block;margin-bottom:.5rem">API Integration</strong>
+              <span style="font-size:.9rem;color:var(--text-muted)">Help with REST API integration, authentication, or rate limits.</span>
+            </li>
+            <li style="margin-bottom:1.5rem">
+              <strong style="display:block;margin-bottom:.5rem">Data & Methodology</strong>
+              <span style="font-size:.9rem;color:var(--text-muted)">Questions about scoring, overlap calculation, or data sources.</span>
+            </li>
+            <li style="margin-bottom:1.5rem">
+              <strong style="display:block;margin-bottom:.5rem">MCP Server Integration</strong>
+              <span style="font-size:.9rem;color:var(--text-muted)">Use GoETF directly in LLM workflows with our Model Context Protocol integration.</span>
+            </li>
+            <li>
+              <strong style="display:block;margin-bottom:.5rem">Feature Requests</strong>
+              <span style="font-size:.9rem;color:var(--text-muted)">Have an idea to make GoETF better? We'd love to hear it.</span>
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Right: Contact Form -->
       <div class="animate-on-scroll">
         <p class="section-label light">Get in Touch</p>
         <h2>Questions? Let's talk</h2>
-        <p style="color:var(--text-muted);margin-bottom:1.5rem">Got feedback, questions, or partnership ideas? We'd love to hear from you.</p>
+        <p style="color:var(--text-muted);margin-bottom:1.5rem">Got feedback or questions? We'd love to hear from you.</p>
         
         <form id="contactForm" style="display:flex;flex-direction:column;gap:1rem">
           <div>
@@ -861,43 +886,6 @@ overlap = r.<span class="fn">json</span>()
           <button type="submit" class="btn btn-accent" style="width:100%">Send Message</button>
           <div id="contactFeedback" style="display:none;padding:1rem;border-radius:8px;font-size:.9rem"></div>
         </form>
-      </div>
-
-      <!-- Right: Contact Info -->
-      <div class="animate-on-scroll">
-        <div style="padding:2rem;background:var(--surface);border-radius:12px">
-          <h3 style="margin-top:0">What we can help with:</h3>
-          <ul style="list-style:none;padding:0;margin:0">
-            <li style="display:flex;align-items:flex-start;gap:1rem;margin-bottom:1rem">
-              <span style="font-size:1.25rem;flex-shrink:0">🔌</span>
-              <div>
-                <strong>API Integration</strong><br>
-                <span style="font-size:.9rem;color:var(--text-muted)">Help with REST API integration, authentication, or rate limits.</span>
-              </div>
-            </li>
-            <li style="display:flex;align-items:flex-start;gap:1rem;margin-bottom:1rem">
-              <span style="font-size:1.25rem;flex-shrink:0">📊</span>
-              <div>
-                <strong>Data & Methodology</strong><br>
-                <span style="font-size:.9rem;color:var(--text-muted)">Questions about scoring, overlap calculation, or data sources.</span>
-              </div>
-            </li>
-            <li style="display:flex;align-items:flex-start;gap:1rem;margin-bottom:1rem">
-              <span style="font-size:1.25rem;flex-shrink:0">🤝</span>
-              <div>
-                <strong>Partnerships</strong><br>
-                <span style="font-size:.9rem;color:var(--text-muted)">Interested in collaborating or embedding GoETF in your platform?</span>
-              </div>
-            </li>
-            <li style="display:flex;align-items:flex-start;gap:1rem">
-              <span style="font-size:1.25rem;flex-shrink:0">💡</span>
-              <div>
-                <strong>Feature Requests</strong><br>
-                <span style="font-size:.9rem;color:var(--text-muted)">Have an idea to make GoETF better? We'd love to hear it.</span>
-              </div>
-            </li>
-          </ul>
-        </div>
       </div>
     </div>
   </div>
