@@ -188,8 +188,6 @@ def get_current_user(
 
 # ── Contact Form ──────────────────────────────────────────────────────────────
 
-from pydantic import BaseModel, EmailStr
-
 class ContactFormRequest(BaseModel):
     name: str
     email: EmailStr
