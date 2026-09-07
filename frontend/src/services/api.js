@@ -174,5 +174,17 @@ export const adminService = {
   importPdfData(adminSecret, metadata, holdings) {
     return api.post('/admin/etf/import-data', { metadata, holdings }, { headers: { 'x-admin-secret': adminSecret } })
   },
+  importProviderMetadata(adminSecret, ubsFile, isharesFile) {
+    const form = new FormData()
+    if (ubsFile) form.append('ubs_file', ubsFile)
+    if (isharesFile) form.append('ishares_file', isharesFile)
+    return api.post('/admin/import-provider-metadata', form, { headers: { 'x-admin-secret': adminSecret } })
+  },
+  downloadProviderFile(adminSecret, provider) {
+    return api.get(`/admin/provider-metadata/${provider}-file`, {
+      headers: { 'x-admin-secret': adminSecret },
+      responseType: 'blob',
+    })
+  },
 }
 

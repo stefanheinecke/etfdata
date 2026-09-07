@@ -122,6 +122,52 @@
       </div>
     </div>
 
+    <!-- Provider Metadata Import -->
+    <div class="card" style="margin-bottom:1.5rem">
+      <h2 class="card-title">Provider Metadata Import (UBS / iShares)</h2>
+      <p style="font-size:.875rem;color:var(--text-muted);margin-bottom:1rem">
+        Upload the UBS and/or iShares Excel exports to import ETF metadata (TER, domicile, benchmark,
+        asset class, SFDR, inception date, WKN, constituents) by ISIN. Existing fields are only filled
+        in when currently empty — nothing is overwritten, and conflicts are reported below.
+      </p>
+      <div style="display:flex;gap:.75rem;margin-bottom:1rem;flex-wrap:wrap">
+        <button class="btn btn-outline" @click="downloadProviderFile('ubs')" :disabled="!adminVerified">
+          ⬇ View current UBS file
+        </button>
+        <button class="btn btn-outline" @click="downloadProviderFile('ishares')" :disabled="!adminVerified">
+          ⬇ View current iShares file
+        </button>
+      </div>
+      <div class="grid-2" style="margin-bottom:1rem">
+        <div>
+          <label class="label">UBS file <span style="font-weight:400;color:var(--text-muted)">(.xlsx)</span></label>
+          <input type="file" accept=".xlsx" class="input" @change="e => providerUbsFile = e.target.files[0]" />
+        </div>
+        <div>
+          <label class="label">iShares file <span style="font-weight:400;color:var(--text-muted)">(.xls)</span></label>
+          <input type="file" accept=".xls" class="input" @change="e => providerIsharesFile = e.target.files[0]" />
+        </div>
+      </div>
+      <button class="btn btn-primary" style="width:100%"
+        @click="importProviderMetadata"
+        :disabled="!adminVerified || (!providerUbsFile && !providerIsharesFile) || providerImportLoading">
+        {{ providerImportLoading ? 'Importing…' : 'Import ETFs' }}
+      </button>
+      <div v-if="providerImportError" class="error-box" style="margin-top:.75rem">{{ providerImportError }}</div>
+      <div v-if="providerImportResult" style="margin-top:.75rem;display:flex;flex-direction:column;gap:.5rem">
+        <div v-if="providerImportResult.ubs" class="success-msg">
+          UBS: {{ providerImportResult.ubs.created ?? 0 }} created, {{ providerImportResult.ubs.updated ?? 0 }} updated
+          <span v-if="providerImportResult.ubs.error">— error: {{ providerImportResult.ubs.error }}</span>
+        </div>
+        <div v-if="providerImportResult.ishares" class="success-msg">
+          iShares: {{ providerImportResult.ishares.created ?? 0 }} created, {{ providerImportResult.ishares.updated ?? 0 }} updated
+          <span v-if="providerImportResult.ishares.error">— error: {{ providerImportResult.ishares.error }}</span>
+        </div>
+        <div v-if="providerImportConflicts.length"
+          style="background:#f8f9fa;border-radius:6px;padding:.75rem;font-family:monospace;font-size:.8rem;white-space:pre-wrap;max-height:200px;overflow-y:auto;">{{ providerImportConflicts.join('\n') }}</div>
+      </div>
+    </div>
+
     <!-- Import ETF -->
     <div class="card" style="margin-bottom:1.5rem">
       <h2 class="card-title">Import ETF</h2>
@@ -829,6 +875,15 @@ const refreshPricesProgress = ref('')   // "5 of 12 — SWDA"
 const refreshPricesResult = ref('')
 const refreshPricesError = ref('')
 const backfillLoading = ref(false)
+const providerUbsFile = ref(null)
+const providerIsharesFile = ref(null)
+const providerImportLoading = ref(false)
+const providerImportResult = ref(null)
+const providerImportError = ref('')
+const providerImportConflicts = computed(() => [
+  ...(providerImportResult.value?.ubs?.log || []),
+  ...(providerImportResult.value?.ishares?.log || []),
+])
 const backfillResult = ref('')
 const backfillError = ref('')
 
@@ -1036,6 +1091,34 @@ async function triggerBackfillSymbols() {
     backfillError.value = e.response?.data?.detail || e.message
   } finally {
     backfillLoading.value = false
+  }
+}
+
+async function importProviderMetadata() {
+  providerImportLoading.value = true; providerImportResult.value = null; providerImportError.value = ''
+  try {
+    const r = await adminService.importProviderMetadata(adminSecret.value, providerUbsFile.value, providerIsharesFile.value)
+    providerImportResult.value = r.data
+  } catch(e) {
+    providerImportError.value = e.response?.data?.detail || e.message
+  } finally {
+    providerImportLoading.value = false
+  }
+}
+
+async function downloadProviderFile(provider) {
+  try {
+    const r = await adminService.downloadProviderFile(adminSecret.value, provider)
+    const url = window.URL.createObjectURL(new Blob([r.data]))
+    const a = document.createElement('a')
+    a.href = url
+    a.download = provider === 'ubs' ? 'UBS ETF Product Overview CH EN.xlsx' : 'iShares-Switzerland.xls'
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    window.URL.revokeObjectURL(url)
+  } catch(e) {
+    providerImportError.value = e.response?.data?.detail || e.message
   }
 }
 

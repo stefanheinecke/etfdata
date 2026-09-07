@@ -1,8 +1,10 @@
 import os
 import threading
 from datetime import date as date_type
+from pathlib import Path
 from uuid import UUID, uuid4
 from fastapi import APIRouter, Depends, HTTPException, Header, UploadFile, File
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -11,6 +13,10 @@ from app.db.database import get_db, SessionLocal
 from app.core.auth import create_api_key
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+
+# Root of the backend package (parents[3] = routes -> api -> app -> backend root),
+# where import_provider_metadata.py and the provider Excel exports live.
+_BACKEND_ROOT = Path(__file__).resolve().parents[3]
 
 # ---------------------------------------------------------------------------
 # In-memory job store for async price refresh progress tracking
@@ -633,6 +639,69 @@ class ETFImportRequest(BaseModel):
     holdings: List[dict]
     date: Optional[date_type] = None
     eodhd_symbol: Optional[str] = None  # Optional: for fetching historical prices
+
+
+# ───────────────────────────────────────────────────────────────────────────
+# Provider Metadata Import (UBS / iShares Excel exports)
+# ───────────────────────────────────────────────────────────────────────────
+
+_PROVIDER_FILES = {
+    "ubs": ("UBS ETF Product Overview CH EN.xlsx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+    "ishares": ("iShares-Switzerland.xls", "application/vnd.ms-excel"),
+}
+
+
+@router.get("/provider-metadata/{provider}-file")
+def download_provider_file(provider: str, _: None = Depends(verify_admin_secret)):
+    """Download the current UBS/iShares Excel export committed in the repo, for inspection."""
+    entry = _PROVIDER_FILES.get(provider)
+    if not entry:
+        raise HTTPException(status_code=404, detail="Unknown provider (use 'ubs' or 'ishares')")
+    filename, media_type = entry
+    path = _BACKEND_ROOT / filename
+    if not path.exists():
+        raise HTTPException(status_code=404, detail=f"{filename} not found on server")
+    return FileResponse(path, filename=filename, media_type=media_type)
+
+
+@router.post("/import-provider-metadata")
+async def import_provider_metadata_endpoint(
+    ubs_file: Optional[UploadFile] = File(None),
+    ishares_file: Optional[UploadFile] = File(None),
+    db: Session = Depends(get_db),
+    _: None = Depends(verify_admin_secret),
+):
+    """
+    Upload UBS and/or iShares provider metadata Excel exports and import them.
+    Upserts ETF rows by ISIN: existing fields are only filled in when currently
+    empty (never overwritten); conflicts are reported in `log`, not silently applied.
+    """
+    import io
+    from import_provider_metadata import parse_ubs, parse_ishares, upsert
+
+    if not ubs_file and not ishares_file:
+        raise HTTPException(status_code=422, detail="Provide at least one of ubs_file / ishares_file")
+
+    response: dict = {}
+
+    if ubs_file:
+        try:
+            content = await ubs_file.read()
+            rows = parse_ubs(io.BytesIO(content))
+            response["ubs"] = upsert(db, rows, "UBS")
+        except Exception as exc:
+            response["ubs"] = {"error": str(exc)}
+
+    if ishares_file:
+        try:
+            content = await ishares_file.read()
+            rows = parse_ishares(io.BytesIO(content))
+            response["ishares"] = upsert(db, rows, "iShares")
+        except Exception as exc:
+            response["ishares"] = {"error": str(exc)}
+
+    return response
 
 
 @router.post("/etf/import-data")

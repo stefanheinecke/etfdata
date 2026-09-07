@@ -20,6 +20,7 @@ import os
 import sys
 import xml.etree.ElementTree as ET
 from datetime import datetime, date
+from decimal import Decimal
 from typing import Optional
 
 import pandas as pd
@@ -80,13 +81,21 @@ def _map_lookup(table: dict, raw: Optional[str]) -> Optional[str]:
     return table.get(raw.lower(), raw)
 
 
+def _values_equal(a, b) -> bool:
+    """Compare field values loosely so re-running an import doesn't report false
+    conflicts from formatting differences (e.g. Decimal('0.200') vs float 0.2)."""
+    if isinstance(a, (int, float, Decimal)) and isinstance(b, (int, float, Decimal)):
+        return float(a) == float(b)
+    return str(a) == str(b)
+
+
 def _set_if_empty(etf: ETF, field: str, new_value, source_label: str, log: list):
     if new_value is None or new_value == "":
         return
     current = getattr(etf, field)
     if current is None or current == "":
         setattr(etf, field, new_value)
-    elif str(current) != str(new_value):
+    elif not _values_equal(current, new_value):
         log.append(f"  [conflict] {etf.isin} {field}: keeping '{current}', {source_label} had '{new_value}'")
 
 
