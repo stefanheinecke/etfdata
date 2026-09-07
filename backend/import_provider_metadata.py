@@ -55,6 +55,7 @@ _ASSET_CLASS_TO_EN = {
 _DIST_POLICY_MAP = {
     "yes": "Distributing", "no": "Accumulating",
     "ausschüttend": "Distributing", "thesaurierend": "Accumulating",
+    "keine erträge": "No Income",
 }
 
 _REPLICATION_MAP = {
