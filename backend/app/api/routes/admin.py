@@ -9,7 +9,6 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 from app.db.database import get_db, SessionLocal
 from app.core.auth import create_api_key
-from app.services.ishares_import import import_ishares, ISHARES_ETFS
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -17,10 +16,6 @@ router = APIRouter(prefix="/admin", tags=["admin"])
 # In-memory job store for async price refresh progress tracking
 # ---------------------------------------------------------------------------
 _refresh_jobs: dict[str, dict] = {}
-
-
-class ImportRequest(BaseModel):
-    tickers: Optional[List[str]] = None
 
 
 class ETFUpdateBody(BaseModel):
@@ -131,7 +126,6 @@ def backfill_eodhd_symbols(
     After running this, 'Refresh Prices' will use EODHD for all ETFs.
     """
     from app.schemas import ETF as ETFModel
-    from app.services.ishares_import import _YF_PERF_SYMBOL, _eodhd_symbol_for_etf
     import os, requests as req_lib
 
     token = os.getenv("EODHD_TOKEN")
@@ -435,34 +429,6 @@ def reset(
     db.query(ETF).delete()
     db.commit()
     return {"reset": True, "message": "All ETF data deleted. Run /admin/import-ishares to import real data."}
-
-
-@router.get("/import-ishares/etfs")
-def list_ishares_etfs(_: None = Depends(verify_admin_secret)):
-    """List the 13 iShares ETFs available for import."""
-    return [
-        {"ticker": e["ticker"], "name": e["name"], "isin": e["isin"], "yf_symbol": e["yf_symbol"]}
-        for e in ISHARES_ETFS
-    ]
-
-
-@router.post("/import-ishares")
-def import_ishares_endpoint(
-    body: ImportRequest = None,
-    db: Session = Depends(get_db),
-    _: None = Depends(verify_admin_secret),
-):
-    """
-    Download real holdings data from iShares.com and import into the database.
-    Provide {"isins": ["IE00B4L5Y983", "IE00B6R52259"]} to import a subset, or omit / send {} to import all.
-    
-    Note: For now, this endpoint still expects the old ticker format for backward compatibility.
-    Update the request body to use ISINs instead of tickers.
-    """
-    # Support both 'tickers' (for backward compatibility) and 'isins' in the request
-    tickers = getattr(body, 'tickers', None) or getattr(body, 'isins', None) if body else None
-    result = import_ishares(db, tickers=tickers)
-    return result
 
 
 @router.delete("/etfs/{etf_id}", status_code=204)

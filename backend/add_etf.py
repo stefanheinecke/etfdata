@@ -43,7 +43,6 @@ from sqlalchemy.pool import NullPool
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__)))
 from app.schemas import ETF, Performance
-from app.services.ishares_import import ISHARES_ETFS
 
 
 # ---------------------------------------------------------------------------
@@ -206,13 +205,12 @@ def main() -> None:
     if not db_url:
         sys.exit("ERROR: Provide --db or set DATABASE_PUBLIC_URL environment variable.")
 
-    # -- Resolve yfinance symbol and any known defaults from ISHARES_ETFS --
+    # -- Resolve yfinance symbol --
     ticker_upper = args.ticker.strip().upper()
-    known = next((e for e in ISHARES_ETFS if e["ticker"] == ticker_upper), None)
-    yf_symbol = args.yf_symbol or (known["yf_symbol"] if known else args.ticker)
-    known_ter       = known["ter"]       if known else None
-    known_benchmark = known["benchmark"] if known else None
-    known_url       = known.get("holdings_url") if known else None
+    yf_symbol = args.yf_symbol or args.ticker
+    known_ter       = None
+    known_benchmark = None
+    known_url       = None
     print(f"Using yfinance symbol: {yf_symbol}")
 
     # -- Resolve holdings CSV (download if --csv not provided) --
@@ -223,8 +221,7 @@ def main() -> None:
             sys.exit(
                 "ERROR: No holdings CSV provided.\n"
                 "  Pass --csv <file> to use a local file, or\n"
-                "  pass --download-url <url> to download from iShares, or\n"
-                "  add the ticker to the built-in ISHARES_ETFS list with a holdings_url."
+                "  pass --download-url <url> to download from iShares."
             )
         try:
             csv_path = _download_holdings(download_url, args.ticker)
