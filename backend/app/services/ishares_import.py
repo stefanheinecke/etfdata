@@ -133,7 +133,6 @@ def _upsert_etf(meta: dict, db: Session) -> ETF:
     if not etf:
         etf = ETF(
             isin=meta["isin"],
-            ticker=meta["ticker"],
             name=meta["name"],
             provider="iShares",
             domicile=meta["domicile"],
