@@ -21,6 +21,12 @@ class ETF(Base):
     currency = Column(String(3), nullable=True)
     dividend_policy = Column(String(20))  # "Accumulating" | "Distributing"
     replication_method = Column(String(50))  # "Physical (Full replication)" | "Physical (Sampling)" | "Synthetic"
+    asset_class = Column(String(50))  # "Equities" | "Bonds" | "Real Estate" | "Commodities" | "Precious Metals" | ...
+    sfdr_classification = Column(String(10))  # "Art.6" | "Art.8" | "Art.9"
+    inception_date = Column(Date)
+    wkn = Column(String(20))
+    num_constituents = Column(Integer)
+    data_source = Column(String(50))  # provenance of the metadata, e.g. "UBS", "iShares", "EODHD", "PDF"
     listings = Column(JSON)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
