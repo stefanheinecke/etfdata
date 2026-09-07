@@ -39,10 +39,10 @@
           </select>
         </div>
         <div>
-          <label class="label">Replication</label>
-          <select class="input" v-model="filterReplication">
+          <label class="label">Dividend Policy</label>
+          <select class="input" v-model="filterDividendPolicy">
             <option value="">All</option>
-            <option v-for="r in filterOptions.replications" :key="r" :value="r">{{ r }}</option>
+            <option v-for="d in filterOptions.dividendPolicies" :key="d" :value="d">{{ d }}</option>
           </select>
         </div>
         <div>
@@ -55,7 +55,7 @@
               <option value="fund_size">Fund Size</option>
               <option value="domicile">Domicile</option>
               <option value="currency">Currency</option>
-              <option value="replication_method">Replication</option>
+              <option value="dividend_policy">Dividend Policy</option>
               <option value="benchmark">Benchmark</option>
             </select>
             <button class="btn btn-outline sort-dir-btn" @click="sortDir = sortDir === 'asc' ? 'desc' : 'asc'" :title="sortDir === 'asc' ? 'Ascending' : 'Descending'">
@@ -78,7 +78,7 @@
     <div v-if="error" class="error-box" style="margin-bottom:1.5rem">{{ error }}</div>
     <div v-if="loading" class="loading"><div class="spinner"></div> Loading ETFs...</div>
     <div v-else-if="filteredETFs.length" class="etf-grid">
-      <div v-for="etf in filteredETFs" :key="etf.id" class="etf-card" @click="openETF(etf)">
+      <div v-for="etf in paginatedETFs" :key="etf.id" class="etf-card" @click="openETF(etf)">
         <div class="etf-card-top">
           <div><span class="etf-ticker">{{ etf.isin }}</span><span v-if="etf.provider" class="badge" style="margin-left:.5rem">{{ etf.provider }}</span></div>
           <span class="etf-ter">TER {{ etf.ter != null ? etf.ter + '%' : '—' }}</span>
@@ -93,6 +93,11 @@
         <div v-if="etf.replication_method" class="etf-replication">{{ etf.replication_method }}</div>
       </div>
     </div>
+    <div v-if="!loading && filteredETFs.length" class="pagination">
+      <button class="btn btn-outline" @click="currentPage--" :disabled="currentPage <= 1">‹ Prev</button>
+      <span>Page {{ currentPage }} of {{ totalPages }} ({{ pageRangeLabel }})</span>
+      <button class="btn btn-outline" @click="currentPage++" :disabled="currentPage >= totalPages">Next ›</button>
+    </div>
     <div v-else-if="!loading && !error" class="empty-state">
       <div class="empty-icon">📭</div>
       <p>No ETFs found. Make sure your API key is configured and the database is seeded.</p>
@@ -101,7 +106,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, inject } from 'vue'
+import { ref, computed, watch, onMounted, inject } from 'vue'
 
 const showApiKeyModal = inject('showApiKeyModal')
 const navigateToETF = inject('navigateToETF')
@@ -122,20 +127,24 @@ const search = ref('')
 const filterProvider = ref('')
 const filterDomicile = ref('')
 const filterCurrency = ref('')
-const filterReplication = ref('')
+const filterDividendPolicy = ref('')
 
 // Sort
 const sortKey = ref('ticker')
 const sortDir = ref('asc')
 
+// Pagination (client-side, over the full fetched + filtered set)
+const currentPage = ref(1)
+const pageSize = 60
+
 // Derive unique filter option lists from loaded data
 const filterOptions = computed(() => {
   const uniq = (arr) => [...new Set(arr.filter(Boolean))].sort()
   return {
-    providers:    uniq(allETFs.value.map(e => e.provider)),
-    domiciles:    uniq(allETFs.value.map(e => e.domicile)),
-    currencies:   uniq(allETFs.value.map(e => e.currency)),
-    replications: uniq(allETFs.value.map(e => e.replication_method)),
+    providers:        uniq(allETFs.value.map(e => e.provider)),
+    domiciles:        uniq(allETFs.value.map(e => e.domicile)),
+    currencies:       uniq(allETFs.value.map(e => e.currency)),
+    dividendPolicies: uniq(allETFs.value.map(e => e.dividend_policy)),
   }
 })
 
@@ -144,10 +153,10 @@ const filteredETFs = computed(() => {
 
   const q = search.value.trim().toLowerCase()
   if (q) list = list.filter(e => e.isin?.toLowerCase().includes(q) || e.name?.toLowerCase().includes(q))
-  if (filterProvider.value)    list = list.filter(e => e.provider === filterProvider.value)
-  if (filterDomicile.value)    list = list.filter(e => e.domicile === filterDomicile.value)
-  if (filterCurrency.value)    list = list.filter(e => e.currency === filterCurrency.value)
-  if (filterReplication.value) list = list.filter(e => e.replication_method === filterReplication.value)
+  if (filterProvider.value)        list = list.filter(e => e.provider === filterProvider.value)
+  if (filterDomicile.value)        list = list.filter(e => e.domicile === filterDomicile.value)
+  if (filterCurrency.value)        list = list.filter(e => e.currency === filterCurrency.value)
+  if (filterDividendPolicy.value)  list = list.filter(e => e.dividend_policy === filterDividendPolicy.value)
 
   const key = sortKey.value
   const dir = sortDir.value === 'asc' ? 1 : -1
@@ -159,14 +168,32 @@ const filteredETFs = computed(() => {
   })
 })
 
+const totalPages = computed(() => Math.max(1, Math.ceil(filteredETFs.value.length / pageSize)))
+const paginatedETFs = computed(() => {
+  const start = (currentPage.value - 1) * pageSize
+  return filteredETFs.value.slice(start, start + pageSize)
+})
+const pageRangeLabel = computed(() => {
+  if (!filteredETFs.value.length) return '0 of 0'
+  const start = (currentPage.value - 1) * pageSize + 1
+  const end = Math.min(start + pageSize - 1, filteredETFs.value.length)
+  return `${start}–${end} of ${filteredETFs.value.length}`
+})
+
+// Jump back to page 1 whenever the filtered/sorted set changes shape
+watch([search, filterProvider, filterDomicile, filterCurrency, filterDividendPolicy, sortKey, sortDir], () => {
+  currentPage.value = 1
+})
+
 function resetFilters() {
   search.value = ''
   filterProvider.value = ''
   filterDomicile.value = ''
   filterCurrency.value = ''
-  filterReplication.value = ''
+  filterDividendPolicy.value = ''
   sortKey.value = 'ticker'
   sortDir.value = 'asc'
+  currentPage.value = 1
 }
 
 function formatSize(n) {
@@ -178,8 +205,9 @@ function formatSize(n) {
 async function loadETFs() {
   loading.value=true; error.value=''
   try {
-    const r = await etfService.getETFs(0, 100)
+    const r = await etfService.getETFs(0, 5000)
     allETFs.value = r.data
+    currentPage.value = 1
   } catch(e) {
     error.value = e.response?.data?.detail || e.message
   } finally {
@@ -208,6 +236,7 @@ onMounted(loadETFs)
 .etf-isin{font-size:.75rem;color:var(--text-muted);font-family:monospace;margin-bottom:.75rem}
 .etf-meta{display:flex;gap:.75rem;font-size:.8rem;color:var(--text-muted);flex-wrap:wrap}
 .etf-replication{margin-top:.5rem;font-size:.75rem;color:var(--text-muted)}
+.pagination{display:flex;align-items:center;justify-content:center;gap:1rem;margin-top:1.5rem;font-size:.85rem;color:var(--text-muted)}
 .badge-acc{background:rgba(0,201,167,.12);color:#009f86;border-radius:4px;padding:1px 6px;font-size:.7rem;font-weight:600}
 .badge-dist{background:rgba(15,76,129,.1);color:#0f4c81;border-radius:4px;padding:1px 6px;font-size:.7rem;font-weight:600}
 .cta-banner{display:flex;align-items:center;justify-content:space-between;gap:1rem;background:var(--surface);border:1.5px solid var(--border);border-radius:12px;padding:1rem 1.25rem;margin-bottom:1.5rem;flex-wrap:wrap;box-shadow:var(--shadow)}
