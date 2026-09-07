@@ -23,7 +23,7 @@ async def list_etfs(
     query = db.query(ETF)
     if provider:
         query = query.filter(ETF.provider == provider)
-    return query.offset(skip).limit(limit).all()
+    return query.order_by(ETF.isin).offset(skip).limit(limit).all()
 
 @router.get("/risk-metrics")
 async def get_etf_risk_metrics(

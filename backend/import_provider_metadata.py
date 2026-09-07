@@ -135,7 +135,7 @@ def parse_ubs(path: str) -> list[dict]:
             "name": _norm(r.get("Share Class Name")),
             "provider": "UBS",
             "domicile": _map_lookup(_DOMICILE_TO_ISO2, r.get("Product Domicile")) if _norm(r.get("Product Domicile")) and len(_norm(r.get("Product Domicile"))) > 2 else _norm(r.get("Product Domicile")),
-            "ter": _to_float(r.get("Total Expense Ratio (TER) (%)")),
+            "ter": _to_float(r.get("Total Expense Ratio (TER) (%)")) if _to_float(r.get("Total Expense Ratio (TER) (%)")) is not None else _to_float(r.get("TER (flat fee)(%)")),
             "fund_size": int(_to_float(r.get("AuM (Mn)")) * 1_000_000) if _to_float(r.get("AuM (Mn)")) is not None else None,
             "benchmark": _norm(r.get("Index Name")),
             "currency": _norm(r.get("Fund Currency")),
