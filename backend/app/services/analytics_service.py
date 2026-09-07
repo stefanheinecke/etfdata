@@ -391,9 +391,27 @@ class AnalyticsService:
         suggestions = []
         for i, etf_a in enumerate(etf_ids):
             for etf_b in etf_ids[i + 1:]:
-                current_overlap = get_overlap(etf_a, etf_b)
+                pair_overlap = AnalyticsService.calculate_overlap(db, [etf_a, etf_b])
+                current_overlap = 0.0
+                if "matrix" in pair_overlap:
+                    for v in pair_overlap["matrix"].values():
+                        current_overlap = float(v.get("weight_overlap", 0))
                 if current_overlap < 1:
                     continue
+
+                common_holdings = sorted(
+                    (
+                        {
+                            "name": h["name"],
+                            "etf_a_weight": h["etf_a_weight"],
+                            "etf_b_weight": h["etf_b_weight"],
+                            "overlap": round(min(h["etf_a_weight"], h["etf_b_weight"]), 4),
+                        }
+                        for h in pair_overlap.get("common_holdings", [])
+                    ),
+                    key=lambda h: h["overlap"],
+                    reverse=True,
+                )
 
                 etf_a_obj = db.query(ETF).filter(ETF.id == etf_a).first()
                 etf_b_obj = db.query(ETF).filter(ETF.id == etf_b).first()
@@ -434,6 +452,7 @@ class AnalyticsService:
                     "etf_a_id": str(etf_a), "etf_a_isin": etf_a_obj.isin,
                     "etf_b_id": str(etf_b), "etf_b_isin": etf_b_obj.isin,
                     "current_overlap": round(current_overlap, 1),
+                    "common_holdings": common_holdings,
                     "best_replacement": best,
                 })
 

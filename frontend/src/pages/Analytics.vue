@@ -40,11 +40,33 @@
         <h3 class="card-title" style="margin-bottom:.25rem">Pairwise Overlap & Replacement Suggestions</h3>
         <p style="font-size:.8rem;color:var(--text-muted);margin-bottom:1rem">For each overlapping pair, the replacement that gives the biggest overlap reduction. Final choice is yours — consider the tracking index and TER before switching.</p>
         <div v-for="pair in pairSuggestions" :key="pair.etf_a_id+pair.etf_b_id" style="border:1px solid var(--border);border-radius:8px;padding:.875rem 1rem;margin-bottom:.75rem">
-          <div style="display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;margin-bottom:.6rem">
+          <div style="display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;cursor:pointer" @click="togglePair(pair)">
+            <span class="pair-chevron" :class="{ open: isPairOpen(pair) }">▶</span>
             <span style="font-weight:700;font-size:.95rem;color:var(--green-600)">{{ pair.etf_a_isin }}</span>
             <span style="color:var(--text-muted)">↔</span>
             <span style="font-weight:700;font-size:.95rem;color:var(--green-600)">{{ pair.etf_b_isin }}</span>
             <span style="margin-left:auto;font-size:.85rem;font-weight:700" :class="pair.current_overlap > 50 ? 'cell-red' : pair.current_overlap > 20 ? 'cell-yellow' : 'cell-green'">{{ pair.current_overlap.toFixed(1) }}% overlap</span>
+          </div>
+          <div v-show="isPairOpen(pair)" style="margin-top:.6rem">
+          <div v-if="pair.common_holdings && pair.common_holdings.length" class="table-wrap" style="margin-bottom:.75rem">
+            <table class="holdings-table">
+              <thead>
+                <tr>
+                  <th>Holding Name</th>
+                  <th style="text-align:right">{{ pair.etf_a_isin }}</th>
+                  <th style="text-align:right">{{ pair.etf_b_isin }}</th>
+                  <th style="text-align:right">Overlap</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="h in pair.common_holdings" :key="h.name">
+                  <td>{{ h.name }}</td>
+                  <td style="text-align:right">{{ h.etf_a_weight.toFixed(2) }}%</td>
+                  <td style="text-align:right">{{ h.etf_b_weight.toFixed(2) }}%</td>
+                  <td style="text-align:right;font-weight:700">{{ h.overlap.toFixed(2) }}%</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
           <div v-if="pair.best_replacement" style="display:flex;flex-direction:column;gap:.4rem;background:rgba(11,106,165,0.06);border-radius:6px;padding:.5rem .75rem;font-size:.82rem">
             <div style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap">
@@ -69,6 +91,7 @@
             <div style="font-size:.8rem;font-weight:600;margin-top:.4rem" v-html="replacementSummary(pair.best_replacement)"></div>
           </div>
           <div v-else style="font-size:.8rem;color:var(--text-muted);font-style:italic">No replacement found in available ETFs</div>
+          </div>
         </div>
       </div>
       <div v-if="pairSuggestions && pairSuggestions.length === 0 && !pairSuggestionsLoading" style="margin-bottom:1.5rem;padding:.75rem 1rem;background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.3);border-radius:8px;font-size:.875rem;color:#166534">
@@ -232,6 +255,15 @@ const portfolioScoreResult = ref(null)
 const portfolioScoreLoading = ref(false)
 const pairSuggestions = ref(null)
 const pairSuggestionsLoading = ref(false)
+const openPairs = ref(new Set())
+function pairKey(pair) { return pair.etf_a_id + pair.etf_b_id }
+function isPairOpen(pair) { return openPairs.value.has(pairKey(pair)) }
+function togglePair(pair) {
+  const key = pairKey(pair)
+  const next = new Set(openPairs.value)
+  next.has(key) ? next.delete(key) : next.add(key)
+  openPairs.value = next
+}
 
 const portfolioSummary = computed(() => {
   if (!portfolioRiskResult.value?.length) return null
@@ -347,7 +379,7 @@ async function loadETFs() {
   try { const r=await etfService.getETFs(0,50); allEtfs.value=r.data } catch(e){console.error(e)} finally{etfsLoading.value=false}
 }
 async function runExposure() {
-  exposureLoading.value=true; exposureError.value=''; exposureResult.value=null; topHoldings.value=null; portfolioRiskResult.value=null; portfolioScoreResult.value=null; pairSuggestions.value=null
+  exposureLoading.value=true; exposureError.value=''; exposureResult.value=null; topHoldings.value=null; portfolioRiskResult.value=null; portfolioScoreResult.value=null; pairSuggestions.value=null; openPairs.value=new Set()
   const p=portfolio.value.filter(x=>x.etf_id)
   try {
     const r = await analyticsService.calculateExposure(p, null, riskFreeRate.value / 100)
@@ -449,6 +481,8 @@ function replacementSummary(r) {
 .cell-green{color:#16a34a;font-weight:600}
 .cell-yellow{color:#ca8a04;font-weight:600}
 .cell-red{color:#ef4444;font-weight:600}
+.pair-chevron{display:inline-block;font-size:.7rem;color:var(--text-muted);transition:transform .15s ease}
+.pair-chevron.open{transform:rotate(90deg)}
 .table-wrap{overflow-x:auto}
 .portfolio-donut-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem;margin-top:1.5rem}
 .portfolio-donut-card{padding:1rem;min-width:0}
