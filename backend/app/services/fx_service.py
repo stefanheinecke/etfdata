@@ -1,11 +1,11 @@
 """
-fx_service.py — daily FX rates (via EODHD forex API) for cross-currency fund
+fx_service.py — daily FX rates (via Frankfurter, https://frankfurter.dev — free,
+no API key, no quotas, sourced from 84 central banks) for cross-currency fund
 size comparison. Stores one row per (date, source_currency, target_currency)
 in the fx_rates table; the latest stored rate is used to convert fund_size
 into a common display currency (USD).
 """
-import os
-from datetime import date, timedelta
+from datetime import date
 from typing import Optional
 
 import requests as _req
@@ -13,45 +13,29 @@ from sqlalchemy.orm import Session
 
 from app.schemas import ETF, FXRate
 
-_EODHD_BASE = "https://eodhd.com/api"
+_FRANKFURTER_BASE = "https://api.frankfurter.dev/v2"
 DISPLAY_CURRENCY = "USD"
 
 
-def fetch_latest_rate(source_currency: str, target_currency: str, token: str) -> tuple:
-    """Fetch the most recent EODHD forex close for source_currency->target_currency.
-    Returns (date, rate). Raises RuntimeError with the EODHD response detail on failure."""
-    if source_currency == target_currency:
-        return date.today(), 1.0
-
-    symbol = f"{source_currency}{target_currency}.FOREX"
-    resp = _req.get(
-        f"{_EODHD_BASE}/eod/{symbol}",
-        params={
-            "api_token": token, "fmt": "json",
-            "from": (date.today() - timedelta(days=10)).isoformat(),
-            "to": date.today().isoformat(), "period": "d",
-        },
-        timeout=30,
-    )
+def fetch_latest_rates(target_currency: str = DISPLAY_CURRENCY) -> tuple:
+    """Fetch the latest target_currency-based rates for every currency in one call.
+    Returns (as_of_date, {currency: units_of_currency_per_1_target_currency}).
+    Raises RuntimeError with the response detail on failure."""
+    resp = _req.get(f"{_FRANKFURTER_BASE}/rates", params={"base": target_currency}, timeout=30)
     if resp.status_code != 200:
-        raise RuntimeError(f"EODHD HTTP {resp.status_code} for '{symbol}': {resp.text[:200]}")
-    rows = resp.json()
-    if not rows:
-        raise RuntimeError(f"EODHD returned empty history for '{symbol}'")
-    latest = max(rows, key=lambda r: r["date"])
-    close = latest.get("adjusted_close") or latest.get("close")
-    if not close:
-        raise RuntimeError(f"EODHD row for '{symbol}' has no close price: {latest}")
-    return date.fromisoformat(latest["date"]), float(close)
+        raise RuntimeError(f"Frankfurter HTTP {resp.status_code}: {resp.text[:200]}")
+    # v2 returns a flat list: [{"date": "...", "base": "USD", "quote": "AED", "rate": 3.67}, ...]
+    data = resp.json()
+    if not data:
+        raise RuntimeError(f"Frankfurter returned no rates: {data}")
+    rates = {row["quote"]: row["rate"] for row in data if row.get("quote") and row.get("rate")}
+    as_of = data[0].get("date")
+    if not rates or not as_of:
+        raise RuntimeError(f"Frankfurter returned no usable rates: {data[:3]}")
+    return date.fromisoformat(as_of), rates
 
 
-def upsert_fx_rate(db: Session, source_currency: str, target_currency: str, token: str) -> dict:
-    try:
-        as_of, rate = fetch_latest_rate(source_currency, target_currency, token)
-    except Exception as exc:
-        return {"source_currency": source_currency, "target_currency": target_currency,
-                "status": "error", "error": str(exc)}
-
+def _store_rate(db: Session, as_of: date, source_currency: str, target_currency: str, rate: float) -> None:
     existing = (
         db.query(FXRate)
         .filter_by(date=as_of, source_currency=source_currency, target_currency=target_currency)
@@ -62,23 +46,39 @@ def upsert_fx_rate(db: Session, source_currency: str, target_currency: str, toke
     else:
         db.add(FXRate(date=as_of, source_currency=source_currency,
                        target_currency=target_currency, rate=rate))
-    db.commit()
-    return {"source_currency": source_currency, "target_currency": target_currency,
-            "date": as_of.isoformat(), "rate": rate, "status": "ok"}
 
 
 def refresh_all_fx_rates(db: Session, target_currency: str = DISPLAY_CURRENCY) -> dict:
-    """Fetch/store the latest rate to `target_currency` for every distinct ETF currency."""
-    token = os.getenv("EODHD_TOKEN")
-    if not token:
-        return {"error": "EODHD_TOKEN not set", "results": []}
-
+    """Fetch the latest rates (one API call) and store source_currency->target_currency
+    (inverted from Frankfurter's target_currency-based rates) for every distinct ETF currency."""
     currencies = sorted({
         (c or "").strip().upper()[:3]
         for (c,) in db.query(ETF.currency).filter(ETF.currency.isnot(None)).distinct().all()
         if c
     })
-    results = [upsert_fx_rate(db, cur, target_currency, token) for cur in currencies]
+    if not currencies:
+        return {"results": []}
+
+    try:
+        as_of, rates_from_target = fetch_latest_rates(target_currency)
+    except Exception as exc:
+        return {"error": str(exc), "results": []}
+
+    results = []
+    for cur in currencies:
+        if cur == target_currency:
+            rate = 1.0
+        else:
+            target_to_cur = rates_from_target.get(cur)
+            if not target_to_cur:
+                results.append({"source_currency": cur, "target_currency": target_currency,
+                                 "status": "error", "error": f"No rate for '{cur}' in Frankfurter response"})
+                continue
+            rate = 1.0 / target_to_cur
+        _store_rate(db, as_of, cur, target_currency, rate)
+        results.append({"source_currency": cur, "target_currency": target_currency,
+                         "date": as_of.isoformat(), "rate": rate, "status": "ok"})
+    db.commit()
     return {"results": results}
 
 
@@ -96,6 +96,7 @@ def get_latest_rate(db: Session, source_currency: Optional[str], target_currency
         .first()
     )
     return float(row.rate) if row else None
+
 
 
 def get_latest_rates_map(db: Session, source_currencies: set, target_currency: str = DISPLAY_CURRENCY) -> dict:

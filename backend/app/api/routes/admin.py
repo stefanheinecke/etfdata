@@ -126,7 +126,8 @@ def refresh_fx_rates_endpoint(
     _: None = Depends(verify_admin_secret),
 ):
     """
-    Fetch/store the latest EODHD forex rate to USD for every distinct ETF currency.
+    Fetch/store the latest rate to USD for every distinct ETF currency, via the
+    free Frankfurter API (frankfurter.dev — no API key, no quotas).
     Used to convert fund_size into a comparable USD figure (fund_size_usd) across
     ETFs denominated in different currencies (e.g. JPY funds otherwise look huge
     purely due to currency, not actual size).
