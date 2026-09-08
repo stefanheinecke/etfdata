@@ -17,9 +17,9 @@ _EODHD_BASE = "https://eodhd.com/api"
 DISPLAY_CURRENCY = "USD"
 
 
-def fetch_latest_rate(source_currency: str, target_currency: str, token: str) -> Optional[tuple]:
+def fetch_latest_rate(source_currency: str, target_currency: str, token: str) -> tuple:
     """Fetch the most recent EODHD forex close for source_currency->target_currency.
-    Returns (date, rate) or None if unavailable."""
+    Returns (date, rate). Raises RuntimeError with the EODHD response detail on failure."""
     if source_currency == target_currency:
         return date.today(), 1.0
 
@@ -34,24 +34,24 @@ def fetch_latest_rate(source_currency: str, target_currency: str, token: str) ->
         timeout=30,
     )
     if resp.status_code != 200:
-        return None
+        raise RuntimeError(f"EODHD HTTP {resp.status_code} for '{symbol}': {resp.text[:200]}")
     rows = resp.json()
     if not rows:
-        return None
+        raise RuntimeError(f"EODHD returned empty history for '{symbol}'")
     latest = max(rows, key=lambda r: r["date"])
     close = latest.get("adjusted_close") or latest.get("close")
     if not close:
-        return None
+        raise RuntimeError(f"EODHD row for '{symbol}' has no close price: {latest}")
     return date.fromisoformat(latest["date"]), float(close)
 
 
 def upsert_fx_rate(db: Session, source_currency: str, target_currency: str, token: str) -> dict:
-    result = fetch_latest_rate(source_currency, target_currency, token)
-    if not result:
+    try:
+        as_of, rate = fetch_latest_rate(source_currency, target_currency, token)
+    except Exception as exc:
         return {"source_currency": source_currency, "target_currency": target_currency,
-                "status": "error", "error": "No FX data returned"}
+                "status": "error", "error": str(exc)}
 
-    as_of, rate = result
     existing = (
         db.query(FXRate)
         .filter_by(date=as_of, source_currency=source_currency, target_currency=target_currency)

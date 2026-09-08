@@ -124,7 +124,7 @@
         <div v-if="backfillResult" class="success-msg" style="margin-top:.75rem">{{ backfillResult }}</div>
         <div v-if="backfillError" class="error-box" style="margin-top:.75rem">{{ backfillError }}</div>
         <div v-if="fxRatesResult" class="success-msg" style="margin-top:.75rem">{{ fxRatesResult }}</div>
-        <div v-if="fxRatesError" class="error-box" style="margin-top:.75rem">{{ fxRatesError }}</div>
+        <div v-if="fxRatesError" class="error-box" style="margin-top:.75rem;white-space:pre-wrap">{{ fxRatesError }}</div>
         <div v-if="dbResult" class="success-msg" style="margin-top:.75rem">{{ dbResult }}</div>
         <div v-if="dbError" class="error-box" style="margin-top:.75rem">{{ dbError }}</div>
       </div>
@@ -1111,8 +1111,13 @@ async function triggerRefreshFxRates() {
     const r = await adminService.refreshFxRates(adminSecret.value)
     const d = r.data
     if (d.error) { fxRatesError.value = d.error; return }
-    const ok = (d.results || []).filter(x => x.status === 'ok')
-    fxRatesResult.value = `✓ ${ok.length}/${d.results?.length ?? 0} currency rate(s) updated: ${ok.map(x => `${x.source_currency}→${x.target_currency} @ ${x.rate}`).join(', ')}`
+    const results = d.results || []
+    const ok = results.filter(x => x.status === 'ok')
+    const failed = results.filter(x => x.status !== 'ok')
+    fxRatesResult.value = `✓ ${ok.length}/${results.length} currency rate(s) updated: ${ok.map(x => `${x.source_currency}→${x.target_currency} @ ${x.rate}`).join(', ')}`
+    if (failed.length) {
+      fxRatesError.value = failed.map(x => `${x.source_currency}→${x.target_currency}: ${x.error}`).join('\n')
+    }
   } catch(e) {
     fxRatesError.value = e.response?.data?.detail || e.message
   } finally {
