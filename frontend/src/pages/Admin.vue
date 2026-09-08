@@ -112,11 +112,19 @@
             </button>
             <p style="font-size:.75rem;color:var(--text-muted);margin-top:.3rem">One-time setup: links existing ETFs to their EODHD symbol so daily price refresh works. Run once after upgrading.</p>
           </div>
+          <div>
+            <button class="btn btn-outline" style="width:100%" @click="triggerRefreshFxRates" :disabled="!adminVerified || fxRatesLoading">
+              {{ fxRatesLoading ? 'Refreshing…' : '💱 Refresh FX Rates (fund size in USD)' }}
+            </button>
+            <p style="font-size:.75rem;color:var(--text-muted);margin-top:.3rem">Fetches the latest EODHD forex rate to USD for every ETF currency in use, so fund sizes can be compared across currencies.</p>
+          </div>
         </div>
         <div v-if="refreshPricesResult" class="success-msg" style="margin-top:.75rem">{{ refreshPricesResult }}</div>
         <div v-if="refreshPricesError" class="error-box" style="margin-top:.75rem">{{ refreshPricesError }}</div>
         <div v-if="backfillResult" class="success-msg" style="margin-top:.75rem">{{ backfillResult }}</div>
         <div v-if="backfillError" class="error-box" style="margin-top:.75rem">{{ backfillError }}</div>
+        <div v-if="fxRatesResult" class="success-msg" style="margin-top:.75rem">{{ fxRatesResult }}</div>
+        <div v-if="fxRatesError" class="error-box" style="margin-top:.75rem">{{ fxRatesError }}</div>
         <div v-if="dbResult" class="success-msg" style="margin-top:.75rem">{{ dbResult }}</div>
         <div v-if="dbError" class="error-box" style="margin-top:.75rem">{{ dbError }}</div>
       </div>
@@ -875,6 +883,9 @@ const refreshPricesProgress = ref('')   // "5 of 12 — SWDA"
 const refreshPricesResult = ref('')
 const refreshPricesError = ref('')
 const backfillLoading = ref(false)
+const fxRatesLoading = ref(false)
+const fxRatesResult = ref('')
+const fxRatesError = ref('')
 const providerUbsFile = ref(null)
 const providerIsharesFile = ref(null)
 const providerImportLoading = ref(false)
@@ -1091,6 +1102,21 @@ async function triggerBackfillSymbols() {
     backfillError.value = e.response?.data?.detail || e.message
   } finally {
     backfillLoading.value = false
+  }
+}
+
+async function triggerRefreshFxRates() {
+  fxRatesLoading.value = true; fxRatesResult.value = ''; fxRatesError.value = ''
+  try {
+    const r = await adminService.refreshFxRates(adminSecret.value)
+    const d = r.data
+    if (d.error) { fxRatesError.value = d.error; return }
+    const ok = (d.results || []).filter(x => x.status === 'ok')
+    fxRatesResult.value = `✓ ${ok.length}/${d.results?.length ?? 0} currency rate(s) updated: ${ok.map(x => `${x.source_currency}→${x.target_currency} @ ${x.rate}`).join(', ')}`
+  } catch(e) {
+    fxRatesError.value = e.response?.data?.detail || e.message
+  } finally {
+    fxRatesLoading.value = false
   }
 }
 

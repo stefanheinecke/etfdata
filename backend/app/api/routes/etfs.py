@@ -9,6 +9,7 @@ from app.core.auth import verify_api_key
 from app.schemas import ETF, APIKey
 from app.models import ETFCreate, ETFResponse
 from app.api.utils import resolve_etf
+from app.services.fx_service import get_latest_rates_map, get_latest_rate
 
 router = APIRouter(prefix="/etfs", tags=["etfs"])
 
@@ -23,7 +24,16 @@ async def list_etfs(
     query = db.query(ETF)
     if provider:
         query = query.filter(ETF.provider == provider)
-    return query.order_by(ETF.isin).offset(skip).limit(limit).all()
+    etfs = query.order_by(ETF.isin).offset(skip).limit(limit).all()
+
+    rates = get_latest_rates_map(db, {e.currency for e in etfs if e.currency})
+    results = []
+    for e in etfs:
+        resp = ETFResponse.model_validate(e)
+        rate = rates.get((e.currency or "").strip().upper()[:3])
+        resp.fund_size_usd = round(e.fund_size * rate) if (e.fund_size and rate) else None
+        results.append(resp)
+    return results
 
 @router.get("/risk-metrics")
 async def get_etf_risk_metrics(
@@ -49,7 +59,10 @@ async def get_etf(
     api_key: APIKey = Depends(verify_api_key)
 ):
     etf = resolve_etf(db, etf_id)
-    return etf
+    resp = ETFResponse.model_validate(etf)
+    rate = get_latest_rate(db, etf.currency)
+    resp.fund_size_usd = round(etf.fund_size * rate) if (etf.fund_size and rate) else None
+    return resp
 
 @router.get("/{etf_id}/holdings")
 async def get_holdings(

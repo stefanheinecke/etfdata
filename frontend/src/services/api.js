@@ -123,6 +123,9 @@ export const adminService = {
   backfillEodhdSymbols(adminSecret) {
     return api.post('/admin/backfill-eodhd-symbols', null, { headers: { 'x-admin-secret': adminSecret } })
   },
+  refreshFxRates(adminSecret) {
+    return api.post('/admin/refresh-fx-rates', null, { headers: { 'x-admin-secret': adminSecret } })
+  },
   deleteETFs(adminSecret, etfIds) {
     return api.delete('/admin/etfs', {
       data: etfIds,

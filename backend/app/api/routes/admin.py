@@ -120,6 +120,21 @@ def refresh_prices_status(job_id: str, _: None = Depends(verify_admin_secret)):
     return job
 
 
+@router.post("/refresh-fx-rates")
+def refresh_fx_rates_endpoint(
+    db: Session = Depends(get_db),
+    _: None = Depends(verify_admin_secret),
+):
+    """
+    Fetch/store the latest EODHD forex rate to USD for every distinct ETF currency.
+    Used to convert fund_size into a comparable USD figure (fund_size_usd) across
+    ETFs denominated in different currencies (e.g. JPY funds otherwise look huge
+    purely due to currency, not actual size).
+    """
+    from app.services.fx_service import refresh_all_fx_rates
+    return refresh_all_fx_rates(db)
+
+
 @router.post("/backfill-eodhd-symbols")
 def backfill_eodhd_symbols(
     db: Session = Depends(get_db),

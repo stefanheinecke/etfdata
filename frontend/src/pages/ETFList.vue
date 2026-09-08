@@ -87,7 +87,8 @@
         <p class="etf-isin">{{ etf.isin || '' }}</p>
         <div class="etf-meta">
           <span v-if="etf.domicile">{{ etf.domicile }}</span><span v-if="etf.currency">{{ etf.currency }}</span>
-          <span v-if="etf.fund_size">{{ formatSize(etf.fund_size) }}</span>
+          <span v-if="etf.fund_size" :title="'Fund size in ETF currency (' + etf.currency + ')'">{{ formatSize(etf.fund_size) }}</span>
+          <span v-if="etf.fund_size_usd" title="Fund size in USD" style="color:var(--text-muted)">(≈ {{ formatSize(etf.fund_size_usd) }} USD)</span>
           <span v-if="etf.dividend_policy" :class="etf.dividend_policy === 'Accumulating' ? 'badge-acc' : 'badge-dist'">{{ etf.dividend_policy === 'Accumulating' ? 'Acc' : 'Dist' }}</span>
         </div>
         <div v-if="etf.replication_method" class="etf-replication">{{ etf.replication_method }}</div>

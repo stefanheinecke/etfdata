@@ -93,6 +93,21 @@ class Performance(Base):
         Index("idx_performance_etf_date", "etf_id", "date"),
     )
 
+class FXRate(Base):
+    __tablename__ = "fx_rates"
+
+    id = Column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    date = Column(Date, nullable=False)
+    source_currency = Column(String(3), nullable=False)
+    target_currency = Column(String(3), nullable=False)
+    rate = Column(Numeric(18, 8), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("date", "source_currency", "target_currency", name="idx_fx_rates_unique"),
+        Index("idx_fx_rates_pair_date", "source_currency", "target_currency", "date"),
+    )
+
 class APIKey(Base):
     __tablename__ = "api_keys"
 

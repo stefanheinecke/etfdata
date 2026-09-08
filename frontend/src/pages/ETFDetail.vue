@@ -204,7 +204,8 @@ const headerKpis = computed(() => {
     { label: 'TER', value: e.ter != null ? e.ter + '%' : '—' },
     { label: 'Domicile', value: e.domicile || '—' },
     { label: 'Currency', value: e.currency || '—' },
-    { label: 'Fund Size', value: e.fund_size ? fmtSize(e.fund_size) : '—' },
+    { label: 'Fund size in ETF currency', value: e.fund_size ? fmtSize(e.fund_size) : '—' },
+    { label: 'Fund size in USD', value: e.fund_size_usd ? fmtSize(e.fund_size_usd) : '—' },
   ]
 })
 
@@ -224,7 +225,8 @@ const strategyRows = computed(() => {
   const e = etf.value; if (!e) return []
   return [
     { label: 'Benchmark / Index', value: e.benchmark || '—' },
-    { label: 'Fund Size', value: e.fund_size ? fmtSize(e.fund_size) : '—' },
+    { label: 'Fund size in ETF currency', value: e.fund_size ? fmtSize(e.fund_size) : '—' },
+    { label: 'Fund size in USD', value: e.fund_size_usd ? fmtSize(e.fund_size_usd) : '—' },
   ]
 })
 
