@@ -109,6 +109,9 @@ def init_db():
             CREATE INDEX IF NOT EXISTS idx_holdings_isin ON holdings (instrument_isin)
         """))
         
+        # Ensure holdings.id is auto-generated at the DB level (not just via the ORM default)
+        conn.execute(text("ALTER TABLE holdings ALTER COLUMN id SET DEFAULT gen_random_uuid()"))
+        
         # Create settings table if it doesn't exist and initialize default contact email
         conn.execute(text("""
             CREATE TABLE IF NOT EXISTS settings (

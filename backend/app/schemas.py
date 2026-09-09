@@ -1,6 +1,6 @@
 from datetime import datetime
 from uuid import UUID, uuid4
-from sqlalchemy import Column, String, Integer, BigInteger, DateTime, Numeric, Date, Boolean, Text, JSON, ForeignKey, UniqueConstraint, Index
+from sqlalchemy import Column, String, Integer, BigInteger, DateTime, Numeric, Date, Boolean, Text, JSON, ForeignKey, UniqueConstraint, Index, text
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
@@ -38,7 +38,7 @@ class ETF(Base):
 class Holding(Base):
     __tablename__ = "holdings"
 
-    id = Column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    id = Column(PGUUID(as_uuid=True), primary_key=True, default=uuid4, server_default=text("gen_random_uuid()"))
     etf_id = Column(PGUUID(as_uuid=True), ForeignKey("etfs.id"), nullable=False, index=True)
     date = Column(Date, nullable=False, index=True)
     instrument_isin = Column(String(50), nullable=True)  # May not be available in all factsheets
