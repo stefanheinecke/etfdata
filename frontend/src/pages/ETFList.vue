@@ -161,9 +161,11 @@ const filteredETFs = computed(() => {
 
   const key = sortKey.value
   const dir = sortDir.value === 'asc' ? 1 : -1
+  // Fund size varies by ETF currency, so sort on the USD-normalized value instead
+  const getVal = (e) => key === 'fund_size' ? (e.fund_size_usd ?? e.fund_size ?? '') : (e[key] ?? '')
   return [...list].sort((a, b) => {
-    const av = a[key] ?? ''
-    const bv = b[key] ?? ''
+    const av = getVal(a)
+    const bv = getVal(b)
     if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * dir
     return String(av).localeCompare(String(bv)) * dir
   })
