@@ -43,7 +43,7 @@ async def list_etfs(
     results = []
     for e in etfs:
         resp = ETFResponse.model_validate(e)
-        resp.holdings_count = holdings_counts.get(e.id)
+        resp.holdings_count = holdings_counts.get(e.id, 0)
         rate = rates.get((e.currency or "").strip().upper()[:3])
         resp.fund_size_usd = round(e.fund_size * rate) if (e.fund_size and rate) else None
         results.append(resp)

@@ -102,11 +102,9 @@
           <span v-if="etf.fund_size_usd" title="Fund size in USD" style="color:var(--text-muted)">(≈ {{ formatSize(etf.fund_size_usd) }} USD)</span>
           <span v-if="etf.dividend_policy" :class="etf.dividend_policy === 'Accumulating' ? 'badge-acc' : 'badge-dist'">{{ etf.dividend_policy === 'Accumulating' ? 'Acc' : 'Dist' }}</span>
         </div>
-        <div class="etf-constituents" :title="etf.holdings_count != null
-          ? 'Holdings in the latest imported snapshot; partial imports may not cover the full portfolio.'
-          : etf.num_constituents != null ? 'Constituent count reported in provider metadata.' : 'Constituent count not available.'">
-          <span>Constituents</span>
-          <strong>{{ (etf.holdings_count ?? etf.num_constituents)?.toLocaleString() ?? '—' }}</strong>
+        <div class="etf-constituents" title="Number of holdings stored in the database for the latest available date. Historical snapshots are not added together.">
+          <span>Constituents in DB</span>
+          <strong>{{ (etf.holdings_count ?? 0).toLocaleString() }}</strong>
         </div>
         <div v-if="etf.replication_method" class="etf-replication">{{ etf.replication_method }}</div>
       </div>
