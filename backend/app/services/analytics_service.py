@@ -67,6 +67,10 @@ class AnalyticsService:
                         "etf_b_weight": round(float(holdings_data[etf_b_str][holding_name]), 4)
                     })
 
+        # Rank the full set before truncation so major shared holdings are retained.
+        common_holdings.sort(key=lambda h: (
+            -min(h["etf_a_weight"], h["etf_b_weight"]), h["name"]
+        ))
         return {"matrix": matrix, "common_holdings": common_holdings[:20]}
 
     @staticmethod
