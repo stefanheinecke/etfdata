@@ -53,6 +53,7 @@
               <option value="name">Name</option>
               <option value="ter">TER</option>
               <option value="fund_size">Fund Size</option>
+              <option value="holdings_count">Constituents in DB</option>
               <option value="domicile">Domicile</option>
               <option value="currency">Currency</option>
               <option value="dividend_policy">Dividend Policy</option>
@@ -179,7 +180,11 @@ const filteredETFs = computed(() => {
   const key = sortKey.value
   const dir = sortDir.value === 'asc' ? 1 : -1
   // Fund size varies by ETF currency, so sort on the USD-normalized value instead
-  const getVal = (e) => key === 'fund_size' ? (e.fund_size_usd ?? e.fund_size ?? '') : (e[key] ?? '')
+  const getVal = (e) => {
+    if (key === 'holdings_count') return Number(e.holdings_count ?? 0)
+    if (key === 'fund_size') return e.fund_size_usd ?? e.fund_size ?? ''
+    return e[key] ?? ''
+  }
   return [...list].sort((a, b) => {
     const av = getVal(a)
     const bv = getVal(b)
