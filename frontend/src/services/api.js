@@ -177,6 +177,17 @@ export const adminService = {
   importPdfData(adminSecret, metadata, holdings) {
     return api.post('/admin/etf/import-data', { metadata, holdings }, { headers: { 'x-admin-secret': adminSecret } })
   },
+  importHoldings(adminSecret, isin, provider, holdingsFile = null, asOf = null) {
+    const params = { isin, provider }
+    if (asOf) params.as_of = asOf
+    const config = { params, headers: { 'x-admin-secret': adminSecret } }
+    if (holdingsFile) {
+      const form = new FormData()
+      form.append('holdings_file', holdingsFile)
+      return api.post('/admin/import-holdings', form, config)
+    }
+    return api.post('/admin/import-holdings', null, config)
+  },
   importProviderMetadata(adminSecret, ubsFile, isharesFile) {
     const form = new FormData()
     if (ubsFile) form.append('ubs_file', ubsFile)

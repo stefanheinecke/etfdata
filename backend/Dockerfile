@@ -6,6 +6,7 @@ COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY backend/ .
+COPY astra/smi_reconstruction.py ./astra/
 
 RUN chmod +x start.sh
 

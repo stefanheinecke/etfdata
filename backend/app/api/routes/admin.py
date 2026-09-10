@@ -67,6 +67,70 @@ def verify_endpoint(_: None = Depends(verify_admin_secret)):
     return {"status": "ok"}
 
 
+def _holdings_script():
+    """Load astra/smi_reconstruction.py (copied into the image on Railway, sibling folder locally)."""
+    import importlib.util
+    import sys
+
+    if "smi_reconstruction" in sys.modules:
+        return sys.modules["smi_reconstruction"]
+    for candidate in (_BACKEND_ROOT / "astra", _BACKEND_ROOT.parent / "astra"):
+        path = candidate / "smi_reconstruction.py"
+        if path.exists():
+            spec = importlib.util.spec_from_file_location("smi_reconstruction", path)
+            module = importlib.util.module_from_spec(spec)
+            sys.modules["smi_reconstruction"] = module
+            spec.loader.exec_module(module)
+            return module
+    raise HTTPException(status_code=503, detail="smi_reconstruction.py not found on server")
+
+
+@router.post("/import-holdings")
+def import_holdings_endpoint(
+    isin: str,
+    provider: str = "ishares",
+    as_of: Optional[str] = None,
+    holdings_file: Optional[UploadFile] = File(None),
+    db: Session = Depends(get_db),
+    _: None = Depends(verify_admin_secret),
+):
+    """Retrieve provider holdings (iShares automatic; UBS via uploaded export) and
+    replace that ETF's holdings snapshot for the source valuation date.
+    The ETF must already exist; metadata, prices and other dates are untouched."""
+    import tempfile
+    from app.services.holdings_db_import import import_holdings
+
+    script = _holdings_script()
+    temp_path = None
+    try:
+        etf_isin = script.validate_isin(isin)
+        if holdings_file:
+            content = holdings_file.file.read(30_000_001)
+            if len(content) > 30_000_000:
+                raise HTTPException(status_code=413, detail="Holdings export exceeds the 30 MB limit")
+            suffix = Path(holdings_file.filename or "holdings.csv").suffix or ".csv"
+            with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+                tmp.write(content)
+                temp_path = tmp.name
+        holdings, _diagnostics = script.provider_holdings(
+            etf_isin, provider=provider, holdings_file=temp_path, as_of=as_of or None)
+        result = import_holdings(db, etf_isin, holdings)
+        db.commit()
+        return result
+    except HTTPException:
+        db.rollback()
+        raise
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        db.rollback()
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    finally:
+        if temp_path:
+            os.unlink(temp_path)
+
+
 @router.post("/refresh-prices")
 def refresh_prices_endpoint(_: None = Depends(verify_admin_secret)):
     """

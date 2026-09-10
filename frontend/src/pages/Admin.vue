@@ -176,6 +176,50 @@
       </div>
     </div>
 
+    <!-- Provider Holdings Import -->
+    <div class="card" style="margin-bottom:1.5rem">
+      <h2 class="card-title">Provider Holdings Import (iShares / UBS)</h2>
+      <p style="font-size:.875rem;color:var(--text-muted);margin-bottom:1rem">
+        Enter an ETF ISIN to retrieve its full holdings from the provider and load them into the
+        holdings table. The ETF must already exist (import its metadata above first). Only the
+        snapshot for the source valuation date is replaced — other dates, metadata and prices are kept.
+        iShares is fetched automatically; UBS requires uploading the full portfolio CSV/JSON export.
+      </p>
+      <div class="grid-2" style="margin-bottom:.75rem">
+        <div>
+          <label class="label">ETF ISIN</label>
+          <input class="input" v-model="holdingsIsin" placeholder="e.g. IE00B4L5Y983" style="text-transform:uppercase" />
+        </div>
+        <div>
+          <label class="label">Provider</label>
+          <select class="input" v-model="holdingsProvider">
+            <option value="ishares">iShares (automatic)</option>
+            <option value="ubs">UBS (file required)</option>
+          </select>
+        </div>
+      </div>
+      <div v-if="holdingsProvider === 'ubs'" class="grid-2" style="margin-bottom:.75rem">
+        <div>
+          <label class="label">Holdings export <span style="font-weight:400;color:var(--text-muted)">(.csv / .json)</span></label>
+          <input type="file" accept=".csv,.json" class="input" @change="e => holdingsUbsFile = e.target.files[0]" />
+        </div>
+        <div>
+          <label class="label">As-of date <span style="font-weight:400;color:var(--text-muted)">(if the export has none)</span></label>
+          <input class="input" type="date" v-model="holdingsAsOf" />
+        </div>
+      </div>
+      <button class="btn btn-primary" style="width:100%"
+        @click="importHoldings"
+        :disabled="!adminVerified || !holdingsIsin.trim() || (holdingsProvider === 'ubs' && !holdingsUbsFile) || holdingsLoading">
+        {{ holdingsLoading ? 'Importing…' : 'Retrieve & Import Holdings' }}
+      </button>
+      <div v-if="holdingsError" class="error-box" style="margin-top:.75rem">{{ holdingsError }}</div>
+      <div v-if="holdingsResult" class="success-msg" style="margin-top:.75rem">
+        ✓ Imported {{ holdingsResult.imported }} holdings for {{ holdingsResult.isin }}
+        as of {{ holdingsResult.as_of }} (replaced {{ holdingsResult.replaced }}).
+      </div>
+    </div>
+
     <!-- Import ETF -->
     <div class="card" style="margin-bottom:1.5rem">
       <h2 class="card-title">Import ETF</h2>
@@ -897,6 +941,33 @@ const providerImportConflicts = computed(() => [
 ])
 const backfillResult = ref('')
 const backfillError = ref('')
+
+const holdingsIsin = ref('')
+const holdingsProvider = ref('ishares')
+const holdingsUbsFile = ref(null)
+const holdingsAsOf = ref('')
+const holdingsLoading = ref(false)
+const holdingsError = ref('')
+const holdingsResult = ref(null)
+
+async function importHoldings() {
+  holdingsLoading.value = true; holdingsError.value = ''; holdingsResult.value = null
+  try {
+    const r = await adminService.importHoldings(
+      adminSecret.value,
+      holdingsIsin.value.trim().toUpperCase(),
+      holdingsProvider.value,
+      holdingsProvider.value === 'ubs' ? holdingsUbsFile.value : null,
+      holdingsAsOf.value || null,
+    )
+    holdingsResult.value = r.data
+  } catch (e) {
+    const detail = e.response?.data?.detail
+    holdingsError.value = Array.isArray(detail) ? detail.map(d => d.msg || JSON.stringify(d)).join('; ') : (detail || e.message)
+  } finally {
+    holdingsLoading.value = false
+  }
+}
 
 const importSymbol = ref('')
 const importName = ref('')
