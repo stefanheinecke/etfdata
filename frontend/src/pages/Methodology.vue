@@ -21,7 +21,7 @@
         <ol class="meth-steps">
           <li><strong>Compute raw metrics</strong>: 7 metrics are calculated from price history, holdings, country and sector allocations, and the fund's TER.</li>
           <li><strong>Benchmark normalization</strong>: each metric is mapped to a 0-1 quality score using a fixed worst-to-best reference range. The direction (higher/lower is better) is taken into account, and values outside the range are capped.</li>
-          <li><strong>Equal-weight score</strong>: all available metric scores receive equal weight. The resulting 0-1 value is scaled to 1-10.</li>
+          <li><strong>Equal-weight score</strong>: all seven required metric scores receive equal weight. The resulting 0-1 value is scaled to 1-10. Scores are unavailable when a required component is missing or the asset class is unsupported.</li>
         </ol>
         <div class="meth-formula-box">
           <code>metric_score<sub>i</sub> = clamp((value<sub>i</sub> − worst<sub>i</sub>) ÷ (best<sub>i</sub> − worst<sub>i</sub>), 0, 1)</code>
@@ -100,7 +100,7 @@
           </table>
         </div>
         <div style="padding:.6rem 1.25rem;font-size:.72rem;color:var(--text-muted);border-top:1px solid var(--border)">
-          Risk-free rate is configurable (default 4% p.a. ≈ Swiss SARON). Scores require at least 252 daily returns. Fixed benchmark ranges make scores stable when the ETF universe changes. If TER, holdings, or allocation data is unavailable, the score uses the remaining available metrics equally and identifies the missing components.
+          Risk-free rate is configurable (default 4% p.a.). Scores require at least 252 daily returns and all seven components. Fixed benchmark ranges make scores stable when the ETF universe changes. Missing TER, holdings, or allocation data produces an unavailable score, not an assumed neutral rating. The catalog is multi-asset; holdings analytics and quality scores currently support equities and listed real estate only.
         </div>
       </div>
     </div>
@@ -135,7 +135,7 @@
             <h3 class="meth-comp-title">Overlap Penalty</h3>
             <span class="meth-comp-range meth-range-neg">0 to −2</span>
           </div>
-          <p class="meth-comp-desc">For every pair of ETFs, GoETF normalizes the available holdings of each ETF to 100%, then adds the smaller weight of each shared holding. The resulting weight overlap is averaged across pairs, giving greater influence to pairs with larger portfolio allocations.</p>
+          <p class="meth-comp-desc">For every supported pair, GoETF matches securities by validated ISIN, normalizes each available equity basket to 100%, and adds the smaller weight of each shared security. Missing holdings or unresolved positive-weight identifiers produce an unavailable comparison, never zero overlap. The resulting weight overlap is averaged across pairs, giving greater influence to pairs with larger portfolio allocations.</p>
           <div class="meth-formula-box meth-formula-sm">
             <code>pair_overlap = Σ min(weight<sub>a</sub>, weight<sub>b</sub>)</code>
             <code>penalty = (avg_weight_overlap_% ÷ 100) × 2</code>
@@ -159,7 +159,8 @@
       <!-- Overlap example -->
       <div class="card meth-card meth-example-card">
         <h3 class="card-title">Overlap calculation example</h3>
-        <p class="meth-example-intro">Only shared holdings contribute to overlap. Each ETF's available holdings are normalized to 100%; for each shared security, the smaller normalized weight is counted once. Holdings that appear in only one ETF contribute 0%.</p>
+        <p class="meth-example-intro">Only shared holdings contribute to overlap. Each ETF's available holdings are normalized to 100%; for each shared security, the smaller normalized weight is counted once. Holdings that appear in only one ETF contribute 0%. This describes the reported basket, not necessarily the tracked index or full economic exposure of a synthetic fund.</p>
+        <p class="meth-example-intro"><strong>Country and sector overlap:</strong> the same minimum-weight formula applies to shared classification buckets, not security ISINs. Each side requires at least 95% classified fund weight. Unknown categories are excluded without rescaling known weights; sources, coverage and snapshot dates are displayed. Existing provider allocations are preferred, with explicitly classified holdings used only when allocation data is absent. Similar exposure is not the same as identical holdings or return correlation.</p>
         <div class="meth-example-grid">
           <div>
             <div class="table-wrap">

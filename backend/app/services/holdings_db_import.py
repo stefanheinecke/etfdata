@@ -3,6 +3,8 @@
 from datetime import date, datetime, timezone
 from decimal import Decimal
 
+from app.services.asset_classes import normalize_bucket
+
 
 def prepare_holdings(etf_isin: str, holdings: list[dict]) -> tuple[date, list[dict]]:
     """Convert script fractions to DB percentages before changing any records."""
@@ -10,6 +12,7 @@ def prepare_holdings(etf_isin: str, holdings: list[dict]) -> tuple[date, list[di
         raise ValueError("Cannot import an empty holdings basket")
     dates = set()
     records = {}
+    classifications = {}
     for index, holding in enumerate(holdings):
         if holding.get("etf_isin") != etf_isin:
             raise ValueError("Holding belongs to a different ETF")
@@ -39,11 +42,20 @@ def prepare_holdings(etf_isin: str, holdings: list[dict]) -> tuple[date, list[di
             records[key]["weight"] += weight
         else:
             records[key] = {"instrument_isin": isin, "instrument_name": name, "weight": weight}
+            classifications[key] = {"country": set(), "sector": set(), "currency": set()}
+        for field, values in classifications[key].items():
+            value = normalize_bucket(holding.get(field), field)
+            if value is not None:
+                values.add(value)
     if len(dates) != 1:
         raise ValueError("All imported holdings must have the same valuation date")
     total = sum(row["weight"] for row in records.values())
     if not 0 < total <= 105:
         raise ValueError("Total published equity weight must be greater than 0% and at most 105%")
+    # Missing labels provide no evidence. Conflicts stay unknown regardless of row order.
+    for key, row in records.items():
+        for field, values in classifications[key].items():
+            row[field] = next(iter(values)) if len(values) == 1 else None
     return dates.pop(), list(records.values())
 
 

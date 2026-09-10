@@ -2,7 +2,7 @@
   <div class="page">
     <div class="page-header">
       <h1 class="page-title">GoETF Quality Scores</h1>
-      <p class="page-subtitle">Composite 1-10 quality score based on seven equal-weight return, risk, diversification, and cost metrics.</p>
+      <p class="page-subtitle">Equity-focused quality scores. Other asset classes remain in the catalog but are not ranked using equity diversification metrics.</p>
     </div>
 
     <div v-if="!hasApiKey" class="cta-banner">
@@ -62,11 +62,11 @@
                     <span class="score-badge" :class="scoreBadgeClass(row.goetf_score)" :title="row.missing_components?.length ? `Calculated without: ${row.missing_components.join(', ')}` : 'All seven components available'">{{ row.goetf_score.toFixed(1) }}</span>
                     <button class="score-info-btn" type="button" :aria-label="`Show ${row.isin} Quality Score calculation`" @click.stop="showScoreDetail(row)" @keydown.stop>i</button>
                   </template>
-                  <span v-else class="score-badge score-na">N/A</span>
+                  <span v-else class="score-badge score-na" :title="row.reason || 'Required data unavailable'">N/A</span>
                 </div>
               </td>
               <td><strong style="color:var(--green-600)">{{ row.isin }}</strong></td>
-              <td style="font-size:.8rem;color:var(--text-muted);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ row.name }}</td>
+              <td style="font-size:.8rem;color:var(--text-muted);max-width:220px"><div>{{ row.name }}</div><small>{{ row.asset_class || 'Unknown' }}</small><div v-if="row.goetf_score == null">{{ row.reason || 'Required data unavailable' }}</div></td>
               <td :class="signClass(row.cagr_pct)">{{ row.cagr_pct != null ? row.cagr_pct.toFixed(1) + '%' : '—' }}</td>
               <td :class="sortinoClass(row.sortino)">{{ row.sortino != null ? row.sortino.toFixed(2) : '—' }}</td>
               <td :class="ddClass(row.max_drawdown_pct)">{{ row.max_drawdown_pct != null ? row.max_drawdown_pct.toFixed(1) + '%' : '—' }}</td>
@@ -79,7 +79,7 @@
         </table>
       </div>
       <div style="padding:.5rem 1.25rem;border-top:1px solid var(--border);font-size:.7rem;color:var(--text-muted)">
-        Seven available components are equally weighted. Scores require at least one year of price history; unavailable holdings, allocation, or TER components are disclosed in the score tooltip and excluded from the average.
+        All seven components are required and equally weighted. Unsupported asset classes or missing price, holdings, allocation, or TER data produce an unavailable score, not a default rating.
       </div>
     </div>
     <div v-if="scoreDetail" class="score-detail-backdrop" @click.self="closeScoreDetail">

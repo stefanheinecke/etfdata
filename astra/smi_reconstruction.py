@@ -1186,6 +1186,8 @@ PROVIDER_FIELDS = {
     "asset_class": ("assetclass", "assettype", "anlageklasse", "anlagekategorie"),
     "exchange": ("exchange", "borse", "stockexchange"),
     "currency": ("marketcurrencycode", "marketcurrency", "currency", "wahrung"),
+    "country": ("countryofrisk", "country", "location", "land"),
+    "sector": ("sectorname", "sector", "sektor"),
 }
 
 
@@ -1295,6 +1297,8 @@ def normalize_provider_holdings(etf_isin: str, rows: list[dict], metadata: dict,
             "isin_status": "resolved" if isin else "unresolved",
             "isin_source": "user mapping" if key in mapping else "provider holdings export",
             "exchange": exchange, "currency": row_field(row, "currency"),
+            # Explicit provider labels only; canonicalization belongs to the DB boundary.
+            "country": row_field(row, "country"), "sector": row_field(row, "sector"),
             "reported_weight": weight, "weight": weight, "as_of": as_of,
             "estimate_type": "provider_reported_equity_basket", "index_constituent_status": "not_verified",
             "source": metadata["source"], "product_structure": metadata.get("product_structure"),

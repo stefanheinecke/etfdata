@@ -2,7 +2,7 @@
   <div class="page">
     <div class="page-header">
       <h1 class="page-title">Portfolio Analytics</h1>
-      <p class="page-subtitle">Portfolio exposure breakdown and per-ETF risk metrics in one call.</p>
+      <p class="page-subtitle">Multi-asset catalog · Equity-focused securities, country and sector overlap. Price-based risk metrics remain available where price data exists.</p>
     </div>
     <div v-if="!hasApiKey" class="cta-banner">
       <div class="cta-text">
@@ -14,7 +14,7 @@
     <div>
       <div class="card" style="margin-bottom:1.5rem">
         <h2 class="card-title">Portfolio Exposure</h2>
-        <p style="font-size:.875rem;color:var(--text-muted);margin-bottom:1rem">Select one ETF for a complete ETF view, or combine several ETFs to analyse the portfolio as a whole.</p>
+        <p style="font-size:.875rem;color:var(--text-muted);margin-bottom:1rem">Combine equity ETFs to compare securities, countries and sectors. Bond, commodity and unknown asset classes are not supported for holdings analytics. Reported holdings may differ from index exposure for synthetic funds.</p>
         <div v-for="(item,i) in portfolio" :key="i" style="display:flex;gap:.5rem;margin-bottom:.5rem;align-items:center">
           <ETFSelector v-model="item.etf_id" :etfs="allEtfs" :label="'Portfolio ETF ' + (i + 1)" style="flex:2" />
           <input class="input" type="number" v-model.number="item.weight" placeholder="Weight %" style="flex:1;max-width:120px" min="0" max="100" step="0.01" :aria-label="'Portfolio weight ' + (i + 1)" />
@@ -31,20 +31,40 @@
           <span style="font-size:.8rem;color:var(--text-muted)">% p.a.</span>
         </div>
       </div>
+      <div v-if="exposureResult" class="portfolio-donut-grid">
+        <div v-for="group in portfolioExposureGroups" :key="group.key" class="card portfolio-donut-card">
+          <div class="portfolio-donut-head"><h3 class="card-title">{{ group.label }}</h3><span>{{ group.total.toFixed(1) }}% classified</span></div>
+          <p class="overlap-caption">{{ group.coverage?.status || 'Coverage unavailable' }} · {{ formatCoverage(group.coverage?.coverage) }} of portfolio represented</p>
+          <div v-if="group.total > 0" class="portfolio-donut-chart"><Doughnut :data="portfolioDonutData(group)" :options="portfolioDonutOptions" /></div>
+          <div v-else class="donut-unavailable" role="status"><div class="empty-donut" aria-hidden="true"></div><span>Data unavailable</span><small>No supported {{ group.key }} allocation data for this selection.</small></div>
+          <div v-if="group.total > 0" class="portfolio-donut-legend">
+            <div v-for="entry in group.entries" :key="entry.name"><span><i :style="{ background: entry.color }"></i>{{ entry.name }}</span><strong>{{ entry.value.toFixed(1) }}%</strong></div>
+          </div>
+        </div>
+      </div>
       <!-- Pair overlap suggestions -->
+      <div v-if="analysisWarnings.length" class="analysis-notice" role="status">
+        <strong>Analytics coverage</strong>
+        <ul><li v-for="warning in analysisWarnings" :key="warning">{{ warning }}</li></ul>
+        <p>Unavailable data does not mean zero overlap or greater diversification.</p>
+      </div>
+      <div v-if="pairSuggestionsError" class="analysis-notice" role="status">{{ pairSuggestionsError }}</div>
       <div v-if="pairSuggestionsLoading" style="margin-bottom:1.5rem;padding:1rem 1.25rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);font-size:.875rem;color:var(--text-muted)">Analysing pairwise overlap & finding replacements…</div>
       <div v-if="pairSuggestions && pairSuggestions.length" class="card" style="margin-bottom:1.5rem">
-        <h3 class="card-title" style="margin-bottom:.25rem">Pairwise Overlap & Replacement Suggestions</h3>
-        <p style="font-size:.8rem;color:var(--text-muted);margin-bottom:1rem">For each overlapping pair, the replacement that gives the biggest overlap reduction. Final choice is yours — consider the tracking index and TER before switching.</p>
+        <h3 class="card-title" style="margin-bottom:.25rem">Securities Overlap & Replacement Suggestions</h3>
+        <p style="font-size:.8rem;color:var(--text-muted);margin-bottom:1rem">Matched by security ISIN. Overlap sums the smaller normalized equity-basket weight for each shared security. Up to 20 largest contributors are shown; totals use all holdings. Replacements stay within the same asset class, but may track a different index.</p>
         <div v-for="pair in pairSuggestions" :key="pair.etf_a_id+pair.etf_b_id" style="border:1px solid var(--border);border-radius:8px;padding:.875rem 1rem;margin-bottom:.75rem">
-          <div style="display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;cursor:pointer" @click="togglePair(pair)">
+          <button class="pair-heading" type="button" :aria-expanded="isPairOpen(pair)" @click="togglePair(pair)">
             <span class="pair-chevron" :class="{ open: isPairOpen(pair) }">▶</span>
             <span style="font-weight:700;font-size:.95rem;color:var(--green-600)">{{ pair.etf_a_isin }}</span>
             <span style="color:var(--text-muted)">↔</span>
             <span style="font-weight:700;font-size:.95rem;color:var(--green-600)">{{ pair.etf_b_isin }}</span>
-            <span style="margin-left:auto;font-size:.85rem;font-weight:700" :class="pair.current_overlap > 50 ? 'cell-red' : pair.current_overlap > 20 ? 'cell-yellow' : 'cell-green'">{{ pair.current_overlap.toFixed(1) }}% overlap</span>
-          </div>
+            <span v-if="pair.current_overlap != null" style="margin-left:auto;font-size:.85rem;font-weight:700">{{ pair.current_overlap.toFixed(1) }}% overlap</span>
+            <span v-else style="margin-left:auto">Analysis unavailable</span>
+          </button>
+          <p v-if="pair.current_overlap == null" class="overlap-caption">{{ pair.reason || 'Holdings data unavailable.' }}</p>
           <div v-show="isPairOpen(pair)" style="margin-top:.6rem">
+          <p class="overlap-caption">Snapshot dates: {{ pair.as_of_a || 'Unavailable' }} / {{ pair.as_of_b || 'Unavailable' }}</p>
           <div v-if="pair.common_holdings && pair.common_holdings.length" class="table-wrap" style="margin-bottom:.75rem">
             <table class="holdings-table">
               <thead>
@@ -56,8 +76,8 @@
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="h in pair.common_holdings" :key="h.name">
-                  <td>{{ h.name }}</td>
+                <tr v-for="h in pair.common_holdings" :key="h.isin || h.name">
+                  <td>{{ h.name }}<small class="security-isin">{{ h.isin }}</small></td>
                   <td style="text-align:right">{{ h.etf_a_weight.toFixed(2) }}%</td>
                   <td style="text-align:right">{{ h.etf_b_weight.toFixed(2) }}%</td>
                   <td style="text-align:right;font-weight:700">{{ h.overlap.toFixed(2) }}%</td>
@@ -87,28 +107,34 @@
             </div>
             <div style="font-size:.8rem;font-weight:600;margin-top:.4rem" v-html="replacementSummary(pair.best_replacement)"></div>
           </div>
-          <div v-else style="font-size:.8rem;color:var(--text-muted);font-style:italic">No replacement found in available ETFs</div>
+          <div v-else-if="pair.current_overlap != null" style="font-size:.8rem;color:var(--text-muted);font-style:italic">No lower-overlap replacement found among eligible candidates with available data.</div>
           </div>
         </div>
       </div>
       <div v-if="pairSuggestions && pairSuggestions.length === 0 && !pairSuggestionsLoading" style="margin-bottom:1.5rem;padding:.75rem 1rem;background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.3);border-radius:8px;font-size:.875rem;color:#166534">
-        ✓ No significant holdings overlap detected between ETFs in your portfolio.
+        No ETF pairs available for comparison.
       </div>
-      <div v-if="exposureError" class="error-box" style="margin-bottom:1rem">{{ exposureError }}</div>
-      <div v-if="exposureResult" class="portfolio-donut-grid">
-        <div v-for="group in portfolioExposureGroups" :key="group.key" class="card portfolio-donut-card">
-          <div class="portfolio-donut-head"><h3 class="card-title">{{ group.label }}</h3><span>{{ group.total.toFixed(1) }}%</span></div>
-          <div class="portfolio-donut-chart"><Doughnut :data="portfolioDonutData(group)" :options="portfolioDonutOptions" /></div>
-          <div class="portfolio-donut-legend">
-            <div v-for="entry in group.entries" :key="entry.name"><span><i :style="{ background: entry.color }"></i>{{ entry.name }}</span><strong>{{ entry.value.toFixed(1) }}%</strong></div>
+      <section v-for="kind in ['country', 'sector']" :key="kind" class="card allocation-overlap" v-show="allocationOverlap[kind]?.length">
+        <h3 class="card-title">{{ kind === 'country' ? 'Country' : 'Sector' }} Overlap</h3>
+        <p class="overlap-caption">Sum of the smaller weight in each shared {{ kind }}. This compares exposures, not identical securities or return correlation. At least 95% classified fund weight is required on each side; unknown exposure is not matched or rescaled.</p>
+        <details v-for="pair in allocationOverlap[kind] || []" :key="pair.etf_a + pair.etf_b" class="allocation-pair">
+          <summary><span>{{ pair.etf_a_isin }} ↔ {{ pair.etf_b_isin }}</span><strong>{{ pair.weight_overlap == null ? 'Analysis unavailable' : pair.weight_overlap.toFixed(1) + '% overlap' }}</strong></summary>
+          <p v-if="pair.weight_overlap == null" class="overlap-caption">{{ pair.reason || 'Classification data unavailable.' }}</p>
+          <p class="overlap-caption">{{ pair.etf_a_isin }}: {{ pair.as_of_a || 'No snapshot' }} · {{ pair.source_a || 'No source' }} · {{ formatCoverage(pair.coverage_a) }} classified<br />{{ pair.etf_b_isin }}: {{ pair.as_of_b || 'No snapshot' }} · {{ pair.source_b || 'No source' }} · {{ formatCoverage(pair.coverage_b) }} classified</p>
+          <div v-if="pair.buckets?.length" class="table-wrap">
+            <table class="holdings-table">
+              <thead><tr><th>{{ kind === 'country' ? 'Country' : 'Sector' }}</th><th>{{ pair.etf_a_isin }}</th><th>{{ pair.etf_b_isin }}</th><th>Overlap</th></tr></thead>
+              <tbody><tr v-for="bucket in pair.buckets" :key="bucket.bucket"><td>{{ kind === 'country' ? fullCountryName(bucket.bucket) : bucket.bucket }}</td><td>{{ bucket.etf_a_weight.toFixed(2) }}%</td><td>{{ bucket.etf_b_weight.toFixed(2) }}%</td><td><strong>{{ bucket.overlap.toFixed(2) }}%</strong></td></tr></tbody>
+            </table>
           </div>
-        </div>
-      </div>
-
+        </details>
+      </section>
+      <div v-if="exposureError" class="error-box" style="margin-bottom:1rem">{{ exposureError }}</div>
       <!-- Top 10 Holdings -->
       <div v-if="topHoldings && topHoldings.length" class="card" style="margin-top:1.5rem;padding:0;overflow:hidden">
         <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--border)">
           <h3 class="card-title" style="margin:0">Top 10 Holdings</h3>
+          <p class="overlap-caption">{{ exposureResult?.top_holdings_status || 'Coverage unavailable' }} · source baskets cover {{ formatCoverage(exposureResult?.top_holdings_coverage) }} of portfolio before top-10 truncation.</p>
         </div>
         <div class="table-wrap">
           <table class="holdings-table">
@@ -118,6 +144,7 @@
                 <th style="text-align:right">Weight</th>
                 <th>Sector</th>
                 <th>Country</th>
+                <th>Holding currency</th>
               </tr>
             </thead>
             <tbody>
@@ -126,6 +153,7 @@
                 <td style="text-align:right;font-weight:600">{{ holding.weight.toFixed(2) }}%</td>
                 <td style="color:var(--text-muted);font-size:.85rem">{{ holding.sector || '—' }}</td>
                 <td style="color:var(--text-muted);font-size:.85rem">{{ holding.country || '—' }}</td>
+                <td style="color:var(--text-muted);font-size:.85rem">{{ holding.currency || '—' }}</td>
               </tr>
             </tbody>
           </table>
@@ -153,7 +181,7 @@
             </div>
             <div class="stat-box">
               <div class="stat-label">Avg HHI</div>
-              <div class="stat-value" :class="hhiClass(portfolioSummary.hhi)">{{ portfolioSummary.hhi.toFixed(0) }}</div>
+              <div class="stat-value" :class="hhiClass(portfolioSummary.hhi)">{{ portfolioSummary.hhi?.toFixed(0) ?? '—' }}</div>
             </div>
             <div class="stat-box">
               <div class="stat-label">Active ETFs</div>
@@ -205,7 +233,7 @@
                 <td :class="volClass(row.volatility)">{{ fmtPct(row.volatility) }}</td>
                 <td :class="sharpeClass(row.sharpe_ratio)">{{ row.sharpe_ratio !== null ? row.sharpe_ratio : '—' }}</td>
                 <td :class="ddClass(row.max_drawdown)">{{ fmtPct(row.max_drawdown) }}</td>
-                <td :class="hhiClass(row.hhi)">{{ row.hhi !== null ? row.hhi.toFixed(0) : '—' }}</td>
+                <td :class="hhiClass(row.hhi)" :title="row.hhi_reason || ''">{{ row.hhi != null ? row.hhi.toFixed(0) : '—' }}</td>
                 <td :class="diversityClass(individualScore(row.etf_id)?.geo_div)">{{ fmtDiversity(individualScore(row.etf_id)?.geo_div) }}</td>
                 <td :class="diversityClass(individualScore(row.etf_id)?.sector_div)">{{ fmtDiversity(individualScore(row.etf_id)?.sector_div) }}</td>
                 <td :class="terClass(individualScore(row.etf_id)?.ter_pct)">{{ individualScore(row.etf_id)?.ter_pct != null ? individualScore(row.etf_id).ter_pct.toFixed(2) + '%' : '—' }}</td>
@@ -225,7 +253,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, inject } from 'vue'
+import { ref, computed, onMounted, inject, watch } from 'vue'
 import ETFSelector from '../components/ETFSelector.vue'
 import { Doughnut } from 'vue-chartjs'
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js'
@@ -253,6 +281,29 @@ const portfolioScoreResult = ref(null)
 const portfolioScoreLoading = ref(false)
 const pairSuggestions = ref(null)
 const pairSuggestionsLoading = ref(false)
+const pairSuggestionsError = ref('')
+const scoreError = ref('')
+let analysisRun = 0
+watch(portfolio, () => {
+  analysisRun++
+  exposureResult.value = null
+  topHoldings.value = null
+  portfolioRiskResult.value = null
+  portfolioScoreResult.value = null
+  pairSuggestions.value = null
+  exposureError.value = ''
+  scoreError.value = ''
+  pairSuggestionsError.value = ''
+  exposureLoading.value = false
+  portfolioScoreLoading.value = false
+  pairSuggestionsLoading.value = false
+}, { deep: true, flush: 'sync' })
+const analysisWarnings = computed(() => [
+  ...(exposureResult.value?.analysis_warnings || []),
+  ...(portfolioScoreResult.value?.status === 'unavailable' ? [portfolioScoreResult.value.reason || 'Portfolio quality score unavailable.'] : []),
+  ...(scoreError.value ? [scoreError.value] : []),
+])
+const formatCoverage = value => value == null ? 'Unknown' : `${Number(value).toFixed(1)}%`
 const openPairs = ref(new Set())
 function pairKey(pair) { return pair.etf_a_id + pair.etf_b_id }
 function isPairOpen(pair) { return openPairs.value.has(pairKey(pair)) }
@@ -265,7 +316,7 @@ function togglePair(pair) {
 
 const portfolioSummary = computed(() => {
   if (!portfolioRiskResult.value?.length) return null
-  const p = portfolio.value.filter(x => x.etf_id)
+  const p = portfolio.value.filter(x => x.etf_id && x.weight > 0)
   const totalW = p.reduce((s, x) => s + (x.weight || 0), 0)
   if (!totalW) return null
   let wReturn = 0, wVol = 0, wDD = 0, wHHI = 0, wTer = 0, terWeight = 0
@@ -282,13 +333,14 @@ const portfolioSummary = computed(() => {
       terWeight += w
     }
   }
-  const countryDiversity = diversityFromExposure(exposureResult.value?.countries)
-  const sectorDiversity = diversityFromExposure(exposureResult.value?.sectors)
+  const completeMetric = key => p.every(item => portfolioRiskResult.value.find(row => row.etf_id === item.etf_id)?.[key] != null)
+  const countryDiversity = exposureResult.value?.exposure_coverage?.country?.status === 'available' ? diversityFromExposure(exposureResult.value?.countries) : null
+  const sectorDiversity = exposureResult.value?.exposure_coverage?.sector?.status === 'available' ? diversityFromExposure(exposureResult.value?.sectors) : null
   return {
-    ann_return: wReturn,
-    volatility: wVol,
-    max_drawdown: wDD,
-    hhi: wHHI,
+    ann_return: completeMetric('ann_return') ? wReturn : null,
+    volatility: completeMetric('volatility') ? wVol : null,
+    max_drawdown: completeMetric('max_drawdown') ? wDD : null,
+    hhi: completeMetric('hhi') ? wHHI : null,
     etf_count: p.length,
     geo_div: countryDiversity,
     sector_div: sectorDiversity,
@@ -329,7 +381,11 @@ function buildExposureGroup(key, label, values, formatter = name => name) {
   const visible = sorted.slice(0, 6)
   const other = sorted.slice(6).reduce((sum, item) => sum + item.value, 0)
   if (other > 0) visible.push({ name: 'Other', value: other })
-  return { key, label, total: sorted.reduce((sum, item) => sum + item.value, 0), entries: visible.map((item, index) => ({ ...item, color: item.name === 'Other' ? '#aab8c5' : DONUT_COLORS[index % DONUT_COLORS.length] })) }
+  const total = sorted.reduce((sum, item) => sum + item.value, 0)
+  const portfolioWeight = portfolio.value.filter(item => item.etf_id && item.weight > 0).reduce((sum, item) => sum + item.weight, 0)
+  const unknown = Math.max(0, portfolioWeight - total)
+  if (unknown > 0.005) visible.push({ name: 'Unclassified / unavailable', value: unknown })
+  return { key, label, total, entries: visible.map((item, index) => ({ ...item, color: ['Other', 'Unclassified / unavailable'].includes(item.name) ? '#aab8c5' : DONUT_COLORS[index % DONUT_COLORS.length] })) }
 }
 
 const portfolioExposureGroups = computed(() => {
@@ -339,8 +395,8 @@ const portfolioExposureGroups = computed(() => {
     buildExposureGroup('country', 'Country Exposure', r.countries, fullCountryName),
     buildExposureGroup('region', 'Region Exposure', regionExposures(r.countries)),
     buildExposureGroup('sector', 'Sector Exposure', r.sectors),
-    buildExposureGroup('currency', 'Currency Exposure', r.currencies),
-  ].filter(group => group.entries.length)
+    buildExposureGroup('currency', 'Holding Currency Exposure', r.currencies),
+  ].map(group => ({ ...group, coverage: r.exposure_coverage?.[group.key === 'region' ? 'country' : group.key] }))
 })
 
 const filteredPairwiseOverlaps = computed(() => {
@@ -377,10 +433,13 @@ async function loadETFs() {
   try { const r=await etfService.getETFs(0,5000); allEtfs.value=r.data } catch(e){exposureError.value=e.response?.data?.detail||e.message} finally{etfsLoading.value=false}
 }
 async function runExposure() {
+  const run = ++analysisRun
   exposureLoading.value=true; exposureError.value=''; exposureResult.value=null; topHoldings.value=null; portfolioRiskResult.value=null; portfolioScoreResult.value=null; pairSuggestions.value=null; openPairs.value=new Set()
-  const p=portfolio.value.filter(x=>x.etf_id)
+  pairSuggestionsError.value=''; scoreError.value=''
+  const p=portfolio.value.filter(x=>x.etf_id && x.weight > 0).map(x=>({...x}))
   try {
     const r = await analyticsService.calculateExposure(p, null, riskFreeRate.value / 100)
+    if (run !== analysisRun) return
     exposureResult.value = r.data
     topHoldings.value = r.data.top_holdings ?? null
     portfolioRiskResult.value = r.data.risk_metrics ?? null
@@ -388,19 +447,21 @@ async function runExposure() {
       portfolioScoreLoading.value = true
       try {
         const sr = await scoreService.getPortfolioScore(p, riskFreeRate.value / 100)
+        if (run !== analysisRun) return
         portfolioScoreResult.value = sr.data
-      } catch(e) { console.warn('Portfolio score failed:', e.message) }
-        finally { portfolioScoreLoading.value = false }
+      } catch(e) { if (run === analysisRun) scoreError.value = 'Portfolio quality score unavailable: ' + (e.response?.data?.detail || e.message) }
+        finally { if (run === analysisRun) portfolioScoreLoading.value = false }
     }
     if (p.length >= 2) {
       pairSuggestionsLoading.value = true
       try {
         const pr = await analyticsService.getPairSuggestions(p)
+        if (run !== analysisRun) return
         pairSuggestions.value = pr.data
-      } catch(e) { console.warn('Pair suggestions failed:', e.message) }
-        finally { pairSuggestionsLoading.value = false }
+      } catch(e) { if (run === analysisRun) pairSuggestionsError.value = 'Securities overlap unavailable: ' + (e.response?.data?.detail || e.message) }
+        finally { if (run === analysisRun) pairSuggestionsLoading.value = false }
     }
-  } catch(e){exposureError.value=e.response?.data?.detail||e.message} finally{exposureLoading.value=false}
+  } catch(e){if (run === analysisRun) exposureError.value=e.response?.data?.detail||e.message} finally{if (run === analysisRun) exposureLoading.value=false}
 }
 
 // Risk-free rate used for constituent ETF risk metrics and the portfolio Quality Score.
@@ -482,6 +543,14 @@ function replacementSummary(r) {
 .cell-red{color:#ef4444;font-weight:600}
 .pair-chevron{display:inline-block;font-size:.7rem;color:var(--text-muted);transition:transform .15s ease}
 .pair-chevron.open{transform:rotate(90deg)}
+.pair-heading{display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;cursor:pointer;width:100%;border:0;background:transparent;color:var(--text);text-align:left;padding:.25rem 0;font:inherit}
+.analysis-notice{padding:1rem 1.25rem;border:1px solid var(--border);border-left:4px solid #c99522;border-radius:8px;background:var(--surface);margin:1rem 0;font-size:.85rem}
+.analysis-notice ul{padding-left:1.25rem;max-height:180px;overflow:auto}
+.overlap-caption{font-size:.78rem;color:var(--text-muted);margin:.5rem 0 .75rem;line-height:1.5}
+.allocation-overlap{margin:1rem 0}
+.allocation-pair{border:1px solid var(--border);border-radius:8px;padding:.75rem 1rem;margin-top:.75rem}
+.allocation-pair summary{cursor:pointer;display:flex;justify-content:space-between;gap:.75rem;flex-wrap:wrap;font-size:.85rem}
+.security-isin{display:block;color:var(--text-muted);font-size:.7rem}
 .table-wrap{overflow-x:auto}
 .portfolio-donut-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem;margin-top:1.5rem}
 .portfolio-donut-card{padding:1rem;min-width:0}
@@ -489,6 +558,8 @@ function replacementSummary(r) {
 .portfolio-donut-head .card-title{margin:0}
 .portfolio-donut-head>span{font-size:.75rem;font-weight:700;color:var(--text-muted);font-variant-numeric:tabular-nums}
 .portfolio-donut-chart{height:220px;margin:.5rem 0 .75rem}
+.donut-unavailable{height:250px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.65rem;text-align:center;color:var(--text-muted);font-size:.85rem}
+.empty-donut{width:145px;height:145px;border:25px solid var(--border);border-radius:50%;box-sizing:border-box}
 .portfolio-donut-legend{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.35rem .75rem}
 .portfolio-donut-legend div{display:flex;align-items:center;justify-content:space-between;gap:.5rem;min-width:0;font-size:.75rem;color:var(--text-muted)}
 .portfolio-donut-legend span{display:flex;align-items:center;gap:.35rem;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}

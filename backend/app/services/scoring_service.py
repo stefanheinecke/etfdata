@@ -12,8 +12,9 @@ import math
 from typing import List, Optional, Dict
 from uuid import UUID
 from sqlalchemy.orm import Session
-from sqlalchemy import func
-from app.schemas import ETF, Performance, Holding, Allocation
+from app.schemas import ETF, Performance
+from app.services.asset_classes import equity_analytics_supported, normalize_asset_class
+from app.services.analytics_service import _holdings_snapshot, _allocation_snapshot
 
 # ---------------------------------------------------------------------------
 # Scoring configuration
@@ -55,6 +56,8 @@ def _compute_raw_metrics(db: Session, etf: ETF, rf_annual: float) -> Optional[Di
     Compute the 7 GoETF Quality Score metrics from existing DB tables.
     Returns None if there is insufficient price history for a one-year score.
     """
+    if not equity_analytics_supported(etf.asset_class):
+        return None
     perf = (
         db.query(Performance)
         .filter(Performance.etf_id == etf.id)
@@ -95,70 +98,26 @@ def _compute_raw_metrics(db: Session, etf: ETF, rf_annual: float) -> Optional[Di
         if dd < max_dd:
             max_dd = dd
     # ── Holdings: HHI ────────────────────────────────────────────────────────
-    latest_holding_date = (
-        db.query(func.max(Holding.date)).filter(Holding.etf_id == etf.id).scalar()
-    )
+    snapshot = _holdings_snapshot(db, etf.id)
     hhi = None
     num_holdings = 0
-    if latest_holding_date:
-        holdings = (
-            db.query(Holding)
-            .filter(Holding.etf_id == etf.id, Holding.date == latest_holding_date)
-            .all()
-        )
-        w = [float(h.weight) for h in holdings if h.weight is not None]
-        total_w = sum(w)
-        num_holdings = len(w)
-        if total_w > 0 and len(w) > 0:
-            norm = [x / total_w for x in w]
-            sum_sq = sum(x * x for x in norm)
-            hhi = sum_sq * 10_000
+    if snapshot["status"] == "available":
+        num_holdings = len(snapshot["weights"])
+        hhi = sum(w * w for w in snapshot["weights"].values())
 
     # ── Allocations: Country and sector diversification ───────────────────────
-    latest_alloc_date = (
-        db.query(func.max(Allocation.date))
-        .filter(Allocation.etf_id == etf.id, Allocation.type == "country")
-        .scalar()
-    )
-    geo_div = None
-    if latest_alloc_date:
-        allocs = (
-            db.query(Allocation)
-            .filter(
-                Allocation.etf_id == etf.id,
-                Allocation.type == "country",
-                Allocation.date == latest_alloc_date,
-            )
-            .all()
-        )
-        w = [float(a.weight) for a in allocs if a.weight is not None]
-        total_w = sum(w)
-        if total_w > 0 and len(w) > 0:
-            norm = [x / total_w for x in w]
-            country_hhi = sum(x * x for x in norm) * 10_000
-            geo_div = 1.0 - country_hhi / 10_000
+    country = _allocation_snapshot(db, etf.id, "country")
+    sector = _allocation_snapshot(db, etf.id, "sector")
 
-    latest_sector_date = (
-        db.query(func.max(Allocation.date))
-        .filter(Allocation.etf_id == etf.id, Allocation.type == "sector")
-        .scalar()
-    )
-    sector_div = None
-    if latest_sector_date:
-        sector_allocs = (
-            db.query(Allocation)
-            .filter(
-                Allocation.etf_id == etf.id,
-                Allocation.type == "sector",
-                Allocation.date == latest_sector_date,
-            )
-            .all()
-        )
-        sector_weights = [float(a.weight) for a in sector_allocs if a.weight is not None]
-        sector_total = sum(sector_weights)
-        if sector_total > 0:
-            sector_norm = [weight / sector_total for weight in sector_weights]
-            sector_div = 1.0 - sum(weight * weight for weight in sector_norm)
+    def diversity(allocation):
+        if allocation["status"] != "available":
+            return None
+        weights = list(allocation["weights"].values())
+        # Conservative bound: unresolved exposure belongs to the largest known bucket.
+        weights[weights.index(max(weights))] += max(0, 100 - sum(weights))
+        return 1.0 - sum((w / 100) ** 2 for w in weights)
+
+    geo_div, sector_div = diversity(country), diversity(sector)
 
     ter_pct = float(etf.ter) if etf.ter is not None else None
 
@@ -174,6 +133,8 @@ def _compute_raw_metrics(db: Session, etf: ETF, rf_annual: float) -> Optional[Di
         "ann_vol_pct": round(ann_vol * 100, 2),
         "num_holdings": num_holdings,
         "data_points": n,
+        "country_coverage": country["coverage"],
+        "sector_coverage": sector["coverage"],
     }
 
 
@@ -206,7 +167,7 @@ def compute_goetf_scores(
     Returns list sorted by score descending (None scores last).
     """
     query = db.query(ETF)
-    if etf_ids:
+    if etf_ids is not None:
         query = query.filter(ETF.id.in_(etf_ids))
     etfs = query.order_by(ETF.isin).all()
 
@@ -214,7 +175,9 @@ def compute_goetf_scores(
     rows = []
     for etf in etfs:
         raw = _compute_raw_metrics(db, etf, rf_annual)
-        rows.append({"etf_id": str(etf.id), "isin": etf.isin, "name": etf.name, "metrics": raw})
+        rows.append({"etf_id": str(etf.id), "isin": etf.isin, "name": etf.name, "metrics": raw,
+                     "asset_class": normalize_asset_class(etf.asset_class),
+                     "equity_analytics_supported": equity_analytics_supported(etf.asset_class)})
 
     # Step 2: score each ETF against fixed absolute reference ranges
     results = []
@@ -227,6 +190,10 @@ def compute_goetf_scores(
                     "name": row["name"],
                     "goetf_score": None,
                     "insufficient_data": True,
+                    "status": "unavailable",
+                    "reason": "Unsupported asset class for equity scoring" if not row["equity_analytics_supported"] else "Insufficient price history (requires 253 observations)",
+                    "asset_class": row["asset_class"],
+                    "equity_analytics_supported": row["equity_analytics_supported"],
                 }
             )
             continue
@@ -239,7 +206,7 @@ def compute_goetf_scores(
             component: _absolute_score(component, row["metrics"][component])
             for component in available_components
         }
-        raw_score = sum(metric_scores.values()) / len(metric_scores) if metric_scores else None
+        raw_score = sum(metric_scores.values()) / len(SCORE_COMPONENTS) if len(metric_scores) == len(SCORE_COMPONENTS) else None
         if raw_score is None:
             results.append(
                 {
@@ -248,6 +215,13 @@ def compute_goetf_scores(
                     "name": row["name"],
                     "goetf_score": None,
                     "insufficient_data": True,
+                    "status": "unavailable",
+                    "reason": "Missing or unreliable score components: " + ", ".join(c for c in SCORE_COMPONENTS if c not in available_components),
+                    "asset_class": row["asset_class"],
+                    "equity_analytics_supported": row["equity_analytics_supported"],
+                    **row["metrics"],
+                    "available_components": available_components,
+                    "missing_components": [c for c in SCORE_COMPONENTS if c not in available_components],
                 }
             )
             continue
@@ -259,6 +233,9 @@ def compute_goetf_scores(
                 "isin": row["isin"],
                 "name": row["name"],
                 "goetf_score": goetf_score,
+                "status": "available", "reason": None, "insufficient_data": False,
+                "asset_class": row["asset_class"],
+                "equity_analytics_supported": row["equity_analytics_supported"],
                 **row["metrics"],
                 "metric_scores": {m: round(metric_scores[m], 3) for m in metric_scores},
                 "available_components": available_components,
@@ -290,7 +267,7 @@ def compute_portfolio_score(
     """
     from app.services.analytics_service import AnalyticsService
 
-    active = [p for p in portfolio if p.get("weight", 0) > 0 and p.get("etf_id")]
+    active = [{**p, "etf_id": str(p["etf_id"])} for p in portfolio if p.get("weight", 0) > 0 and p.get("etf_id")]
     if not active:
         return {"error": "No valid ETFs in portfolio"}
 
@@ -298,25 +275,24 @@ def compute_portfolio_score(
 
     # Individual ETF scores used to calculate the portfolio base score.
     all_scores = compute_goetf_scores(db, rf_annual)
-    score_map = {s["etf_id"]: s.get("goetf_score") or 5.0 for s in all_scores}
-    geo_map = {s["etf_id"]: s.get("geo_div", 0.5) for s in all_scores}
+    score_map = {s["etf_id"]: s.get("goetf_score") for s in all_scores}
+    geo_map = {s["etf_id"]: s.get("geo_div") for s in all_scores}
     isin_map = {s["etf_id"]: s["isin"] for s in all_scores}
 
     # 1. Base score
-    base = sum((p["weight"] / total_w) * score_map.get(p["etf_id"], 5.0) for p in active)
+    missing_scores = any(score_map.get(p["etf_id"]) is None for p in active)
+    base = None if missing_scores else sum((p["weight"] / total_w) * score_map[p["etf_id"]] for p in active)
 
     # 2. Pairwise weight overlaps
-    etf_uuids = [UUID(p["etf_id"]) for p in active]
+    etf_uuids = [UUID(str(p["etf_id"])) for p in active]
     weights_norm = [p["weight"] / total_w for p in active]
     pairwise_overlaps = []
 
     for i in range(len(etf_uuids)):
         for j in range(i + 1, len(etf_uuids)):
             ov_result = AnalyticsService.calculate_overlap(db, [etf_uuids[i], etf_uuids[j]])
-            weight_ov = 0.0
-            if "matrix" in ov_result:
-                for v in ov_result["matrix"].values():
-                    weight_ov = v.get("weight_overlap", 0)
+            pair = next(iter(ov_result.get("matrix", {}).values()), {})
+            weight_ov = pair.get("weight_overlap") if pair.get("status") == "available" else None
             combined_w = (weights_norm[i] + weights_norm[j]) / 2
             pairwise_overlaps.append(
                 {
@@ -324,10 +300,23 @@ def compute_portfolio_score(
                     "etf_b_id": str(etf_uuids[j]),
                     "etf_a_isin": isin_map.get(str(etf_uuids[i]), active[i]["etf_id"]),
                     "etf_b_isin": isin_map.get(str(etf_uuids[j]), active[j]["etf_id"]),
-                    "weight_overlap_pct": round(float(weight_ov), 1),
+                    "weight_overlap_pct": round(float(weight_ov), 1) if weight_ov is not None else None,
+                    "status": pair.get("status", "unavailable"), "reason": pair.get("reason"),
+                    "as_of_a": pair.get("as_of_a"), "as_of_b": pair.get("as_of_b"),
                     "combined_weight_pct": round(combined_w * 100, 1),
                 }
             )
+
+    active_ids = {p["etf_id"] for p in active}
+    individual_scores = [
+        {**s, "ticker": s["isin"], "weight_pct": round(sum(p["weight"] for p in active if p["etf_id"] == s["etf_id"]) / total_w * 100, 1)}
+        for s in all_scores if s["etf_id"] in active_ids
+    ]
+    if missing_scores or any(p["weight_overlap_pct"] is None for p in pairwise_overlaps):
+        return {"portfolio_score": None, "base_score": base, "overlap_penalty": None,
+                "allocation_bonus": None, "avg_overlap_pct": None, "portfolio_geo_div": None,
+                "status": "unavailable", "reason": "One or more ETF scores or pairwise overlaps are unavailable",
+                "pairwise_overlaps": pairwise_overlaps, "individual_scores": individual_scores}
 
     if pairwise_overlaps:
         total_cw = sum(ov["combined_weight_pct"] for ov in pairwise_overlaps)
@@ -355,36 +344,20 @@ def compute_portfolio_score(
     if country_vals:
         total_c = sum(country_vals)
         if total_c > 0:
-            norm_c = [v / total_c for v in country_vals]
+            # Same conservative treatment of unresolved classification as individual scores.
+            country_vals[country_vals.index(max(country_vals))] += max(0, 100 - total_c)
+            norm_c = [v / max(100, total_c) for v in country_vals]
             port_country_hhi = sum(x * x for x in norm_c) * 10_000
             portfolio_geo_div = round(1.0 - port_country_hhi / 10_000, 3)
             avg_ind_geo = sum(
-                (p["weight"] / total_w) * geo_map.get(p["etf_id"], 0.5) for p in active
+                (p["weight"] / total_w) * geo_map[p["etf_id"]] for p in active
             )
             allocation_bonus = max(0.0, portfolio_geo_div - avg_ind_geo)
 
     final_score = max(1.0, min(10.0, base - overlap_penalty + allocation_bonus))
 
-    # Build individual scores list
-    active_ids = {p["etf_id"] for p in active}
-    individual_scores = []
-    for s in all_scores:
-        if s["etf_id"] in active_ids:
-            p = next(p for p in active if p["etf_id"] == s["etf_id"])
-            individual_scores.append(
-                {
-                    "etf_id": s["etf_id"],
-                    "ticker": s["isin"],
-                    "name": s["name"],
-                    "goetf_score": s.get("goetf_score"),
-                    "weight_pct": round(p["weight"] / total_w * 100, 1),
-                    "geo_div": s.get("geo_div"),
-                    "sector_div": s.get("sector_div"),
-                    "ter_pct": s.get("ter_pct"),
-                }
-            )
-
     return {
+        "status": "available", "reason": None,
         "portfolio_score": round(final_score, 1),
         "base_score": round(base, 1),
         "overlap_penalty": round(overlap_penalty, 2),

@@ -2,7 +2,8 @@ from datetime import date, datetime
 from typing import List, Optional
 from decimal import Decimal
 from uuid import UUID
-from pydantic import BaseModel
+from pydantic import BaseModel, computed_field, field_validator
+from app.services.asset_classes import normalize_asset_class, equity_analytics_supported
 
 class ETFBase(BaseModel):
     isin: str  # Required - primary identifier
@@ -21,6 +22,18 @@ class ETFCreate(ETFBase):
 
 class ETFResponse(ETFBase):
     id: UUID
+    asset_class: str = "Unknown"
+
+    @field_validator("asset_class", mode="before")
+    @classmethod
+    def normalize_asset(cls, value):
+        return normalize_asset_class(value)
+
+    @computed_field
+    @property
+    def equity_analytics_supported(self) -> bool:
+        return equity_analytics_supported(self.asset_class)
+
     fund_size_usd: Optional[float] = None
     num_constituents: Optional[int] = None
     holdings_count: Optional[int] = None
@@ -37,6 +50,7 @@ class HoldingBase(BaseModel):
     weight: Decimal
     country: Optional[str] = None
     sector: Optional[str] = None
+    currency: Optional[str] = None
 
 class HoldingCreate(HoldingBase):
     etf_id: UUID

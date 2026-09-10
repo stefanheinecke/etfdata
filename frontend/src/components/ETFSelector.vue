@@ -22,6 +22,7 @@
             <li class="selector-option" :class="{ active, selected }">
               <span class="selector-isin">{{ etf.isin }}<span v-if="selected" aria-hidden="true"> ✓</span></span>
               <span class="selector-name">{{ etf.name }}</span>
+              <span class="selector-name">{{ etf.asset_class || 'Unknown' }}{{ etf.equity_analytics_supported ? '' : ' · Equity holdings analysis unavailable' }}</span>
             </li>
           </ComboboxOption>
           <li v-if="matches.length > visibleMatches.length" class="selector-message" role="presentation">

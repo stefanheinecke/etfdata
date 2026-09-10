@@ -59,6 +59,7 @@ def init_db():
         conn.execute(text("ALTER TABLE etfs ALTER COLUMN currency DROP NOT NULL"))
         conn.execute(text("ALTER TABLE performance ALTER COLUMN currency DROP NOT NULL"))
         conn.execute(text("ALTER TABLE holdings ALTER COLUMN instrument_isin TYPE VARCHAR(50)"))
+        conn.execute(text("ALTER TABLE holdings ADD COLUMN IF NOT EXISTS currency VARCHAR(3)"))
         # Drop ticker column — ISIN is now the primary identifier
         conn.execute(text("ALTER TABLE etfs DROP COLUMN IF EXISTS ticker"))
         # Update holdings schema: make instrument_isin nullable and update unique constraint

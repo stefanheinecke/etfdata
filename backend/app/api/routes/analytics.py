@@ -33,11 +33,13 @@ async def calculate_exposure(
     allocation_overlap = {}
     if len(etf_ids) >= 2:
         allocation_overlap = {
-            "sector": AnalyticsService.calculate_allocation_overlap(db, etf_ids, "sector"),
-            "country": AnalyticsService.calculate_allocation_overlap(db, etf_ids, "country"),
+            "sector": AnalyticsService.calculate_allocation_overlap(db, etf_ids, "sector", date),
+            "country": AnalyticsService.calculate_allocation_overlap(db, etf_ids, "country", date),
         }
 
-    return {**exposure, "risk_metrics": risk_metrics, **top_holdings, "allocation_overlap": allocation_overlap}
+    warnings = list(dict.fromkeys(exposure["analysis_warnings"] + top_holdings["analysis_warnings"]))
+    return {**exposure, "risk_metrics": risk_metrics, **top_holdings,
+            "allocation_overlap": allocation_overlap, "analysis_warnings": warnings}
 
 
 @router.post("/alternatives/{etf_id}")

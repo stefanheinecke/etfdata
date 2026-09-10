@@ -46,6 +46,7 @@ class Holding(Base):
     weight = Column(Numeric(8, 4), nullable=False)
     country = Column(String(2), index=True)
     sector = Column(String(100), index=True)
+    currency = Column(String(3), nullable=True)  # Provider-reported holding market currency.
     created_at = Column(DateTime, default=datetime.utcnow)
 
     etf = relationship("ETF", back_populates="holdings")

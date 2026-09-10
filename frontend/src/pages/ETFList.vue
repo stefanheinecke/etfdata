@@ -2,7 +2,7 @@
   <div class="page">
     <div class="page-header">
       <h1 class="page-title">ETF Explorer</h1>
-      <p class="page-subtitle">Select ETFs to explore their holdings, allocations and performance together in Portfolio Exposure.</p>
+      <p class="page-subtitle">Multi-asset ETF catalog with equity-focused holdings analytics. Select ETFs to compare in Portfolio Exposure.</p>
     </div>
     <div v-if="!hasApiKey" class="cta-banner">
       <div class="cta-text">
@@ -15,13 +15,20 @@
       <div class="filters">
         <div>
           <label class="label">Search</label>
-          <input class="input" v-model="search" placeholder="Ticker or name…" />
+          <input class="input" v-model="search" placeholder="ISIN or name…" />
         </div>
         <div>
           <label class="label">Provider</label>
           <select class="input" v-model="filterProvider">
             <option value="">All</option>
             <option v-for="p in filterOptions.providers" :key="p" :value="p">{{ p }}</option>
+          </select>
+        </div>
+        <div>
+          <label class="label" for="asset-class-filter">Asset class</label>
+          <select id="asset-class-filter" class="input" v-model="filterAssetClass">
+            <option value="">All asset classes</option>
+            <option v-for="asset in filterOptions.assetClasses" :key="asset" :value="asset">{{ asset }}</option>
           </select>
         </div>
         <div>
@@ -96,6 +103,8 @@
           <span class="etf-ter">TER {{ etf.ter != null ? etf.ter + '%' : '—' }}</span>
         </div>
         <h3 class="etf-name">{{ etf.name }}</h3>
+        <span class="badge">{{ etf.asset_class || 'Unknown' }}</span>
+        <p v-if="!etf.equity_analytics_supported" class="analytics-availability">Equity holdings analysis unavailable for this asset class.</p>
         <p class="etf-isin">{{ etf.isin || '' }}</p>
         <div class="etf-meta">
           <span v-if="etf.domicile">{{ etf.domicile }}</span><span v-if="etf.currency">{{ etf.currency }}</span>
@@ -144,6 +153,7 @@ window.addEventListener('storage', (e) => { if (e.key === 'api_key') apiKey.valu
 // Filters
 const search = ref('')
 const filterProvider = ref('')
+const filterAssetClass = ref('')
 const filterDomicile = ref('')
 const filterCurrency = ref('')
 const filterDividendPolicy = ref('')
@@ -161,6 +171,7 @@ const filterOptions = computed(() => {
   const uniq = (arr) => [...new Set(arr.filter(Boolean))].sort()
   return {
     providers:        uniq(allETFs.value.map(e => e.provider)),
+    assetClasses:     uniq(allETFs.value.map(e => e.asset_class || 'Unknown')),
     domiciles:        uniq(allETFs.value.map(e => e.domicile)),
     currencies:       uniq(allETFs.value.map(e => e.currency)),
     dividendPolicies: uniq(allETFs.value.map(e => e.dividend_policy)),
@@ -173,6 +184,7 @@ const filteredETFs = computed(() => {
   const q = search.value.trim().toLowerCase()
   if (q) list = list.filter(e => e.isin?.toLowerCase().includes(q) || e.name?.toLowerCase().includes(q))
   if (filterProvider.value)        list = list.filter(e => e.provider === filterProvider.value)
+  if (filterAssetClass.value)      list = list.filter(e => (e.asset_class || 'Unknown') === filterAssetClass.value)
   if (filterDomicile.value)        list = list.filter(e => e.domicile === filterDomicile.value)
   if (filterCurrency.value)        list = list.filter(e => e.currency === filterCurrency.value)
   if (filterDividendPolicy.value)  list = list.filter(e => e.dividend_policy === filterDividendPolicy.value)
@@ -206,13 +218,14 @@ const pageRangeLabel = computed(() => {
 })
 
 // Jump back to page 1 whenever the filtered/sorted set changes shape
-watch([search, filterProvider, filterDomicile, filterCurrency, filterDividendPolicy, sortKey, sortDir], () => {
+watch([search, filterProvider, filterAssetClass, filterDomicile, filterCurrency, filterDividendPolicy, sortKey, sortDir], () => {
   currentPage.value = 1
 })
 
 function resetFilters() {
   search.value = ''
   filterProvider.value = ''
+  filterAssetClass.value = ''
   filterDomicile.value = ''
   filterCurrency.value = ''
   filterDividendPolicy.value = ''
@@ -273,6 +286,7 @@ onMounted(loadETFs)
 .etf-ticker{font-size:1rem;font-weight:700;color:#0f4c81}
 .etf-ter{font-size:.75rem;color:var(--text-muted);font-weight:500}
 .etf-name{font-size:.95rem;font-weight:600;color:var(--text);margin-bottom:.25rem;line-height:1.3}
+.analytics-availability{font-size:.75rem;color:var(--text-muted);margin:.4rem 0}
 .etf-isin{font-size:.75rem;color:var(--text-muted);font-family:monospace;margin-bottom:.75rem}
 .etf-meta{display:flex;gap:.75rem;font-size:.8rem;color:var(--text-muted);flex-wrap:wrap}
 .etf-constituents{display:flex;justify-content:space-between;align-items:center;margin-top:.85rem;padding-top:.65rem;border-top:1px solid var(--border);font-size:.8rem;color:var(--text-muted)}
