@@ -16,10 +16,7 @@
         <h2 class="card-title">Portfolio Exposure</h2>
         <p style="font-size:.875rem;color:var(--text-muted);margin-bottom:1rem">Select one ETF for a complete ETF view, or combine several ETFs to analyse the portfolio as a whole.</p>
         <div v-for="(item,i) in portfolio" :key="i" style="display:flex;gap:.5rem;margin-bottom:.5rem;align-items:center">
-          <select class="input" v-model="item.etf_id" style="flex:2" :aria-label="'Portfolio ETF ' + (i + 1)">
-            <option value="">Select ETF...</option>
-            <option v-for="e in allEtfs" :key="e.id" :value="e.id">{{ e.isin }} - {{ e.name }}</option>
-          </select>
+          <ETFSelector v-model="item.etf_id" :etfs="allEtfs" :label="'Portfolio ETF ' + (i + 1)" style="flex:2" />
           <input class="input" type="number" v-model.number="item.weight" placeholder="Weight %" style="flex:1;max-width:120px" min="0" max="100" step="0.01" :aria-label="'Portfolio weight ' + (i + 1)" />
           <button class="btn btn-outline" @click="portfolio.splice(i,1);pairSuggestions=null" style="flex-shrink:0">✕</button>
         </div>
@@ -229,6 +226,7 @@
 
 <script setup>
 import { ref, computed, onMounted, inject } from 'vue'
+import ETFSelector from '../components/ETFSelector.vue'
 import { Doughnut } from 'vue-chartjs'
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js'
 import { etfService, analyticsService, scoreService } from '../services/api.js'
