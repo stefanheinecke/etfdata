@@ -16,11 +16,11 @@
         <h2 class="card-title">Portfolio Exposure</h2>
         <p style="font-size:.875rem;color:var(--text-muted);margin-bottom:1rem">Select one ETF for a complete ETF view, or combine several ETFs to analyse the portfolio as a whole.</p>
         <div v-for="(item,i) in portfolio" :key="i" style="display:flex;gap:.5rem;margin-bottom:.5rem;align-items:center">
-          <select class="input" v-model="item.etf_id" style="flex:2">
+          <select class="input" v-model="item.etf_id" style="flex:2" :aria-label="'Portfolio ETF ' + (i + 1)">
             <option value="">Select ETF...</option>
             <option v-for="e in allEtfs" :key="e.id" :value="e.id">{{ e.isin }} - {{ e.name }}</option>
           </select>
-          <input class="input" type="number" v-model.number="item.weight" placeholder="Weight %" style="flex:1;max-width:120px" min="0" max="100" />
+          <input class="input" type="number" v-model.number="item.weight" placeholder="Weight %" style="flex:1;max-width:120px" min="0" max="100" step="0.01" :aria-label="'Portfolio weight ' + (i + 1)" />
           <button class="btn btn-outline" @click="portfolio.splice(i,1);pairSuggestions=null" style="flex-shrink:0">✕</button>
         </div>
         <div style="display:flex;gap:.75rem;margin-top:.75rem;align-items:center;flex-wrap:wrap">
@@ -376,7 +376,7 @@ function individualScore(etfId) {
 
 async function loadETFs() {
   etfsLoading.value=true
-  try { const r=await etfService.getETFs(0,50); allEtfs.value=r.data } catch(e){console.error(e)} finally{etfsLoading.value=false}
+  try { const r=await etfService.getETFs(0,5000); allEtfs.value=r.data } catch(e){exposureError.value=e.response?.data?.detail||e.message} finally{etfsLoading.value=false}
 }
 async function runExposure() {
   exposureLoading.value=true; exposureError.value=''; exposureResult.value=null; topHoldings.value=null; portfolioRiskResult.value=null; portfolioScoreResult.value=null; pairSuggestions.value=null; openPairs.value=new Set()
@@ -423,9 +423,10 @@ const fmtDiversity = v => v == null ? '—' : `${(v * 100).toFixed(1)}%`
 onMounted(() => {
   loadETFs()
   if (portfolioInit.value) {
-    portfolio.value = [{ ...portfolioInit.value }]
+    const isSelection = Array.isArray(portfolioInit.value)
+    portfolio.value = (isSelection ? portfolioInit.value : [portfolioInit.value]).map(item => ({ ...item }))
     portfolioInit.value = null
-    runExposure()
+    if (!isSelection) runExposure()
   }
   analyticsInitTab.value = null
 })

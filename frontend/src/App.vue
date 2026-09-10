@@ -196,6 +196,17 @@ provide('navigateToETF', (etf) => {
 })
 const analyticsInitTab = ref(null)
 provide('analyticsInitTab', analyticsInitTab)
+provide('navigateToPortfolio', (etfs) => {
+  const ids = [...new Set(etfs.map(etf => etf.id).filter(Boolean))]
+  if (!ids.length) return
+  const base = Math.floor(10000 / ids.length)
+  const remainder = 10000 % ids.length
+  portfolioInit.value = ids.map((id, index) => ({
+    etf_id: id,
+    weight: (base + (index < remainder ? 1 : 0)) / 100,
+  }))
+  goToPage('analytics', 'exposure')
+})
 provide('navigateTo', (page, tab) => { goToPage(page, tab) })
 
 function goToPage(page, tab = null) {

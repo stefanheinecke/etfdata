@@ -2,7 +2,7 @@
   <div class="page">
     <div class="page-header">
       <h1 class="page-title">ETF Explorer</h1>
-      <p class="page-subtitle">Browse all tracked ETFs, inspect holdings, allocations and performance data.</p>
+      <p class="page-subtitle">Select ETFs to explore their holdings, allocations and performance together in Portfolio Exposure.</p>
     </div>
     <div v-if="!hasApiKey" class="cta-banner">
       <div class="cta-text">
@@ -76,9 +76,20 @@
       </div>
     </div>
     <div v-if="error" class="error-box" style="margin-bottom:1.5rem">{{ error }}</div>
+    <div v-if="selectedETFs.length" class="selection-bar">
+      <span role="status">{{ selectedETFs.length }} ETF{{ selectedETFs.length === 1 ? '' : 's' }} selected</span>
+      <div class="selection-actions">
+        <button class="btn btn-outline" @click="selectedIds = []">Clear selection</button>
+        <button class="btn btn-primary" @click="useForPortfolio" :disabled="loading">Use for Portfolio Exposure</button>
+      </div>
+    </div>
     <div v-if="loading" class="loading"><div class="spinner"></div> Loading ETFs...</div>
     <div v-else-if="filteredETFs.length" class="etf-grid">
-      <div v-for="etf in paginatedETFs" :key="etf.id" class="etf-card" @click="openETF(etf)">
+      <div v-for="etf in paginatedETFs" :key="etf.id" class="etf-card" :class="{ 'is-selected': selectedIds.includes(etf.id) }" @click="toggleETF(etf.id)">
+        <label class="etf-selection" @click.stop>
+          <input type="checkbox" v-model="selectedIds" :value="etf.id" :aria-label="'Select ' + etf.isin + ' — ' + etf.name" />
+          {{ selectedIds.includes(etf.id) ? 'Selected' : 'Select for portfolio' }}
+        </label>
         <div class="etf-card-top">
           <div><span class="etf-ticker">{{ etf.isin }}</span><span v-if="etf.provider" class="badge" style="margin-left:.5rem">{{ etf.provider }}</span></div>
           <span class="etf-ter">TER {{ etf.ter != null ? etf.ter + '%' : '—' }}</span>
@@ -116,11 +127,13 @@
 import { ref, computed, watch, onMounted, inject } from 'vue'
 
 const showApiKeyModal = inject('showApiKeyModal')
-const navigateToETF = inject('navigateToETF')
+const navigateToPortfolio = inject('navigateToPortfolio')
 const hasApiKey = inject('hasApiKey', ref(!!localStorage.getItem('api_key')))
 import { etfService } from '../services/api.js'
 
 const allETFs = ref([])
+const selectedIds = ref([])
+const selectedETFs = computed(() => allETFs.value.filter(etf => selectedIds.value.includes(etf.id)))
 const loading = ref(false)
 const error = ref('')
 const apiKey = ref(localStorage.getItem('api_key') || '')
@@ -216,6 +229,8 @@ async function loadETFs() {
   try {
     const r = await etfService.getETFs(0, 5000)
     allETFs.value = r.data
+    const availableIds = new Set(allETFs.value.map(etf => etf.id))
+    selectedIds.value = selectedIds.value.filter(id => availableIds.has(id))
     currentPage.value = 1
   } catch(e) {
     error.value = e.response?.data?.detail || e.message
@@ -224,8 +239,14 @@ async function loadETFs() {
   }
 }
 
-function openETF(etf) {
-  navigateToETF(etf)
+function toggleETF(id) {
+  selectedIds.value = selectedIds.value.includes(id)
+    ? selectedIds.value.filter(selectedId => selectedId !== id)
+    : [...selectedIds.value, id]
+}
+
+function useForPortfolio() {
+  if (selectedETFs.value.length) navigateToPortfolio(selectedETFs.value)
 }
 
 onMounted(loadETFs)
@@ -238,6 +259,13 @@ onMounted(loadETFs)
 .etf-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1rem}
 .etf-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1.25rem;cursor:pointer;transition:all .2s;box-shadow:var(--shadow)}
 .etf-card:hover{border-color:#1a6ab8;box-shadow:var(--shadow-md);transform:translateY(-2px)}
+.etf-card.is-selected{border-color:#0f4c81;box-shadow:0 0 0 2px rgba(15,76,129,.2)}
+.etf-card:focus-within{outline:2px solid #1a6ab8;outline-offset:3px}
+.etf-selection{display:flex;align-items:center;gap:.5rem;margin-bottom:.85rem;font-size:.8rem;color:var(--text-muted);cursor:pointer;width:fit-content}
+.etf-selection input{width:17px;height:17px;accent-color:#0f4c81;cursor:pointer}
+.selection-bar{display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;margin-bottom:1rem;padding:1rem 1.25rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius)}
+.selection-bar>span{font-weight:600;color:var(--text)}
+.selection-actions{display:flex;gap:.5rem;flex-wrap:wrap}
 .etf-card-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem}
 .etf-ticker{font-size:1rem;font-weight:700;color:#0f4c81}
 .etf-ter{font-size:.75rem;color:var(--text-muted);font-weight:500}
