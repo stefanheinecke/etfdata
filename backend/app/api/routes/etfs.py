@@ -6,7 +6,7 @@ from sqlalchemy import func
 
 from app.db.database import get_db
 from app.core.auth import verify_api_key
-from app.schemas import ETF, APIKey
+from app.schemas import ETF, APIKey, Holding
 from app.models import ETFCreate, ETFResponse
 from app.api.utils import resolve_etf
 from app.services.fx_service import get_latest_rates_map, get_latest_rate
@@ -26,10 +26,24 @@ async def list_etfs(
         query = query.filter(ETF.provider == provider)
     etfs = query.order_by(ETF.isin).offset(skip).limit(limit).all()
 
+    holdings_counts = {}
+    if etfs:
+        latest = (
+            db.query(Holding.etf_id, func.max(Holding.date).label("date"))
+            .filter(Holding.etf_id.in_([e.id for e in etfs]))
+            .group_by(Holding.etf_id).subquery()
+        )
+        holdings_counts = dict(
+            db.query(Holding.etf_id, func.count(Holding.id))
+            .join(latest, (Holding.etf_id == latest.c.etf_id) & (Holding.date == latest.c.date))
+            .group_by(Holding.etf_id).all()
+        )
+
     rates = get_latest_rates_map(db, {e.currency for e in etfs if e.currency})
     results = []
     for e in etfs:
         resp = ETFResponse.model_validate(e)
+        resp.holdings_count = holdings_counts.get(e.id)
         rate = rates.get((e.currency or "").strip().upper()[:3])
         resp.fund_size_usd = round(e.fund_size * rate) if (e.fund_size and rate) else None
         results.append(resp)

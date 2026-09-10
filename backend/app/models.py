@@ -22,6 +22,8 @@ class ETFCreate(ETFBase):
 class ETFResponse(ETFBase):
     id: UUID
     fund_size_usd: Optional[float] = None
+    num_constituents: Optional[int] = None
+    holdings_count: Optional[int] = None
     created_at: datetime
     updated_at: datetime
 

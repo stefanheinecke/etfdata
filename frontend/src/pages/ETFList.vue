@@ -91,6 +91,12 @@
           <span v-if="etf.fund_size_usd" title="Fund size in USD" style="color:var(--text-muted)">(≈ {{ formatSize(etf.fund_size_usd) }} USD)</span>
           <span v-if="etf.dividend_policy" :class="etf.dividend_policy === 'Accumulating' ? 'badge-acc' : 'badge-dist'">{{ etf.dividend_policy === 'Accumulating' ? 'Acc' : 'Dist' }}</span>
         </div>
+        <div class="etf-constituents" :title="etf.holdings_count != null
+          ? 'Holdings in the latest imported snapshot; partial imports may not cover the full portfolio.'
+          : etf.num_constituents != null ? 'Constituent count reported in provider metadata.' : 'Constituent count not available.'">
+          <span>Constituents</span>
+          <strong>{{ (etf.holdings_count ?? etf.num_constituents)?.toLocaleString() ?? '—' }}</strong>
+        </div>
         <div v-if="etf.replication_method" class="etf-replication">{{ etf.replication_method }}</div>
       </div>
     </div>
@@ -238,6 +244,8 @@ onMounted(loadETFs)
 .etf-name{font-size:.95rem;font-weight:600;color:var(--text);margin-bottom:.25rem;line-height:1.3}
 .etf-isin{font-size:.75rem;color:var(--text-muted);font-family:monospace;margin-bottom:.75rem}
 .etf-meta{display:flex;gap:.75rem;font-size:.8rem;color:var(--text-muted);flex-wrap:wrap}
+.etf-constituents{display:flex;justify-content:space-between;align-items:center;margin-top:.85rem;padding-top:.65rem;border-top:1px solid var(--border);font-size:.8rem;color:var(--text-muted)}
+.etf-constituents strong{color:var(--text);font-variant-numeric:tabular-nums}
 .etf-replication{margin-top:.5rem;font-size:.75rem;color:var(--text-muted)}
 .pagination{display:flex;align-items:center;justify-content:center;gap:1rem;margin-top:1.5rem;font-size:.85rem;color:var(--text-muted)}
 .badge-acc{background:rgba(0,201,167,.12);color:#009f86;border-radius:4px;padding:1px 6px;font-size:.7rem;font-weight:600}
