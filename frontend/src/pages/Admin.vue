@@ -213,7 +213,7 @@
         :disabled="!adminVerified || !holdingsIsin.trim() || (holdingsProvider === 'ubs' && !holdingsUbsFile) || holdingsLoading">
         {{ holdingsLoading ? 'Importing…' : 'Retrieve & Import Holdings' }}
       </button>
-      <div v-if="holdingsError" class="error-box" style="margin-top:.75rem">{{ holdingsError }}</div>
+      <div v-if="holdingsImportError" class="error-box" style="margin-top:.75rem">{{ holdingsImportError }}</div>
       <div v-if="holdingsResult" class="success-msg" style="margin-top:.75rem">
         ✓ Imported {{ holdingsResult.imported }} holdings for {{ holdingsResult.isin }}
         as of {{ holdingsResult.as_of }} (replaced {{ holdingsResult.replaced }}).
@@ -947,11 +947,11 @@ const holdingsProvider = ref('ishares')
 const holdingsUbsFile = ref(null)
 const holdingsAsOf = ref('')
 const holdingsLoading = ref(false)
-const holdingsError = ref('')
+const holdingsImportError = ref('')
 const holdingsResult = ref(null)
 
 async function importHoldings() {
-  holdingsLoading.value = true; holdingsError.value = ''; holdingsResult.value = null
+  holdingsLoading.value = true; holdingsImportError.value = ''; holdingsResult.value = null
   try {
     const r = await adminService.importHoldings(
       adminSecret.value,
@@ -963,7 +963,7 @@ async function importHoldings() {
     holdingsResult.value = r.data
   } catch (e) {
     const detail = e.response?.data?.detail
-    holdingsError.value = Array.isArray(detail) ? detail.map(d => d.msg || JSON.stringify(d)).join('; ') : (detail || e.message)
+    holdingsImportError.value = Array.isArray(detail) ? detail.map(d => d.msg || JSON.stringify(d)).join('; ') : (detail || e.message)
   } finally {
     holdingsLoading.value = false
   }
