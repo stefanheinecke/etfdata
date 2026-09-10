@@ -51,7 +51,7 @@ class Holding(Base):
     etf = relationship("ETF", back_populates="holdings")
 
     __table_args__ = (
-        UniqueConstraint("etf_id", "date", "instrument_name", name="idx_holdings_unique"),
+        UniqueConstraint("etf_id", "date", "instrument_isin", name="idx_holdings_unique_isin"),
         Index("idx_holdings_etf_date", "etf_id", "date"),
         Index("idx_holdings_isin", "instrument_isin"),  # For optional ISIN lookups
     )

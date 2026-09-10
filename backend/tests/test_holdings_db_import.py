@@ -38,12 +38,30 @@ class HoldingsImportTests(unittest.TestCase):
         rows.append(deepcopy(rows[0]))
         self.assertEqual(prepare_holdings(ISIN, rows)[1][0]["weight"], Decimal("80"))
 
-    def test_reject_ambiguous_names(self):
+    def test_same_name_different_isins_are_separate(self):
         rows = basket()
+        rows[0]["name"] = "EQT"
         rows[0]["reported_weight"] = 0.4
         rows.append({**rows[0], "isin": "US5949181045"})
-        with self.assertRaisesRegex(ValueError, "Different securities"):
-            prepare_holdings(ISIN, rows)
+        prepared = prepare_holdings(ISIN, rows)[1]
+        self.assertEqual(len(prepared), 2)
+        self.assertEqual([row["instrument_name"] for row in prepared], ["EQT", "EQT"])
+        self.assertEqual({row["instrument_isin"] for row in prepared}, {"US0378331005", "US5949181045"})
+
+    def test_same_isin_different_names_are_combined(self):
+        rows = basket()
+        rows[0]["reported_weight"] = 0.4
+        rows.append({**rows[0], "name": "APPLE", "isin": " us0378331005 "})
+        prepared = prepare_holdings(ISIN, rows)[1]
+        self.assertEqual(len(prepared), 1)
+        self.assertEqual(prepared[0]["weight"], Decimal("80"))
+        self.assertEqual(prepared[0]["instrument_isin"], "US0378331005")
+
+    def test_same_name_missing_isins_are_not_combined(self):
+        row = {**basket()[0], "isin": None, "reported_weight": 0.4}
+        prepared = prepare_holdings(ISIN, [row, deepcopy(row)])[1]
+        self.assertEqual(len(prepared), 2)
+        self.assertTrue(all(item["instrument_isin"] is None for item in prepared))
 
     def test_reject_empty_and_wrong_identity(self):
         for rows in ([], [{**basket()[0], "etf_isin": "IE00B5BMR087"}]):

@@ -10,7 +10,7 @@ def prepare_holdings(etf_isin: str, holdings: list[dict]) -> tuple[date, list[di
         raise ValueError("Cannot import an empty holdings basket")
     dates = set()
     records = {}
-    for holding in holdings:
+    for index, holding in enumerate(holdings):
         if holding.get("etf_isin") != etf_isin:
             raise ValueError("Holding belongs to a different ETF")
         if holding.get("estimate_type") != "provider_reported_equity_basket":
@@ -23,6 +23,8 @@ def prepare_holdings(etf_isin: str, holdings: list[dict]) -> tuple[date, list[di
         if not name or len(name) > 255:
             raise ValueError("Holding name must contain 1–255 characters")
         isin = holding.get("isin")
+        if isinstance(isin, str):
+            isin = isin.strip().upper() or None
         if isin is not None and (not isinstance(isin, str) or len(isin) != 12):
             raise ValueError("Invalid constituent ISIN; use the provider's ISIN validation first")
         raw_weight = holding.get("reported_weight")
@@ -31,13 +33,12 @@ def prepare_holdings(etf_isin: str, holdings: list[dict]) -> tuple[date, list[di
         weight = Decimal(str(raw_weight)) * 100
         if not weight.is_finite() or not 0 <= weight <= 105:
             raise ValueError("Published NAV weight must be finite and between 0% and 105%")
-        if name in records:
-            # The existing unique constraint uses instrument_name, not ISIN/exchange.
-            if not isin or records[name]["instrument_isin"] != isin:
-                raise ValueError(f"Different securities share the name {name!r}; database names must be unique per date")
-            records[name]["weight"] += weight
+        # Unknown ISINs cannot safely identify the same security, even by name.
+        key = ("isin", isin) if isin else ("unresolved", index)
+        if key in records:
+            records[key]["weight"] += weight
         else:
-            records[name] = {"instrument_isin": isin, "instrument_name": name, "weight": weight}
+            records[key] = {"instrument_isin": isin, "instrument_name": name, "weight": weight}
     if len(dates) != 1:
         raise ValueError("All imported holdings must have the same valuation date")
     total = sum(row["weight"] for row in records.values())

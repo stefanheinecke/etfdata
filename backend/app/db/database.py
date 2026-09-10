@@ -75,34 +75,9 @@ def init_db():
             END $$;
         """))
         
-        # Drop old unique constraint if it exists (safer with exception handling)
-        try:
-            conn.execute(text("ALTER TABLE holdings DROP CONSTRAINT IF EXISTS idx_holdings_unique CASCADE"))
-        except Exception:
-            pass  # Constraint may not exist or may have different name
-        
-        # Add new unique constraint on (etf_id, date, instrument_name) if holdings table exists
-        # First check if we need to drop duplicates
-        try:
-            conn.execute(text("""
-                -- Delete duplicate holdings keeping only the latest (by created_at)
-                DELETE FROM holdings h1
-                WHERE EXISTS (
-                    SELECT 1 FROM holdings h2
-                    WHERE h1.etf_id = h2.etf_id
-                    AND h1.date = h2.date
-                    AND h1.instrument_name = h2.instrument_name
-                    AND h1.id != h2.id
-                    AND h1.created_at < h2.created_at
-                )
-            """))
-            # Now add the constraint
-            conn.execute(text("""
-                ALTER TABLE holdings ADD CONSTRAINT idx_holdings_unique 
-                UNIQUE (etf_id, date, instrument_name)
-            """))
-        except Exception:
-            pass  # Constraint may already exist, duplicates may prevent creation
+        from pathlib import Path
+        migration = Path(__file__).with_name("holdings_isin_unique.sql").read_text(encoding="utf-8")
+        conn.execute(text(migration))
         
         # Add index on instrument_isin for optional lookups
         conn.execute(text("""

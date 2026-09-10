@@ -41,13 +41,16 @@ for equity coverage below 80%. Cash and derivatives are excluded.
 - Leaves other dates, ETF metadata, performance and allocations unchanged.
   This is a holdings-only import, not an allocation refresh. The script does not
   supply country/sector classifications; new rows leave those fields null.
-- The database requires names to be unique per ETF/date. Multiple listings of
-  the same named ISIN are combined; conflicting securities with the same name fail.
+- The database requires security ISINs to be unique per ETF/date. Multiple listings
+  of the same ISIN are combined, even if names differ. Different ISINs may share a
+  name. Unresolved ISINs remain separate null-valued rows rather than being guessed.
 - Rejects reconstruction/demo mode for database imports.
 
 Without `--import-db`, existing JSON export behavior is unchanged. Diagnostic
 JSON files are still written; `--stdout` still optionally prints the basket.
-No new API endpoint, UI, database migration, or provider dependency is required.
+The backend migrates existing name-based uniqueness to ISIN-based uniqueness on
+startup, combining existing same-ISIN rows by summing weights. Redeploy the backend
+before importing against an existing database with the old constraint.
 
 ## Extending providers
 
