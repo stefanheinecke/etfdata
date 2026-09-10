@@ -4,6 +4,9 @@ Eine moderne REST-API für strukturierte ETF-Datenanalyse, entwickelt mit FastAP
 
 ## Features
 
+**Provider holdings import:** The existing iShares/UBS script can write directly
+to PostgreSQL with `--import-db`. See [usage and prerequisites](astra/README.md).
+
 ✅ **ETF Master Data Management** - Verwaltung von ETF-Stammdaten (ISIN, Ticker, Provider, etc.)  
 ✅ **Holdings & Allocations** - Detaillierte Informationen über ETF-Bestände und Allokationen  
 ✅ **Overlap Analysis** - Vergleich von Holdings zwischen mehreren ETFs  

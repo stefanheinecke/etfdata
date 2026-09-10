@@ -1,0 +1,42 @@
+{
+  "etf_isin": "IE00B5BMR087",
+  "provider": "ishares",
+  "source": "https://www.blackrock.com/varnish-api/uk-retail01-product-data/product-data/api/v2/get-product-data?appType=PRODUCT_PAGE&appSubType=ISHARES&component=holdings.all&locale=en_GB&portfolioId=253743&targetSite=ishares-uk&userType=individual&excludeContent=true&asOfDate=20260908&includeConfig=true",
+  "as_of": "2026-09-08",
+  "source_binding": "ETF ISIN verified on issuer product page",
+  "input_rows": 510,
+  "equity_rows": 504,
+  "reported_equity_weight": 0.9975017,
+  "normalized_equity_weight": 1.0,
+  "missing_isins": [],
+  "excluded_positions": [
+    {
+      "name": "USD CASH",
+      "reason": "non-equity position"
+    },
+    {
+      "name": "CASH COLLATERAL USD MLIFT",
+      "reason": "non-equity position"
+    },
+    {
+      "name": "GBP CASH",
+      "reason": "non-equity position"
+    },
+    {
+      "name": "MXN CASH",
+      "reason": "non-equity position"
+    },
+    {
+      "name": "EUR CASH",
+      "reason": "non-equity position"
+    },
+    {
+      "name": "S&P500 EMINI SEP 26",
+      "reason": "non-equity position"
+    }
+  ],
+  "limitations": [
+    "Provider-reported equities are not verified index constituents.",
+    "Cash and derivatives excluded; weights normalized within equity basket."
+  ]
+}

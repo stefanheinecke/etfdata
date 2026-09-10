@@ -1,0 +1,102 @@
+{
+  "etf_isin": "IE00B4L5Y983",
+  "provider": "ishares",
+  "source": "https://www.blackrock.com/varnish-api/uk-retail01-product-data/product-data/api/v2/get-product-data?appType=PRODUCT_PAGE&appSubType=ISHARES&component=holdings.all&locale=en_GB&portfolioId=251882&targetSite=ishares-uk&userType=individual&excludeContent=true&asOfDate=20260908&includeConfig=true",
+  "as_of": "2026-09-08",
+  "source_binding": "ETF ISIN verified on issuer product page",
+  "input_rows": 1272,
+  "equity_rows": 1251,
+  "reported_equity_weight": 0.9971982,
+  "normalized_equity_weight": 1.0,
+  "missing_isins": [],
+  "excluded_positions": [
+    {
+      "name": "USD CASH",
+      "reason": "non-equity position"
+    },
+    {
+      "name": "GBP CASH",
+      "reason": "non-equity position"
+    },
+    {
+      "name": "EUR CASH",
+      "reason": "non-equity position"
+    },
+    {
+      "name": "AUD CASH",
+      "reason": "non-equity position"
+    },
+    {
+      "name": "CASH COLLATERAL USD BZFUT",
+      "reason": "non-equity position"
+    },
+    {
+      "name": "JPY CASH",
+      "reason": "non-equity position"
+    },
+    {
+      "name": "SGD CASH",
+      "reason": "non-equity position"
+    },
+    {
+      "name": "CAD CASH",
+      "reason": "non-equity position"
+    },
+    {
+      "name": "DKK CASH",
+      "reason": "non-equity position"
+    },
+    {
+      "name": "HKD CASH",
+      "reason": "non-equity position"
+    },
+    {
+      "name": "CHF CASH",
+      "reason": "non-equity position"
+    },
+    {
+      "name": "NOK CASH",
+      "reason": "non-equity position"
+    },
+    {
+      "name": "NZD CASH",
+      "reason": "non-equity position"
+    },
+    {
+      "name": "SEK CASH",
+      "reason": "non-equity position"
+    },
+    {
+      "name": "ILS CASH",
+      "reason": "non-equity position"
+    },
+    {
+      "name": "ETD JPY BALANCE WITH 06738C",
+      "reason": "non-equity position"
+    },
+    {
+      "name": "TOPIX INDEX DEC 26",
+      "reason": "non-equity position"
+    },
+    {
+      "name": "EURO STOXX 50 SEP 26",
+      "reason": "non-equity position"
+    },
+    {
+      "name": "FTSE 100 INDEX SEP 26",
+      "reason": "non-equity position"
+    },
+    {
+      "name": "S&P500 EMINI SEP 26",
+      "reason": "non-equity position"
+    },
+    {
+      "name": "SGD/USD",
+      "reason": "non-equity position"
+    }
+  ],
+  "limitations": [
+    "Provider-reported equities are not verified index constituents.",
+    "Cash and derivatives excluded; weights normalized within equity basket."
+  ]
+}
