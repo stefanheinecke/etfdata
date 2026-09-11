@@ -35,7 +35,7 @@
           <div v-if="group.total > 0" class="portfolio-donut-chart"><Doughnut :data="portfolioDonutData(group)" :options="portfolioDonutOptions" /></div>
           <div v-else class="donut-unavailable" role="status"><div class="empty-donut" aria-hidden="true"></div><span>Data unavailable</span><small>No supported {{ group.key }} allocation data for this selection.</small></div>
           <div v-if="group.total > 0" class="portfolio-donut-legend">
-            <div v-for="entry in group.entries" :key="entry.name"><span><i :style="{ background: entry.color }"></i>{{ entry.name }}</span><strong>{{ entry.value.toFixed(1) }}%</strong></div>
+            <div v-for="entry in group.entries" :key="entry.name" :title="entry.name"><span><i :style="{ background: entry.color }"></i>{{ entry.name }}</span><strong>{{ entry.value.toFixed(1) }}%</strong></div>
           </div>
         </div>
       </div>
@@ -44,7 +44,7 @@
         <h3 class="card-title" style="margin-bottom:.25rem">{{ section.title }}</h3>
         <p class="overlap-caption">{{ section.description }}</p>
         <div v-if="section.loading" style="padding:.75rem 0;font-size:.85rem;color:var(--text-muted)">{{ section.loadingLabel }}</div>
-        <div v-for="pair in section.pairs" :key="pair.key" class="overlap-pair">
+        <div v-for="pair in visiblePairs(section)" :key="pair.key" class="overlap-pair">
           <button class="pair-heading" type="button" :aria-expanded="isPairOpen(pair.key)" @click="togglePair(pair.key)">
             <span class="pair-chevron" :class="{ open: isPairOpen(pair.key) }">▶</span>
             <span class="pair-etf">{{ etfLabel(pair.etf_a_isin) }}</span>
@@ -81,6 +81,9 @@
             </div>
           </div>
         </div>
+        <button v-if="section.pairs.length > DEFAULT_VISIBLE_PAIRS" class="btn btn-outline" type="button" style="margin-top:.25rem" @click="toggleSectionExpanded(section.key)">
+          {{ isSectionExpanded(section.key) ? 'Show fewer pairs' : `Show all ${section.pairs.length} pairs (sorted by overlap)` }}
+        </button>
       </section>
       <div v-if="exposureError" class="error-box" style="margin-bottom:1rem">{{ exposureError }}</div>
       <!-- Top 10 Holdings -->
@@ -248,6 +251,19 @@ function togglePair(key) {
   next.has(key) ? next.delete(key) : next.add(key)
   openPairs.value = next
 }
+// Pairs are pre-sorted highest-overlap first; only show a handful by default
+// since C(n,2) pairs get large fast with many ETFs.
+const DEFAULT_VISIBLE_PAIRS = 5
+const expandedSections = ref(new Set())
+function isSectionExpanded(key) { return expandedSections.value.has(key) }
+function toggleSectionExpanded(key) {
+  const next = new Set(expandedSections.value)
+  next.has(key) ? next.delete(key) : next.add(key)
+  expandedSections.value = next
+}
+function visiblePairs(section) {
+  return isSectionExpanded(section.key) ? section.pairs : section.pairs.slice(0, DEFAULT_VISIBLE_PAIRS)
+}
 function etfLabel(isin) {
   const etf = allEtfs.value.find(item => item.isin === isin)
   return etf ? `${etf.name} (${etf.isin})` : (isin || 'Unknown ETF')
@@ -387,7 +403,7 @@ async function loadETFs() {
 }
 async function runExposure() {
   const run = ++analysisRun
-  exposureLoading.value=true; exposureError.value=''; exposureResult.value=null; topHoldings.value=null; portfolioRiskResult.value=null; pairSuggestions.value=null; openPairs.value=new Set()
+  exposureLoading.value=true; exposureError.value=''; exposureResult.value=null; topHoldings.value=null; portfolioRiskResult.value=null; pairSuggestions.value=null; openPairs.value=new Set(); expandedSections.value=new Set()
   pairSuggestionsError.value=''
   const p=portfolio.value.filter(x=>x.etf_id && x.weight > 0).map(x=>({...x}))
   try {
@@ -469,7 +485,7 @@ onMounted(() => {
 .overlap-section{margin-bottom:1.5rem}
 .overlap-pair{border:1px solid var(--border);border-radius:8px;padding:.875rem 1rem;margin-bottom:.75rem}
 .table-wrap{overflow-x:auto}
-.portfolio-donut-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1rem;margin-top:1.5rem}
+.portfolio-donut-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1rem;margin-top:1.5rem}
 .portfolio-donut-card{padding:1rem;min-width:0}
 .portfolio-donut-head{display:flex;justify-content:space-between;gap:1rem;align-items:baseline}
 .portfolio-donut-head .card-title{margin:0}
@@ -477,7 +493,7 @@ onMounted(() => {
 .portfolio-donut-chart{height:220px;margin:.5rem 0 .75rem}
 .donut-unavailable{height:250px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.65rem;text-align:center;color:var(--text-muted);font-size:.85rem}
 .empty-donut{width:145px;height:145px;border:25px solid var(--border);border-radius:50%;box-sizing:border-box}
-.portfolio-donut-legend{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.35rem .75rem}
+.portfolio-donut-legend{display:flex;flex-direction:column;gap:.3rem}
 .portfolio-donut-legend div{display:flex;align-items:center;justify-content:space-between;gap:.5rem;min-width:0;font-size:.75rem;color:var(--text-muted)}
 .portfolio-donut-legend span{display:flex;align-items:center;gap:.35rem;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .portfolio-donut-legend i{width:8px;height:8px;border-radius:50%;flex-shrink:0}
@@ -495,11 +511,7 @@ onMounted(() => {
 .alloc-pct{width:45px;text-align:right;font-size:.8rem;font-weight:600;color:var(--text)}
 .meth-link{background:none;border:none;padding:0;cursor:pointer;font-size:.76rem;color:#0f4c81;text-decoration:underline;margin-top:.2rem;display:inline-block}
 .meth-link:hover{color:#1a6ab8}
-@media (max-width:900px){
-  .portfolio-donut-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
-}
 @media (max-width:640px){
-  .portfolio-donut-grid{grid-template-columns:1fr}
   .portfolio-donut-chart{height:240px}
 }
 </style>

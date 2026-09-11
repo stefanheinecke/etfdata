@@ -382,6 +382,7 @@ class AnalyticsService:
                     "weight_overlap": round(weight_overlap, 2) if status["status"] == "available" else None,
                     "buckets": top_buckets if status["status"] == "available" else [],
                 })
+        pairs.sort(key=lambda p: (p["weight_overlap"] is None, -(p["weight_overlap"] or 0)))
         return pairs
 
     @staticmethod

@@ -271,6 +271,17 @@ class AnalyticsDatabaseTests(unittest.TestCase):
         self.assertEqual(result["weight_overlap"], 100)
         self.assertEqual(result["as_of_a"], DAY.isoformat())
 
+    def test_allocation_overlap_sorted_highest_first_unavailable_last(self):
+        # Each fund needs >=95% classified coverage; a padding bucket keeps that
+        # threshold met without changing which pair has the larger US overlap.
+        a, b, c, bond = self.fund(), self.fund(), self.fund(), self.fund("Bonds")
+        for fund, us, de in ((a, 80, 15), (b, 80, 15), (c, 10, 85)):
+            self.allocation(fund, "country", "US", us)
+            self.allocation(fund, "country", "DE", de)
+        self.holding(bond)  # Bonds: unavailable, must sort after every available pair.
+        pairs = AnalyticsService.calculate_allocation_overlap(self.db, [a.id, b.id, c.id, bond.id], "country")
+        self.assertEqual([p["weight_overlap"] for p in pairs], [95, 25, 25, None, None, None])
+
     def test_exposure_and_top_holdings_are_partial_for_mixed_assets(self):
         equity, bond = self.fund(), self.fund("Bonds")
         self.holding(equity)
