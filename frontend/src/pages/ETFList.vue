@@ -60,7 +60,7 @@
               <option value="name">Name</option>
               <option value="ter">TER</option>
               <option value="fund_size">Fund Size</option>
-              <option value="holdings_count">Constituents in DB</option>
+              <option value="holdings_count">Number of Constituents</option>
               <option value="domicile">Domicile</option>
               <option value="currency">Currency</option>
               <option value="dividend_policy">Dividend Policy</option>
@@ -93,10 +93,14 @@
     </div>
     <div v-if="loading" class="loading"><div class="spinner"></div> Loading ETFs...</div>
     <div v-else-if="filteredETFs.length" class="etf-grid">
-      <div v-for="etf in paginatedETFs" :key="etf.id" class="etf-card" :class="{ 'is-selected': selectedIds.includes(etf.id) }" @click="toggleETF(etf.id)">
+      <div v-for="etf in paginatedETFs" :key="etf.id" class="etf-card"
+        :class="{ 'is-selected': selectedIds.includes(etf.id), 'is-disabled': !isEligible(etf) }"
+        :title="isEligible(etf) ? '' : ineligibleReason(etf)"
+        @click="isEligible(etf) && toggleETF(etf.id)">
         <label class="etf-selection" @click.stop>
-          <input type="checkbox" v-model="selectedIds" :value="etf.id" :aria-label="'Select ' + etf.isin + ' — ' + etf.name" />
-          {{ selectedIds.includes(etf.id) ? 'Selected' : 'Select for portfolio' }}
+          <input type="checkbox" v-model="selectedIds" :value="etf.id" :disabled="!isEligible(etf)"
+            :aria-label="'Select ' + etf.isin + ' — ' + etf.name" />
+          {{ !isEligible(etf) ? ineligibleReason(etf) : selectedIds.includes(etf.id) ? 'Selected' : 'Select for portfolio' }}
         </label>
         <div class="etf-card-top">
           <div><span class="etf-ticker">{{ etf.isin }}</span><span v-if="etf.provider" class="badge" style="margin-left:.5rem">{{ etf.provider }}</span></div>
@@ -158,9 +162,9 @@ const filterDomicile = ref('')
 const filterCurrency = ref('')
 const filterDividendPolicy = ref('')
 
-// Sort
-const sortKey = ref('ticker')
-const sortDir = ref('asc')
+// Sort — defaults to constituent count so the most-covered ETFs surface first.
+const sortKey = ref('holdings_count')
+const sortDir = ref('desc')
 
 // Pagination (client-side, over the full fetched + filtered set)
 const currentPage = ref(1)
@@ -229,9 +233,19 @@ function resetFilters() {
   filterDomicile.value = ''
   filterCurrency.value = ''
   filterDividendPolicy.value = ''
-  sortKey.value = 'ticker'
-  sortDir.value = 'asc'
+  sortKey.value = 'holdings_count'
+  sortDir.value = 'desc'
   currentPage.value = 1
+}
+
+// Not selectable for Portfolio Exposure: equity analytics needs a supported
+// asset class and at least one stored holding for the latest snapshot.
+function isEligible(etf) {
+  return !!etf.equity_analytics_supported && !!etf.holdings_count
+}
+function ineligibleReason(etf) {
+  if (!etf.equity_analytics_supported) return 'Not selectable — equity holdings analysis unavailable for this asset class.'
+  return 'Not selectable — no constituents stored in the database yet.'
 }
 
 function formatSize(n) {
@@ -245,8 +259,8 @@ async function loadETFs() {
   try {
     const r = await etfService.getETFs(0, 5000)
     allETFs.value = r.data
-    const availableIds = new Set(allETFs.value.map(etf => etf.id))
-    selectedIds.value = selectedIds.value.filter(id => availableIds.has(id))
+    const eligibleIds = new Set(allETFs.value.filter(isEligible).map(etf => etf.id))
+    selectedIds.value = selectedIds.value.filter(id => eligibleIds.has(id))
     currentPage.value = 1
   } catch(e) {
     error.value = e.response?.data?.detail || e.message
@@ -256,9 +270,13 @@ async function loadETFs() {
 }
 
 function toggleETF(id) {
-  selectedIds.value = selectedIds.value.includes(id)
-    ? selectedIds.value.filter(selectedId => selectedId !== id)
-    : [...selectedIds.value, id]
+  if (selectedIds.value.includes(id)) {
+    selectedIds.value = selectedIds.value.filter(selectedId => selectedId !== id)
+    return
+  }
+  const etf = allETFs.value.find(item => item.id === id)
+  if (etf && !isEligible(etf)) return
+  selectedIds.value = [...selectedIds.value, id]
 }
 
 function useForPortfolio() {
@@ -275,6 +293,10 @@ onMounted(loadETFs)
 .etf-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1rem}
 .etf-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1.25rem;cursor:pointer;transition:all .2s;box-shadow:var(--shadow)}
 .etf-card:hover{border-color:#1a6ab8;box-shadow:var(--shadow-md);transform:translateY(-2px)}
+.etf-card.is-disabled{opacity:.5;cursor:not-allowed;filter:grayscale(60%)}
+.etf-card.is-disabled:hover{border-color:var(--border);box-shadow:var(--shadow);transform:none}
+.etf-card.is-disabled .etf-selection{cursor:not-allowed}
+.etf-card.is-disabled input[type=checkbox]{cursor:not-allowed}
 .etf-card.is-selected{border-color:#0f4c81;box-shadow:0 0 0 2px rgba(15,76,129,.2)}
 .etf-card:focus-within{outline:2px solid #1a6ab8;outline-offset:3px}
 .etf-selection{display:flex;align-items:center;gap:.5rem;margin-bottom:.85rem;font-size:.8rem;color:var(--text-muted);cursor:pointer;width:fit-content}

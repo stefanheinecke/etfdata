@@ -64,13 +64,17 @@ async def find_alternatives(
 @router.post("/pair-suggestions")
 async def pair_suggestions(
     request: ExposureRequest,
+    include_replacements: bool = False,
     db: Session = Depends(get_db),
     api_key: APIKey = Depends(verify_api_key)
 ):
-    """For each overlapping ETF pair in the portfolio, find the replacement with the biggest overlap reduction."""
+    """For each overlapping ETF pair in the portfolio, return securities overlap.
+    Set include_replacements=true to also search the catalog for the replacement
+    with the biggest overlap reduction (slower)."""
     resolved_portfolio = [
         {"etf_id": str(resolve_etf(db, item["etf_id"]).id), "weight": item["weight"]}
         for item in request.portfolio
     ]
-    return AnalyticsService.suggest_pair_replacements(db, resolved_portfolio)
+    return AnalyticsService.suggest_pair_replacements(db, resolved_portfolio,
+                                                       include_replacements=include_replacements)
 

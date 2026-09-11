@@ -317,10 +317,14 @@ class AnalyticsDatabaseTests(unittest.TestCase):
         portfolio = self.portfolio(a, b)
         result = AnalyticsService.suggest_lower_overlap_alternatives(self.db, portfolio, str(a.id))
         self.assertEqual([r["etf_id"] for r in result["alternatives"]], [str(c.id)])
-        pair = AnalyticsService.suggest_pair_replacements(self.db, portfolio)[0]
+        pair = AnalyticsService.suggest_pair_replacements(self.db, portfolio, include_replacements=True)[0]
         self.assertEqual(pair["current_overlap"], 100)
         self.assertEqual(pair["best_replacement"]["candidate_etf_id"], str(c.id))
         self.assertEqual(pair["common_holdings"][0]["isin"], APPLE)
+        # Default omits the replacement search entirely (used for automatic re-analysis).
+        default_pair = AnalyticsService.suggest_pair_replacements(self.db, portfolio)[0]
+        self.assertIsNone(default_pair["best_replacement"])
+        self.assertEqual(default_pair["current_overlap"], 100)
 
     def test_pair_suggestions_include_zero_and_unavailable(self):
         a, b, bond = self.fund(), self.fund(), self.fund("Bonds")

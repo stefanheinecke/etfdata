@@ -410,17 +410,26 @@ class AnalyticsService:
         return {"alternatives": results[:top_n], "replaced_etf_id": replace_etf_id}
 
     @staticmethod
-    def suggest_pair_replacements(db: Session, portfolio: List[Dict], candidate_limit: int = 30):
-        """Return every pair, including genuine zero overlap and unavailable comparisons."""
+    def suggest_pair_replacements(db: Session, portfolio: List[Dict], candidate_limit: int = 30,
+                                  include_replacements: bool = False):
+        """Return every pair, including genuine zero overlap and unavailable comparisons.
+
+        Replacement-candidate search is opt-in: it scores the whole catalog and
+        re-runs overlap per candidate, which is too slow for automatic re-analysis.
+        """
         if len(portfolio) < 2:
             return []
 
-        from app.services.scoring_service import compute_goetf_scores
-        all_scores = compute_goetf_scores(db)
-        score_map = {s["etf_id"]: s.get("goetf_score") for s in all_scores}
+        score_map = {}
+        candidates = []
+        if include_replacements:
+            from app.services.scoring_service import compute_goetf_scores
+            all_scores = compute_goetf_scores(db)
+            score_map = {s["etf_id"]: s.get("goetf_score") for s in all_scores}
 
         etf_ids = list(dict.fromkeys(UUID(str(p["etf_id"])) for p in portfolio))
-        candidates = db.query(ETF).filter(ETF.id.notin_(etf_ids)).limit(candidate_limit).all()
+        if include_replacements:
+            candidates = db.query(ETF).filter(ETF.id.notin_(etf_ids)).limit(candidate_limit).all()
 
         def get_overlap(id_a, id_b):
             result = AnalyticsService.calculate_overlap(db, [id_a, id_b])
