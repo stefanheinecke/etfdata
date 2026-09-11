@@ -2,7 +2,7 @@
   <div :data-theme="theme">
     <nav v-if="currentPage !== 'home'" class="navbar" :class="{ scrolled: navScrolled }">
       <div class="nav-inner">
-        <a href="#" class="logo" @click.prevent="goToPage('home')">Go<span>ETF</span></a>
+        <a href="#" class="logo" @click.prevent="goToPage('home')">{{ BRAND_PREFIX }}<span>ETF</span></a>
         <ul class="nav-links">
           <li><a href="#" :class="{ active: currentPage === 'etfs' || currentPage === 'etf-detail' }" @click.prevent="goToPage('etfs')">ETF Explorer</a></li>
           <li><a href="#" @click.prevent="goToPage('analytics', 'exposure')">Portfolio</a></li>
@@ -52,7 +52,7 @@
         <div class="footer-inner">
           <div class="footer-top">
             <div class="footer-brand">
-              <div class="footer-logo">Go<span>ETF</span></div>
+              <div class="footer-logo">{{ BRAND_PREFIX }}<span>ETF</span></div>
               <p>ETF analysis for investors and developers. Not investment advice.</p>
             </div>
             <div class="footer-links">
@@ -83,14 +83,17 @@
             </div>
           </div>
           <div class="footer-bottom">
-            <p>© 2026 GoETF.ch · Not investment advice · All data for informational purposes only.</p>
-            <a href="mailto:info@goetf.ch">info@goetf.ch</a>
+            <p>© 2026 {{ BRAND.domain }} · Not investment advice · All data for informational purposes only.</p>
+            <button class="footer-contact-link" type="button" @click="showContactModal = true">Contact us</button>
           </div>
         </div>
       </div>
     </footer>
     <!-- Get API Key Modal -->
     <GetApiKeyModal :show="showApiKeyModal" :initialTab="apiKeyModalTab" @close="showApiKeyModal = false" @key-saved="onApiKeySaved" />
+
+    <!-- Contact Modal -->
+    <ContactModal :show="showContactModal" @close="showContactModal = false" />
 
     <!-- Admin Login Modal -->
     <Teleport to="body">
@@ -123,6 +126,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted, provide } from 'vue'
 import { healthService, adminService, authService } from './services/api.js'
+import { BRAND, BRAND_PREFIX } from './brand.js'
 
 const adminActive = ref(!!sessionStorage.getItem('admin_secret'))
 function setAdminActive(val) {
@@ -162,6 +166,9 @@ import ApiDocs from './pages/ApiDocs.vue'
 import Methodology from './pages/Methodology.vue'
 import Admin from './pages/Admin.vue'
 import GetApiKeyModal from './components/GetApiKeyModal.vue'
+import ContactModal from './components/ContactModal.vue'
+
+const showContactModal = ref(false)
 
 const currentPage = ref('home')
 const theme = ref('light')
@@ -492,6 +499,8 @@ onUnmounted(() => {
 .footer-bottom p { font-size: .78rem; color: rgba(255,255,255,.3); }
 .footer-bottom a { color: rgba(255,255,255,.4); font-size: .78rem; text-decoration: none; }
 .footer-bottom a:hover { color: rgba(255,255,255,.7); }
+.footer-contact-link { background: none; border: none; padding: 0; cursor: pointer; font-family: inherit; color: rgba(255,255,255,.4); font-size: .78rem; }
+.footer-contact-link:hover { color: rgba(255,255,255,.7); }
 
 /* Admin login modal */
 .modal-backdrop {

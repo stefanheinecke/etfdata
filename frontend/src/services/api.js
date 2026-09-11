@@ -77,6 +77,9 @@ export const authService = {
   },
   me() {
     return api.get('/auth/me')
+  },
+  contact({ name, email, message }) {
+    return api.post('/auth/contact', { name, email, message })
   }
 }
 
