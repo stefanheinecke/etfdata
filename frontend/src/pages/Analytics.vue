@@ -495,16 +495,6 @@ onMounted(() => {
 .alloc-pct{width:45px;text-align:right;font-size:.8rem;font-weight:600;color:var(--text)}
 .meth-link{background:none;border:none;padding:0;cursor:pointer;font-size:.76rem;color:#0f4c81;text-decoration:underline;margin-top:.2rem;display:inline-block}
 .meth-link:hover{color:#1a6ab8}
-.score-badge{display:inline-block;padding:.2rem .55rem;border-radius:6px;font-size:.85rem;font-weight:700;min-width:2.4rem;text-align:center}
-.score-badge.score-lg{font-size:1.5rem;padding:.35rem .9rem;border-radius:10px}
-.score-high{background:#dcfce7;color:#166534}
-.score-mid{background:#fef9c3;color:#854d0e}
-.score-low{background:#ffedd5;color:#9a3412}
-.score-poor{background:#fee2e2;color:#b91c1c}
-[data-theme="dark"] .score-high{background:#052e16;color:#86efac}
-[data-theme="dark"] .score-mid{background:#2d1b00;color:#fde68a}
-[data-theme="dark"] .score-low{background:#3d1a00;color:#fdba74}
-[data-theme="dark"] .score-poor{background:#3d0000;color:#fca5a5}
 @media (max-width:900px){
   .portfolio-donut-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
