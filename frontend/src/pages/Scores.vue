@@ -1,7 +1,7 @@
 <template>
   <div class="page">
     <div class="page-header">
-      <h1 class="page-title">GoETF Quality Scores</h1>
+      <h1 class="page-title">{{ BRAND.name }} Quality Scores</h1>
       <p class="page-subtitle">Equity-focused quality scores. Other asset classes remain in the catalog but are not ranked using equity diversification metrics.</p>
     </div>
 
@@ -15,7 +15,7 @@
 
     <div class="card" style="margin-bottom:1.5rem;display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
       <div>
-        <h2 class="card-title" style="margin:0">GoETF Quality Score</h2>
+        <h2 class="card-title" style="margin:0">{{ BRAND.name }} Quality Score</h2>
         <p style="font-size:.8rem;color:var(--text-muted);margin:.2rem 0 0">Absolute quality score against fixed benchmarks, independent of ETF universe size.</p>
         <button class="meth-link" @click="navigateTo('methodology')">How is this calculated?</button>
       </div>
@@ -86,7 +86,7 @@
       <section class="score-detail" role="dialog" aria-modal="true" :aria-label="`${scoreDetail.isin} Quality Score calculation`">
         <div class="score-detail-head">
           <div>
-            <p>GoETF Quality Score</p>
+            <p>{{ BRAND.name }} Quality Score</p>
             <h2>{{ scoreDetail.isin }} <span>{{ scoreDetail.goetf_score.toFixed(1) }} / 10</span></h2>
           </div>
           <button class="score-detail-close" type="button" aria-label="Close calculation details" @click="closeScoreDetail">×</button>
@@ -113,6 +113,7 @@
 <script setup>
 import { ref, computed, inject, onMounted } from 'vue'
 import { scoreService } from '../services/api.js'
+import { BRAND } from '../brand.js'
 
 const showApiKeyModal = inject('showApiKeyModal')
 const hasApiKey = inject('hasApiKey', ref(!!localStorage.getItem('api_key')))

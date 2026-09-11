@@ -3,7 +3,7 @@
     <iframe
       class="concept-frame"
       :srcdoc="brandedHtml"
-      title="GoETF Frontpage"
+      :title="`${BRAND.name} Frontpage`"
     ></iframe>
   </section>
 </template>
@@ -22,6 +22,7 @@ const brandedHtml = computed(() => conceptHtml
   .replace('<title>GoETF —', `<title>${BRAND.name} —`)
   .replace('© 2026 GoETF.ch', `© 2026 ${BRAND.domain}`)
   .replace('<a href="mailto:info@goetf.ch">info@goetf.ch</a>', '<a href="#contactForm" class="footer-contact-link">Contact us</a>')
+  .replaceAll('https://api.goetf.ch', `https://api.${BRAND.domain}`)
   .replace(/\bGoETF\b/g, BRAND.name))
 </script>
 

@@ -4,7 +4,7 @@
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;flex-wrap:wrap">
         <div>
           <h1 class="page-title">API Reference</h1>
-          <p class="page-subtitle">Complete documentation for all GoETF.ch API endpoints.</p>
+          <p class="page-subtitle">Complete documentation for all {{ BRAND.domain }} API endpoints.</p>
         </div>
         <button v-if="!hasApiKey" class="btn btn-primary" style="flex-shrink:0;margin-top:.25rem" @click="showApiKeyModal = true">
           Get Free API Key
@@ -118,7 +118,7 @@
       <div class="grid-2">
         <div>
           <p class="label">Base URL</p>
-          <pre style="margin-top:.35rem">https://api.goetf.ch</pre>
+          <pre style="margin-top:.35rem">{{ DOC_BASE }}</pre>
         </div>
         <div>
           <p class="label">Rate Limiting</p>
@@ -132,7 +132,10 @@
 <script setup>
 import { ref, computed, inject, watch } from 'vue'
 import axios from 'axios'
+import { BRAND } from '../brand.js'
 const BASE = import.meta.env.VITE_API_URL || 'https://etfdata-production.up.railway.app'
+// Illustrative host shown in code examples only; live "Try it" calls always use BASE above.
+const DOC_BASE = `https://api.${BRAND.domain}`
 
 const showApiKeyModal = inject('showApiKeyModal')
 const hasApiKey = inject('hasApiKey', ref(!!localStorage.getItem('api_key')))
@@ -202,14 +205,14 @@ const groups = [
     label: 'Scores',
     endpoints: [
       { id: 'score-etfs', method: 'GET', short: '/scores/etfs', path: '/scores/etfs',
-        title: 'GoETF Quality Score: Individual ETFs', desc: 'Returns the GoETF Quality Score (1-10) for all ETFs or a ticker-filtered subset. Seven available components are equally weighted against fixed worst-to-best benchmark ranges: CAGR, Sortino ratio, maximum drawdown, holdings HHI, country diversity, sector diversity, and TER. Scores require at least one year of price history. Missing holdings, allocation, or TER data is disclosed and excluded from the equal-weight average.',
+        title: `${BRAND.name} Quality Score: Individual ETFs`, desc: `Returns the ${BRAND.name} Quality Score (1-10) for all ETFs or a ticker-filtered subset. Seven available components are equally weighted against fixed worst-to-best benchmark ranges: CAGR, Sortino ratio, maximum drawdown, holdings HHI, country diversity, sector diversity, and TER. Scores require at least one year of price history. Missing holdings, allocation, or TER data is disclosed and excluded from the equal-weight average.`,
         params: [
           {name:'tickers',in:'query',type:'string',required:false,desc:'Comma-separated tickers (e.g. SWDA,CSSPX). Omit to score all ETFs.'},
           {name:'rf_rate',in:'query',type:'float',required:false,desc:'Annual risk-free rate as decimal (default 0.04 = 4%)'},
         ],
       },
       { id: 'score-portfolio', method: 'POST', short: '/scores/portfolio', path: '/scores/portfolio',
-        title: 'GoETF Score: Portfolio', desc: 'Computes a composite GoETF Portfolio Score (1-10) from: weighted average of individual GoETF Scores (base), minus pairwise holdings overlap penalty (up to -2 pts), plus geographic diversification bonus (up to +1 pt).',
+        title: `${BRAND.name} Score: Portfolio`, desc: `Computes a composite ${BRAND.name} Portfolio Score (1-10) from: weighted average of individual ${BRAND.name} Scores (base), minus pairwise holdings overlap penalty (up to -2 pts), plus geographic diversification bonus (up to +1 pt).`,
         body: `{\n  "portfolio": [\n    {"etf_id": "SWDA", "weight": 60},\n    {"etf_id": "CSSPX", "weight": 40}\n  ]\n}`,
         params: [
           {name:'rf_rate',in:'query',type:'float',required:false,desc:'Annual risk-free rate as decimal (default 0.04 = 4%)'},
@@ -307,124 +310,124 @@ const activeCodeTab = ref('cURL')
 
 const codeSnippets = {
   'list-etfs': {
-    cURL: `curl https://api.goetf.ch/etfs \\
+    cURL: `curl ${DOC_BASE}/etfs \\
   -H "x-api-key: YOUR_API_KEY"`,
     Python: `import requests
 
 r = requests.get(
-    "https://api.goetf.ch/etfs",
+    "${DOC_BASE}/etfs",
     headers={"x-api-key": "YOUR_API_KEY"}
 )
 etfs = r.json()`,
     JavaScript: `const etfs = await fetch(
-  "https://api.goetf.ch/etfs",
+  "${DOC_BASE}/etfs",
   { headers: { "x-api-key": "YOUR_API_KEY" } }
 ).then(r => r.json());`,
   },
   'get-etf': {
-    cURL: `curl https://api.goetf.ch/etfs/{ETF_ID} \\
+    cURL: `curl ${DOC_BASE}/etfs/{ETF_ID} \\
   -H "x-api-key: YOUR_API_KEY"`,
     Python: `import requests
 
 r = requests.get(
-    "https://api.goetf.ch/etfs/{ETF_ID}",
+    "${DOC_BASE}/etfs/{ETF_ID}",
     headers={"x-api-key": "YOUR_API_KEY"}
 )
 etf = r.json()`,
     JavaScript: `const etf = await fetch(
-  "https://api.goetf.ch/etfs/{ETF_ID}",
+  "${DOC_BASE}/etfs/{ETF_ID}",
   { headers: { "x-api-key": "YOUR_API_KEY" } }
 ).then(r => r.json());`,
   },
   'holdings': {
-    cURL: `curl https://api.goetf.ch/etfs/{ETF_ID}/holdings \\
+    cURL: `curl ${DOC_BASE}/etfs/{ETF_ID}/holdings \\
   -H "x-api-key: YOUR_API_KEY"`,
     Python: `import requests
 
 r = requests.get(
-    "https://api.goetf.ch/etfs/{ETF_ID}/holdings",
+    "${DOC_BASE}/etfs/{ETF_ID}/holdings",
     headers={"x-api-key": "YOUR_API_KEY"}
 )
 holdings = r.json()
 for h in holdings[:5]:
     print(h["instrument_name"], h["weight"])`,
     JavaScript: `const holdings = await fetch(
-  "https://api.goetf.ch/etfs/{ETF_ID}/holdings",
+  "${DOC_BASE}/etfs/{ETF_ID}/holdings",
   { headers: { "x-api-key": "YOUR_API_KEY" } }
 ).then(r => r.json());`,
   },
   'allocations': {
-    cURL: `curl https://api.goetf.ch/etfs/{ETF_ID}/allocations \\
+    cURL: `curl ${DOC_BASE}/etfs/{ETF_ID}/allocations \\
   -H "x-api-key: YOUR_API_KEY"`,
     Python: `import requests
 
 r = requests.get(
-    "https://api.goetf.ch/etfs/{ETF_ID}/allocations",
+    "${DOC_BASE}/etfs/{ETF_ID}/allocations",
     headers={"x-api-key": "YOUR_API_KEY"}
 )
 allocs = r.json()`,
     JavaScript: `const allocs = await fetch(
-  "https://api.goetf.ch/etfs/{ETF_ID}/allocations",
+  "${DOC_BASE}/etfs/{ETF_ID}/allocations",
   { headers: { "x-api-key": "YOUR_API_KEY" } }
 ).then(r => r.json());`,
   },
   'performance': {
-    cURL: `curl "https://api.goetf.ch/etfs/SWDA/performance" \\
+    cURL: `curl "${DOC_BASE}/etfs/SWDA/performance" \\
   -H "x-api-key: YOUR_API_KEY"`,
     Python: `import requests
 
 r = requests.get(
-    "https://api.goetf.ch/etfs/SWDA/performance",
+    "${DOC_BASE}/etfs/SWDA/performance",
     params={"from_date": "2025-01-01"},
     headers={"x-api-key": "YOUR_API_KEY"}
 )
 history = r.json()`,
     JavaScript: `const history = await fetch(
-  "https://api.goetf.ch/etfs/SWDA/performance",
+  "${DOC_BASE}/etfs/SWDA/performance",
   { headers: { "x-api-key": "YOUR_API_KEY" } }
 ).then(r => r.json());`,
   },
   'performance': {
-    cURL: `curl "https://api.goetf.ch/etfs/SWDA/performance" \\
+    cURL: `curl "${DOC_BASE}/etfs/SWDA/performance" \\
   -H "x-api-key: YOUR_API_KEY"`,
     Python: `import requests
 
 r = requests.get(
-    "https://api.goetf.ch/etfs/SWDA/performance",
+    "${DOC_BASE}/etfs/SWDA/performance",
     params={"from_date": "2025-01-01"},
     headers={"x-api-key": "YOUR_API_KEY"}
 )
 history = r.json()`,
     JavaScript: `const history = await fetch(
-  "https://api.goetf.ch/etfs/SWDA/performance",
+  "${DOC_BASE}/etfs/SWDA/performance",
   { headers: { "x-api-key": "YOUR_API_KEY" } }
 ).then(r => r.json());`,
   },
   'etf-risk-metrics': {
-    cURL: `curl "https://api.goetf.ch/etfs/SWDA/risk-metrics" \\
+    cURL: `curl "${DOC_BASE}/etfs/SWDA/risk-metrics" \\
   -H "x-api-key: YOUR_API_KEY"`,
     Python: `import requests
 
 r = requests.get(
-    "https://api.goetf.ch/etfs/SWDA/risk-metrics",
+    "${DOC_BASE}/etfs/SWDA/risk-metrics",
     params={"rf_rate": 0.04},
     headers={"x-api-key": "YOUR_API_KEY"}
 )
 metrics = r.json()`,
     JavaScript: `const metrics = await fetch(
-  "https://api.goetf.ch/etfs/SWDA/risk-metrics?rf_rate=0.04",
+  "${DOC_BASE}/etfs/SWDA/risk-metrics?rf_rate=0.04",
   { headers: { "x-api-key": "YOUR_API_KEY" } }
 ).then(r => r.json());`,
   },
   'exposure': {
-    cURL: `curl -X POST "https://api.goetf.ch/analytics/exposure?rf_rate=0.04" \\
+    cURL: `curl -X POST "${DOC_BASE}/analytics/exposure?rf_rate=0.04" \\
   -H "x-api-key: YOUR_API_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{"portfolio": [{"etf_id": "SWDA", "weight": 60}, {"etf_id": "CSSPX", "weight": 40}]}'`,
     Python: `import requests
 
 r = requests.post(
-    "https://api.goetf.ch/analytics/exposure",
+    "${DOC_BASE}/analytics/exposure",
     params={"rf_rate": 0.04},
     headers={"x-api-key": "YOUR_API_KEY"},
     json={"portfolio": [
@@ -435,7 +438,7 @@ r = requests.post(
 # Response includes sectors, countries, currencies + risk_metrics per ETF
 result = r.json()`,
     JavaScript: `const result = await fetch(
-  "https://api.goetf.ch/analytics/exposure?rf_rate=0.04",
+  "${DOC_BASE}/analytics/exposure?rf_rate=0.04",
   {
     method: "POST",
     headers: {
@@ -453,36 +456,36 @@ result = r.json()`,
 // result.sectors / result.countries / result.currencies / result.risk_metrics`,
   },
   'risk-metrics-get': {
-    cURL: `curl "https://api.goetf.ch/analytics/risk-metrics" \\
+    cURL: `curl "${DOC_BASE}/analytics/risk-metrics" \\
   -H "x-api-key: YOUR_API_KEY"`,
     Python: `import requests
 
 r = requests.get(
-    "https://api.goetf.ch/analytics/risk-metrics",
+    "${DOC_BASE}/analytics/risk-metrics",
     params={"rf_rate": 0.04},
     headers={"x-api-key": "YOUR_API_KEY"}
 )
 all_metrics = r.json()`,
     JavaScript: `const allMetrics = await fetch(
-  "https://api.goetf.ch/analytics/risk-metrics?rf_rate=0.04",
+  "${DOC_BASE}/analytics/risk-metrics?rf_rate=0.04",
   { headers: { "x-api-key": "YOUR_API_KEY" } }
 ).then(r => r.json());`,
   },
   'risk-metrics-post': {
-    cURL: `curl -X POST https://api.goetf.ch/analytics/risk-metrics \\
+    cURL: `curl -X POST ${DOC_BASE}/analytics/risk-metrics \\
   -H "x-api-key: YOUR_API_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{"etf_ids": ["SWDA", "CSSPX"]}'`,
     Python: `import requests
 
 r = requests.post(
-    "https://api.goetf.ch/analytics/risk-metrics",
+    "${DOC_BASE}/analytics/risk-metrics",
     headers={"x-api-key": "YOUR_API_KEY"},
     json={"etf_ids": ["SWDA", "CSSPX"]}
 )
 metrics = r.json()`,
     JavaScript: `const metrics = await fetch(
-  "https://api.goetf.ch/analytics/risk-metrics",
+  "${DOC_BASE}/analytics/risk-metrics",
   {
     method: "POST",
     headers: {

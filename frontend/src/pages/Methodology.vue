@@ -2,7 +2,7 @@
   <div class="page meth-page">
     <div class="page-header">
       <h1 class="page-title">Score Methodology</h1>
-      <p class="page-subtitle">How GoETF Scores are calculated for individual ETFs and portfolios.</p>
+      <p class="page-subtitle">How {{ BRAND.name }} Scores are calculated for individual ETFs and portfolios.</p>
     </div>
 
     <!-- ETF Score -->
@@ -10,7 +10,7 @@
       <div class="meth-section-head">
         <span class="meth-badge">1-10</span>
         <div>
-          <h2 class="meth-title">GoETF Quality Score: Individual ETF</h2>
+          <h2 class="meth-title">{{ BRAND.name }} Quality Score: Individual ETF</h2>
           <p class="meth-sub">A transparent historical return, downside-risk, diversification, and cost summary measured against fixed quality benchmarks.</p>
         </div>
       </div>
@@ -26,7 +26,7 @@
         <div class="meth-formula-box">
           <code>metric_score<sub>i</sub> = clamp((value<sub>i</sub> − worst<sub>i</sub>) ÷ (best<sub>i</sub> − worst<sub>i</sub>), 0, 1)</code>
           <code>raw = average(metric_score<sub>i</sub>)</code>
-          <code>GoETF Quality Score = 1 + raw × 9</code>
+          <code>{{ BRAND.name }} Quality Score = 1 + raw × 9</code>
         </div>
       </div>
 
@@ -110,7 +110,7 @@
       <div class="meth-section-head">
         <span class="meth-badge meth-badge-port">1-10</span>
         <div>
-          <h2 class="meth-title">Portfolio GoETF Quality Score</h2>
+          <h2 class="meth-title">Portfolio {{ BRAND.name }} Quality Score</h2>
           <p class="meth-sub">A portfolio-level score that rewards low overlap between ETFs and broad geographic diversification, while penalising redundant positions.</p>
         </div>
       </div>
@@ -123,7 +123,7 @@
             <h3 class="meth-comp-title">Base Score</h3>
             <span class="meth-comp-range">1-10</span>
           </div>
-          <p class="meth-comp-desc">Weighted average of the individual GoETF Quality Scores of all ETFs in the portfolio, using their portfolio weights.</p>
+          <p class="meth-comp-desc">Weighted average of the individual {{ BRAND.name }} Quality Scores of all ETFs in the portfolio, using their portfolio weights.</p>
           <div class="meth-formula-box meth-formula-sm">
             <code>base = Σ (w<sub>i</sub> × Quality_Score<sub>i</sub>)</code>
           </div>
@@ -135,7 +135,7 @@
             <h3 class="meth-comp-title">Overlap Penalty</h3>
             <span class="meth-comp-range meth-range-neg">0 to −2</span>
           </div>
-          <p class="meth-comp-desc">For every supported pair, GoETF matches securities by validated ISIN, normalizes each available equity basket to 100%, and adds the smaller weight of each shared security. Missing holdings or unresolved positive-weight identifiers produce an unavailable comparison, never zero overlap. The resulting weight overlap is averaged across pairs, giving greater influence to pairs with larger portfolio allocations.</p>
+          <p class="meth-comp-desc">For every supported pair, {{ BRAND.name }} matches securities by validated ISIN, normalizes each available equity basket to 100%, and adds the smaller weight of each shared security. Missing holdings or unresolved positive-weight identifiers produce an unavailable comparison, never zero overlap. The resulting weight overlap is averaged across pairs, giving greater influence to pairs with larger portfolio allocations.</p>
           <div class="meth-formula-box meth-formula-sm">
             <code>pair_overlap = Σ min(weight<sub>a</sub>, weight<sub>b</sub>)</code>
             <code>penalty = (avg_weight_overlap_% ÷ 100) × 2</code>
@@ -148,7 +148,7 @@
             <h3 class="meth-comp-title">Diversification Bonus</h3>
             <span class="meth-comp-range meth-range-pos">0 to +1</span>
           </div>
-          <p class="meth-comp-desc">GoETF first combines country exposures using the portfolio allocations. It compares that portfolio diversity with the allocation-weighted average diversity of the individual ETFs. Only an improvement produces a bonus.</p>
+          <p class="meth-comp-desc">{{ BRAND.name }} first combines country exposures using the portfolio allocations. It compares that portfolio diversity with the allocation-weighted average diversity of the individual ETFs. Only an improvement produces a bonus.</p>
           <div class="meth-formula-box meth-formula-sm">
             <code>geo_div = 1 − (country HHI ÷ 10,000)</code>
             <code>bonus = max(0, portfolio_geo_div − avg_individual_geo_div)</code>
@@ -241,7 +241,7 @@
       <!-- Using portfolio analysis -->
       <div class="card meth-card">
         <h3 class="card-title">Using portfolio analysis</h3>
-        <p style="font-size:.875rem;color:var(--text)">GoETF describes portfolio composition and diversification; it does not recommend ETF replacements. Review holdings overlap alongside country, sector, and currency exposure to decide whether a concentration or tilt is intentional for your own objectives.</p>
+        <p style="font-size:.875rem;color:var(--text)">{{ BRAND.name }} describes portfolio composition and diversification; it does not recommend ETF replacements. Review holdings overlap alongside country, sector, and currency exposure to decide whether a concentration or tilt is intentional for your own objectives.</p>
         <div style="margin-top:.75rem;display:flex;flex-direction:column;gap:.3rem">
           <div class="meth-tip-row"><span class="meth-tip-key">Overlap</span><span>Shared holdings can reveal redundancy, but may also represent an intentional allocation tilt.</span></div>
           <div class="meth-tip-row"><span class="meth-tip-key">Diversification</span><span>Country, sector, and currency exposure show where the portfolio is concentrated.</span></div>
@@ -253,13 +253,14 @@
     <!-- Disclaimer -->
     <div class="card" style="background:var(--bg-3);border-color:var(--border)">
       <p style="font-size:.8rem;color:var(--text-muted);margin:0;line-height:1.7">
-        <strong>Note:</strong> GoETF Scores are quantitative summaries derived from historical data and fixed reference benchmarks. They are provided for informational purposes only and do not constitute investment advice or an invitation to buy or sell any ETF. Past performance and historical statistics are not indicative of future results. Score values depend on the available data history, the risk-free rate, and the benchmark ranges defined by GoETF.
+        <strong>Note:</strong> {{ BRAND.name }} Scores are quantitative summaries derived from historical data and fixed reference benchmarks. They are provided for informational purposes only and do not constitute investment advice or an invitation to buy or sell any ETF. Past performance and historical statistics are not indicative of future results. Score values depend on the available data history, the risk-free rate, and the benchmark ranges defined by {{ BRAND.name }}.
       </p>
     </div>
   </div>
 </template>
 
 <script setup>
+import { BRAND } from '../brand.js'
 </script>
 
 <style scoped>

@@ -512,7 +512,7 @@
       <h3>📋 Admin Disclaimer</h3>
       <p>
         Admin operations directly modify the production database. The Reset operation permanently deletes all ETF data.
-        GoETF.ch is for <strong>informational purposes only</strong>; none of the data constitutes investment advice.
+        {{ BRAND.domain }} is for <strong>informational purposes only</strong>; none of the data constitutes investment advice.
         Do not use real financial data without appropriate licensing and compliance review.
       </p>
     </div>
@@ -866,6 +866,7 @@
 <script setup>
 import { ref, computed, onMounted, inject } from 'vue'
 import { healthService, adminService, etfService } from '../services/api.js'
+import { BRAND } from '../brand.js'
 
 const setAdminActive = inject('setAdminActive')
 
