@@ -2,7 +2,7 @@
   <div class="page">
     <div class="page-header">
       <h1 class="page-title">Portfolio Analytics</h1>
-      <p class="page-subtitle">Multi-asset catalog · Equity-focused securities, country and sector overlap. Price-based risk metrics remain available where price data exists.</p>
+      <p class="page-subtitle">Multi-asset catalog · Equity-focused securities, country, region, sector and currency overlap.</p>
     </div>
     <div v-if="!hasApiKey" class="cta-banner">
       <div class="cta-text">
@@ -22,7 +22,7 @@
         </div>
         <div style="display:flex;gap:.75rem;margin-top:.75rem;align-items:center;flex-wrap:wrap">
           <button class="btn btn-outline" @click="portfolio.push({etf_id:'',weight:0})">+ Add ETF</button>
-          <span style="font-size:.8rem;color:var(--text-muted)">{{ exposureLoading ? 'Calculating…' : 'Updates automatically as you edit the portfolio.' }}</span>
+          <span style="font-size:.8rem;color:var(--text-muted)">{{ exposureLoading ? 'Calculating…' : 'Updated' }}</span>
           <label style="font-size:.8rem;color:var(--text-muted);margin-left:auto">Risk-free rate</label>
           <input class="input" type="number" v-model.number="riskFreeRate" min="0" max="20" step="0.5"
             style="width:72px;padding:.3rem .5rem;font-size:.875rem" />
@@ -83,7 +83,7 @@
         </div>
         <div v-if="section.pairs.length > 1" class="pairs-pagination">
           <button class="btn btn-outline" type="button" @click="setPairPage(section.key, pairPage(section.key) - 1)" :disabled="pairPage(section.key) <= 1">‹ Prev</button>
-          <span>Pair {{ pairPage(section.key) }} of {{ section.pairs.length }} (sorted by overlap, largest first)</span>
+          <span>Pair {{ pairPage(section.key) }} of {{ section.pairs.length }}</span>
           <button class="btn btn-outline" type="button" @click="setPairPage(section.key, pairPage(section.key) + 1)" :disabled="pairPage(section.key) >= section.pairs.length">Next ›</button>
         </div>
       </section>
@@ -92,7 +92,6 @@
       <div v-if="topHoldings && topHoldings.length" class="card" style="margin-top:1.5rem;padding:0;overflow:hidden">
         <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--border)">
           <h3 class="card-title" style="margin:0">Top 10 Holdings</h3>
-          <p class="overlap-caption">{{ exposureResult?.top_holdings_status || 'Coverage unavailable' }} · source baskets cover {{ formatCoverage(exposureResult?.top_holdings_coverage) }} of portfolio before top-10 truncation.</p>
         </div>
         <div class="table-wrap">
           <table class="holdings-table">
@@ -350,7 +349,10 @@ const portfolioExposureGroups = computed(() => {
 
 const overlapSections = computed(() => {
   const allocationOverlap = exposureResult.value?.allocation_overlap || {}
-  const securities = (pairSuggestions.value || []).map(pair => ({
+  // A pair unavailable purely because one ETF's asset class isn't equity-eligible
+  // isn't a data gap worth surfacing here — drop it rather than showing "unavailable".
+  const isAssetClassExcluded = pair => (pair.reason || '').includes('Unsupported asset class for equity analytics')
+  const securities = (pairSuggestions.value || []).filter(pair => !isAssetClassExcluded(pair)).map(pair => ({
     key: `securities:${pair.etf_a_id}_${pair.etf_b_id}`,
     etf_a_isin: pair.etf_a_isin, etf_b_isin: pair.etf_b_isin,
     value: pair.current_overlap, reason: pair.reason,
@@ -360,7 +362,7 @@ const overlapSections = computed(() => {
       a: h.etf_a_weight, b: h.etf_b_weight, overlap: h.overlap,
     })),
   }))
-  const buildAllocation = (kind) => (allocationOverlap[kind] || []).map(pair => ({
+  const buildAllocation = (kind) => (allocationOverlap[kind] || []).filter(pair => !isAssetClassExcluded(pair)).map(pair => ({
     key: `${kind}:${pair.etf_a}_${pair.etf_b}`,
     etf_a_isin: pair.etf_a_isin, etf_b_isin: pair.etf_b_isin,
     value: pair.weight_overlap, reason: pair.reason,
@@ -373,11 +375,11 @@ const overlapSections = computed(() => {
   return [
     { key: 'securities', title: 'Securities Overlap', rowLabel: 'Security', pairs: securities,
       loading: pairSuggestionsLoading.value, loadingLabel: 'Analysing securities overlap…',
-      description: 'Matched by security ISIN. Overlap sums the smaller normalized equity-basket weight for each shared security. Up to 20 largest contributors are shown; totals use all holdings.' },
+      description: '' },
     { key: 'country', title: 'Country Overlap', rowLabel: 'Country', pairs: buildAllocation('country'), loading: false, loadingLabel: '',
-      description: 'Sum of the smaller weight in each shared country. At least 95% classified fund weight is required on each side; unknown exposure is not matched or rescaled.' },
+      description: '' },
     { key: 'sector', title: 'Sector Overlap', rowLabel: 'Sector', pairs: buildAllocation('sector'), loading: false, loadingLabel: '',
-      description: 'Sum of the smaller weight in each shared sector. At least 95% classified fund weight is required on each side; unknown exposure is not matched or rescaled.' },
+      description: '' },
   ]
 })
 
