@@ -81,9 +81,11 @@
             </div>
           </div>
         </div>
-        <button v-if="section.pairs.length > DEFAULT_VISIBLE_PAIRS" class="btn btn-outline" type="button" style="margin-top:.25rem" @click="toggleSectionExpanded(section.key)">
-          {{ isSectionExpanded(section.key) ? 'Show fewer pairs' : `Show all ${section.pairs.length} pairs (sorted by overlap)` }}
-        </button>
+        <div v-if="section.pairs.length > 1" class="pairs-pagination">
+          <button class="btn btn-outline" type="button" @click="setPairPage(section.key, pairPage(section.key) - 1)" :disabled="pairPage(section.key) <= 1">‹ Prev</button>
+          <span>Pair {{ pairPage(section.key) }} of {{ section.pairs.length }} (sorted by overlap, largest first)</span>
+          <button class="btn btn-outline" type="button" @click="setPairPage(section.key, pairPage(section.key) + 1)" :disabled="pairPage(section.key) >= section.pairs.length">Next ›</button>
+        </div>
       </section>
       <div v-if="exposureError" class="error-box" style="margin-bottom:1rem">{{ exposureError }}</div>
       <!-- Top 10 Holdings -->
@@ -251,18 +253,17 @@ function togglePair(key) {
   next.has(key) ? next.delete(key) : next.add(key)
   openPairs.value = next
 }
-// Pairs are pre-sorted highest-overlap first; only show a handful by default
-// since C(n,2) pairs get large fast with many ETFs.
-const DEFAULT_VISIBLE_PAIRS = 5
-const expandedSections = ref(new Set())
-function isSectionExpanded(key) { return expandedSections.value.has(key) }
-function toggleSectionExpanded(key) {
-  const next = new Set(expandedSections.value)
-  next.has(key) ? next.delete(key) : next.add(key)
-  expandedSections.value = next
+// Pairs are pre-sorted highest-overlap first. Show one pair at a time so
+// large ETF selections (many C(n,2) pairs) don't produce a huge scrolling page.
+const pairPages = ref({})
+function pairPage(sectionKey) { return pairPages.value[sectionKey] || 1 }
+function setPairPage(sectionKey, page) {
+  const clamped = Math.max(1, page)
+  pairPages.value = { ...pairPages.value, [sectionKey]: clamped }
 }
 function visiblePairs(section) {
-  return isSectionExpanded(section.key) ? section.pairs : section.pairs.slice(0, DEFAULT_VISIBLE_PAIRS)
+  const page = Math.min(pairPage(section.key), section.pairs.length || 1)
+  return section.pairs.slice(page - 1, page)
 }
 function etfLabel(isin) {
   const etf = allEtfs.value.find(item => item.isin === isin)
@@ -403,7 +404,7 @@ async function loadETFs() {
 }
 async function runExposure() {
   const run = ++analysisRun
-  exposureLoading.value=true; exposureError.value=''; exposureResult.value=null; topHoldings.value=null; portfolioRiskResult.value=null; pairSuggestions.value=null; openPairs.value=new Set(); expandedSections.value=new Set()
+  exposureLoading.value=true; exposureError.value=''; exposureResult.value=null; topHoldings.value=null; portfolioRiskResult.value=null; pairSuggestions.value=null; openPairs.value=new Set(); pairPages.value={}
   pairSuggestionsError.value=''
   const p=portfolio.value.filter(x=>x.etf_id && x.weight > 0).map(x=>({...x}))
   try {
@@ -482,7 +483,8 @@ onMounted(() => {
 .analysis-notice{padding:1rem 1.25rem;border:1px solid var(--border);border-left:4px solid #c99522;border-radius:8px;background:var(--surface);margin:1rem 0;font-size:.85rem}
 .analysis-notice ul{padding-left:1.25rem;max-height:180px;overflow:auto}
 .overlap-caption{font-size:.78rem;color:var(--text-muted);margin:.5rem 0 .75rem;line-height:1.5}
-.overlap-section{margin-bottom:1.5rem}
+.overlap-section{margin-top:1.5rem;margin-bottom:1.5rem}
+.pairs-pagination{display:flex;align-items:center;justify-content:center;gap:1rem;margin-top:.75rem;font-size:.85rem;color:var(--text-muted)}
 .overlap-pair{border:1px solid var(--border);border-radius:8px;padding:.875rem 1rem;margin-bottom:.75rem}
 .table-wrap{overflow-x:auto}
 .portfolio-donut-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1rem;margin-top:1.5rem}
