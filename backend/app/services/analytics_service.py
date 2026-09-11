@@ -114,6 +114,15 @@ def _pair_status(a, b):
             "reason": "; ".join(reasons) or None,
             "as_of_a": a["as_of"], "as_of_b": b["as_of"]}
 
+def allocation_diversity(allocation):
+    """1 - HHI-style concentration on classified country/sector weights.
+    Conservative: unresolved exposure is folded into the largest known bucket."""
+    if allocation["status"] != "available":
+        return None
+    weights = list(allocation["weights"].values())
+    weights[weights.index(max(weights))] += max(0, 100 - sum(weights))
+    return 1.0 - sum((w / 100) ** 2 for w in weights)
+
 class AnalyticsService:
     @staticmethod
     def calculate_overlap(db: Session, etf_ids: List[UUID], overlap_date: Optional[date] = None):
@@ -288,7 +297,14 @@ class AnalyticsService:
             if snapshot["status"] == "available":
                 row["num_holdings"] = len(snapshot["weights"])
                 row["hhi"] = round(sum(w * w for w in snapshot["weights"].values()), 1)
-
+            # ── Country/sector diversity from allocations, independent of price history ──
+            for kind in ("country", "sector"):
+                alloc = _allocation_snapshot(db, etf.id, kind)
+                key = "geo_div" if kind == "country" else "sector_div"
+                value = allocation_diversity(alloc)
+                row[key] = round(value, 4) if value is not None else None
+                row[f"{key}_status"] = alloc["status"]
+                row[f"{key}_reason"] = alloc["reason"]
             results.append(row)
 
         return results

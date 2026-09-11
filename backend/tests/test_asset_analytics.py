@@ -356,6 +356,22 @@ class AnalyticsDatabaseTests(unittest.TestCase):
         self.assertIsNone(portfolio["portfolio_score"])
         self.assertIsNone(portfolio["base_score"])
 
+    def test_diversity_available_without_price_history(self):
+        # Country/sector diversity must not be gated behind the price-history
+        # requirement used for the composite quality score.
+        fund = self.fund()
+        self.holding(fund)
+        self.allocation(fund, "country", "US", 60)
+        self.allocation(fund, "country", "DE", 40)
+        self.allocation(fund, "sector", "Information Technology", 100)
+        risk = AnalyticsService.calculate_risk_metrics(self.db, etf_id=fund.id)[0]
+        self.assertIsNone(risk["volatility"])  # no price rows added
+        self.assertAlmostEqual(risk["geo_div"], 1 - (0.6 ** 2 + 0.4 ** 2))
+        self.assertEqual(risk["geo_div_status"], "available")
+        self.assertEqual(risk["sector_div"], 0.0)
+        score = compute_goetf_scores(self.db, etf_ids=[fund.id])[0]
+        self.assertIsNone(score["goetf_score"])  # composite score still needs price history
+
     def test_complete_scores_and_missing_component_not_fallback(self):
         good, bad = self.fund(), self.fund()
         for fund in (good, bad):

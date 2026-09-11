@@ -5,7 +5,6 @@
         <a href="#" class="logo" @click.prevent="goToPage('home')">Go<span>ETF</span></a>
         <ul class="nav-links">
           <li><a href="#" :class="{ active: currentPage === 'etfs' || currentPage === 'etf-detail' }" @click.prevent="goToPage('etfs')">ETF Explorer</a></li>
-          <li><a href="#" :class="{ active: currentPage === 'scores' }" @click.prevent="goToPage('scores')">Scores</a></li>
           <li><a href="#" @click.prevent="goToPage('analytics', 'exposure')">Portfolio</a></li>
           <li><a href="#" :class="{ active: currentPage === 'docs' }" @click.prevent="goToPage('docs')">API</a></li>
           <li><a href="#" :class="{ active: currentPage === 'methodology' }" @click.prevent="goToPage('methodology')">Methodology</a></li>
@@ -26,7 +25,6 @@
       <div class="drawer-backdrop" @click="mobileMenuOpen = false"></div>
       <div class="drawer-panel">
         <a href="#" @click.prevent="goToPage('etfs')">ETF Explorer</a>
-        <a href="#" @click.prevent="goToPage('scores')">Scores</a>
         <a href="#" @click.prevent="goToPage('analytics', 'exposure')">Portfolio</a>
         <a href="#" @click.prevent="goToPage('docs')">API</a>
         <a href="#" @click.prevent="goToPage('methodology')">Methodology</a>
@@ -62,7 +60,6 @@
                 <h4>Product</h4>
                 <ul>
                   <li><a href="#" @click.prevent="goToPage('etfs')">ETF Explorer</a></li>
-                  <li><a href="#" @click.prevent="goToPage('scores')">Scores</a></li>
                   <li><a href="#" @click.prevent="goToPage('analytics', 'exposure')">Portfolio</a></li>
                   <li><a href="#" @click.prevent="goToPage('methodology')">Methodology</a></li>
                 </ul>

@@ -31,19 +31,13 @@
       </div>
       <div v-if="exposureResult" class="portfolio-donut-grid">
         <div v-for="group in portfolioExposureGroups" :key="group.key" class="card portfolio-donut-card">
-          <div class="portfolio-donut-head"><h3 class="card-title">{{ group.label }}</h3><span>{{ group.total.toFixed(1) }}% classified</span></div>
-          <p class="overlap-caption">{{ group.coverage?.status || 'Coverage unavailable' }} · {{ formatCoverage(group.coverage?.coverage) }} of portfolio represented</p>
+          <div class="portfolio-donut-head"><h3 class="card-title">{{ group.label }}</h3></div>
           <div v-if="group.total > 0" class="portfolio-donut-chart"><Doughnut :data="portfolioDonutData(group)" :options="portfolioDonutOptions" /></div>
           <div v-else class="donut-unavailable" role="status"><div class="empty-donut" aria-hidden="true"></div><span>Data unavailable</span><small>No supported {{ group.key }} allocation data for this selection.</small></div>
           <div v-if="group.total > 0" class="portfolio-donut-legend">
             <div v-for="entry in group.entries" :key="entry.name"><span><i :style="{ background: entry.color }"></i>{{ entry.name }}</span><strong>{{ entry.value.toFixed(1) }}%</strong></div>
           </div>
         </div>
-      </div>
-      <div v-if="analysisWarnings.length" class="analysis-notice" role="status">
-        <strong>Data availability notices</strong>
-        <p class="overlap-caption">Lists exactly why a total below is partial or unavailable, so missing data is never mistaken for zero overlap or full diversification.</p>
-        <ul><li v-for="warning in analysisWarnings" :key="warning">{{ warning }}</li></ul>
       </div>
       <div v-if="pairSuggestionsError" class="analysis-notice" role="status">{{ pairSuggestionsError }}</div>
       <section v-for="section in overlapSections" :key="section.key" class="card overlap-section" v-show="section.pairs.length">
@@ -124,27 +118,11 @@
 
         <!-- Portfolio-level summary -->
         <div v-if="portfolioSummary" class="card" style="margin-top:1.5rem">
-          <h3 class="card-title" style="margin-bottom:1rem">Financial Figures <span style="font-size:.75rem;font-weight:400;color:var(--text-muted)">(weighted portfolio estimates)</span></h3>
+          <h3 class="card-title" style="margin-bottom:1rem">Portfolio Diversification &amp; Cost <span style="font-size:.75rem;font-weight:400;color:var(--text-muted)">(weighted portfolio estimates)</span></h3>
           <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:.75rem">
-            <div class="stat-box">
-              <div class="stat-label">Annual Return</div>
-              <div class="stat-value" :class="signClass(portfolioSummary.ann_return)">{{ fmtPct(portfolioSummary.ann_return) }}</div>
-            </div>
-            <div class="stat-box">
-              <div class="stat-label">Volatility</div>
-              <div class="stat-value" :class="volClass(portfolioSummary.volatility)">{{ fmtPct(portfolioSummary.volatility) }}</div>
-            </div>
-            <div class="stat-box">
-              <div class="stat-label">Max Drawdown</div>
-              <div class="stat-value" :class="ddClass(portfolioSummary.max_drawdown)">{{ fmtPct(portfolioSummary.max_drawdown) }}</div>
-            </div>
             <div class="stat-box">
               <div class="stat-label">Avg HHI</div>
               <div class="stat-value" :class="hhiClass(portfolioSummary.hhi)">{{ portfolioSummary.hhi?.toFixed(0) ?? '—' }}</div>
-            </div>
-            <div class="stat-box">
-              <div class="stat-label">Active ETFs</div>
-              <div class="stat-value">{{ portfolioSummary.etf_count }}</div>
             </div>
             <div class="stat-box">
               <div class="stat-label">Country Diversity</div>
@@ -158,26 +136,26 @@
               <div class="stat-label">Weighted TER</div>
               <div class="stat-value" :class="terClass(portfolioSummary.ter_pct)">{{ portfolioSummary.ter_pct != null ? portfolioSummary.ter_pct.toFixed(2) + '%' : '—' }}</div>
             </div>
+            <div class="stat-box">
+              <div class="stat-label"># Holdings</div>
+              <div class="stat-value">{{ portfolioSummary.num_holdings.toLocaleString() }}</div>
+            </div>
           </div>
           <p style="font-size:.7rem;color:var(--text-muted);margin-top:.75rem;margin-bottom:0">
-            Based on available price, holdings, allocation, and cost data &nbsp;·&nbsp; A portfolio Sharpe ratio is not shown because it requires a synchronized portfolio return series and correlations. Return, volatility, drawdown, HHI, and TER are weighted estimates, not a backtested portfolio series.
+            HHI and diversity are weighted averages of each fund's own holdings/allocations, not a combined look-through portfolio. # Holdings sums each fund's latest count and does not deduplicate securities held by more than one ETF.
           </p>
         </div>
 
         <!-- Per-ETF breakdown -->
         <div class="card" style="margin-top:1rem;padding:0;overflow:hidden">
           <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--border)">
-            <h3 class="card-title" style="margin:0">Per-ETF Risk Breakdown</h3>
+            <h3 class="card-title" style="margin:0">Per-ETF Breakdown</h3>
           </div>
           <div class="table-wrap">
           <table class="risk-table">
             <thead>
               <tr>
                 <th>ISIN</th>
-                <th>1Y Return</th>
-                <th>Volatility</th>
-                <th>Sharpe</th>
-                <th>Max Drawdown</th>
                 <th>HHI</th>
                 <th>Country Div.</th>
                 <th>Sector Div.</th>
@@ -188,21 +166,17 @@
             <tbody>
               <tr v-for="row in portfolioRiskResult" :key="row.etf_id">
                 <td><strong style="color:var(--green-600)">{{ row.isin }}</strong></td>
-                <td :class="signClass(row.ann_return)">{{ fmtPct(row.ann_return) }}</td>
-                <td :class="volClass(row.volatility)">{{ fmtPct(row.volatility) }}</td>
-                <td :class="sharpeClass(row.sharpe_ratio)">{{ row.sharpe_ratio !== null ? row.sharpe_ratio : '—' }}</td>
-                <td :class="ddClass(row.max_drawdown)">{{ fmtPct(row.max_drawdown) }}</td>
                 <td :class="hhiClass(row.hhi)" :title="row.hhi_reason || ''">{{ row.hhi != null ? row.hhi.toFixed(0) : '—' }}</td>
-                <td :class="diversityClass(individualScore(row.etf_id)?.geo_div)">{{ fmtDiversity(individualScore(row.etf_id)?.geo_div) }}</td>
-                <td :class="diversityClass(individualScore(row.etf_id)?.sector_div)">{{ fmtDiversity(individualScore(row.etf_id)?.sector_div) }}</td>
-                <td :class="terClass(individualScore(row.etf_id)?.ter_pct)">{{ individualScore(row.etf_id)?.ter_pct != null ? individualScore(row.etf_id).ter_pct.toFixed(2) + '%' : '—' }}</td>
+                <td :class="diversityClass(row.geo_div)" :title="row.geo_div_reason || ''">{{ fmtDiversity(row.geo_div) }}</td>
+                <td :class="diversityClass(row.sector_div)" :title="row.sector_div_reason || ''">{{ fmtDiversity(row.sector_div) }}</td>
+                <td :class="terClass(etfTer(row.etf_id))">{{ etfTer(row.etf_id) != null ? etfTer(row.etf_id).toFixed(2) + '%' : '—' }}</td>
                 <td>{{ row.num_holdings?.toLocaleString() }}</td>
               </tr>
             </tbody>
           </table>
         </div>
         <div style="padding:.6rem 1.25rem;font-size:.72rem;color:var(--text-muted);border-top:1px solid var(--border)">
-          Rf = {{ riskFreeRate }}% &nbsp;·&nbsp; HHI: Herfindahl-Hirschman Index (0-10,000; lower = more diversified)
+          HHI: Herfindahl-Hirschman Index (0-10,000; lower = more diversified)
         </div>
       </div>
       </div>
@@ -216,7 +190,7 @@ import { ref, computed, onMounted, inject, watch } from 'vue'
 import ETFSelector from '../components/ETFSelector.vue'
 import { Doughnut } from 'vue-chartjs'
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js'
-import { etfService, analyticsService, scoreService } from '../services/api.js'
+import { etfService, analyticsService } from '../services/api.js'
 
 ChartJS.register(ArcElement, Tooltip, Legend)
 
@@ -238,12 +212,9 @@ const exposureResult = ref(null)
 const exposureError = ref('')
 const topHoldings = ref(null)
 const portfolioRiskResult = ref(null)
-const portfolioScoreResult = ref(null)
-const portfolioScoreLoading = ref(false)
 const pairSuggestions = ref(null)
 const pairSuggestionsLoading = ref(false)
 const pairSuggestionsError = ref('')
-const scoreError = ref('')
 let analysisRun = 0
 let autoRunTimer = null
 // Auto-analyse as the user edits the portfolio; debounced so fast edits (typing
@@ -253,13 +224,10 @@ watch(portfolio, () => {
   exposureResult.value = null
   topHoldings.value = null
   portfolioRiskResult.value = null
-  portfolioScoreResult.value = null
   pairSuggestions.value = null
   exposureError.value = ''
-  scoreError.value = ''
   pairSuggestionsError.value = ''
   exposureLoading.value = false
-  portfolioScoreLoading.value = false
   pairSuggestionsLoading.value = false
   clearTimeout(autoRunTimer)
   if (portfolio.value.some(item => item.etf_id && item.weight > 0)) {
@@ -272,11 +240,6 @@ watch(riskFreeRate, () => {
     autoRunTimer = setTimeout(runExposure, 400)
   }
 })
-const analysisWarnings = computed(() => [
-  ...(exposureResult.value?.analysis_warnings || []),
-  ...(portfolioScoreResult.value?.status === 'unavailable' ? [portfolioScoreResult.value.reason || 'Portfolio quality score unavailable.'] : []),
-  ...(scoreError.value ? [scoreError.value] : []),
-])
 const formatCoverage = value => value == null ? 'Unknown' : `${Number(value).toFixed(1)}%`
 const openPairs = ref(new Set())
 function isPairOpen(key) { return openPairs.value.has(key) }
@@ -290,37 +253,37 @@ function etfLabel(isin) {
   return etf ? `${etf.name} (${etf.isin})` : (isin || 'Unknown ETF')
 }
 
+function etfTer(etfId) {
+  const etf = allEtfs.value.find(item => item.id === etfId)
+  return etf?.ter != null ? Number(etf.ter) : null
+}
+
 const portfolioSummary = computed(() => {
   if (!portfolioRiskResult.value?.length) return null
   const p = portfolio.value.filter(x => x.etf_id && x.weight > 0)
   const totalW = p.reduce((s, x) => s + (x.weight || 0), 0)
   if (!totalW) return null
-  let wReturn = 0, wVol = 0, wDD = 0, wHHI = 0, wTer = 0, terWeight = 0
+  let wHHI = 0, wGeo = 0, wSector = 0, wTer = 0, terWeight = 0, holdingsSum = 0
+  const completeMetric = key => p.every(item => portfolioRiskResult.value.find(row => row.etf_id === item.etf_id)?.[key] != null)
   for (const row of portfolioRiskResult.value) {
     const pw = p.find(x => x.etf_id === row.etf_id)
     const w = pw ? (pw.weight || 0) / totalW : 0
-    if (row.ann_return   !== null) wReturn += w * row.ann_return
-    if (row.volatility   !== null) wVol    += w * row.volatility
-    if (row.max_drawdown !== null) wDD     += w * row.max_drawdown
-    if (row.hhi          !== null) wHHI    += w * row.hhi
-    const etf = allEtfs.value.find(item => item.id === row.etf_id)
-    if (etf?.ter !== null && etf?.ter !== undefined) {
-      wTer += w * Number(etf.ter)
+    if (row.hhi != null) wHHI += w * row.hhi
+    if (row.geo_div != null) wGeo += w * row.geo_div
+    if (row.sector_div != null) wSector += w * row.sector_div
+    holdingsSum += row.num_holdings || 0
+    const ter = etfTer(row.etf_id)
+    if (ter != null) {
+      wTer += w * ter
       terWeight += w
     }
   }
-  const completeMetric = key => p.every(item => portfolioRiskResult.value.find(row => row.etf_id === item.etf_id)?.[key] != null)
-  const countryDiversity = exposureResult.value?.exposure_coverage?.country?.status === 'available' ? diversityFromExposure(exposureResult.value?.countries) : null
-  const sectorDiversity = exposureResult.value?.exposure_coverage?.sector?.status === 'available' ? diversityFromExposure(exposureResult.value?.sectors) : null
   return {
-    ann_return: completeMetric('ann_return') ? wReturn : null,
-    volatility: completeMetric('volatility') ? wVol : null,
-    max_drawdown: completeMetric('max_drawdown') ? wDD : null,
     hhi: completeMetric('hhi') ? wHHI : null,
-    etf_count: p.length,
-    geo_div: countryDiversity,
-    sector_div: sectorDiversity,
+    geo_div: completeMetric('geo_div') ? wGeo : null,
+    sector_div: completeMetric('sector_div') ? wSector : null,
     ter_pct: terWeight > 0 ? wTer / terWeight : null,
+    num_holdings: holdingsSum,
   }
 })
 
@@ -344,13 +307,6 @@ function regionExposures(countries) {
   }, {})
 }
 
-function diversityFromExposure(exposure) {
-  const weights = Object.values(exposure || {}).map(Number)
-  const total = weights.reduce((sum, weight) => sum + weight, 0)
-  if (!total) return null
-  return 1 - weights.reduce((sum, weight) => sum + (weight / total) ** 2, 0)
-}
-
 function buildExposureGroup(key, label, values, formatter = name => name) {
   const sorted = Object.entries(values || {}).map(([name, value]) => ({ name: formatter(name), value: Number(value) }))
     .sort((left, right) => right.value - left.value)
@@ -372,7 +328,7 @@ const portfolioExposureGroups = computed(() => {
     buildExposureGroup('region', 'Region Exposure', regionExposures(r.countries)),
     buildExposureGroup('sector', 'Sector Exposure', r.sectors),
     buildExposureGroup('currency', 'Holding Currency Exposure', r.currencies),
-  ].map(group => ({ ...group, coverage: r.exposure_coverage?.[group.key === 'region' ? 'country' : group.key] }))
+  ]
 })
 
 const overlapSections = computed(() => {
@@ -382,7 +338,7 @@ const overlapSections = computed(() => {
     etf_a_isin: pair.etf_a_isin, etf_b_isin: pair.etf_b_isin,
     value: pair.current_overlap, reason: pair.reason,
     as_of_a: pair.as_of_a, as_of_b: pair.as_of_b, coverage_a: null, coverage_b: null,
-    rows: (pair.common_holdings || []).map(h => ({
+    rows: (pair.common_holdings || []).filter(h => h.overlap > 0).map(h => ({
       key: h.isin || h.name, label: h.isin ? `${h.name} (${h.isin})` : h.name,
       a: h.etf_a_weight, b: h.etf_b_weight, overlap: h.overlap,
     })),
@@ -392,7 +348,7 @@ const overlapSections = computed(() => {
     etf_a_isin: pair.etf_a_isin, etf_b_isin: pair.etf_b_isin,
     value: pair.weight_overlap, reason: pair.reason,
     as_of_a: pair.as_of_a, as_of_b: pair.as_of_b, coverage_a: pair.coverage_a, coverage_b: pair.coverage_b,
-    rows: (pair.buckets || []).map(bucket => ({
+    rows: (pair.buckets || []).filter(bucket => bucket.overlap > 0).map(bucket => ({
       key: bucket.bucket, label: kind === 'country' ? fullCountryName(bucket.bucket) : bucket.bucket,
       a: bucket.etf_a_weight, b: bucket.etf_b_weight, overlap: bucket.overlap,
     })),
@@ -425,18 +381,14 @@ function portfolioDonutData(group) {
   }
 }
 
-function individualScore(etfId) {
-  return portfolioScoreResult.value?.individual_scores?.find(score => score.etf_id === etfId)
-}
-
 async function loadETFs() {
   etfsLoading.value=true
   try { const r=await etfService.getETFs(0,5000); allEtfs.value=r.data } catch(e){exposureError.value=e.response?.data?.detail||e.message} finally{etfsLoading.value=false}
 }
 async function runExposure() {
   const run = ++analysisRun
-  exposureLoading.value=true; exposureError.value=''; exposureResult.value=null; topHoldings.value=null; portfolioRiskResult.value=null; portfolioScoreResult.value=null; pairSuggestions.value=null; openPairs.value=new Set()
-  pairSuggestionsError.value=''; scoreError.value=''
+  exposureLoading.value=true; exposureError.value=''; exposureResult.value=null; topHoldings.value=null; portfolioRiskResult.value=null; pairSuggestions.value=null; openPairs.value=new Set()
+  pairSuggestionsError.value=''
   const p=portfolio.value.filter(x=>x.etf_id && x.weight > 0).map(x=>({...x}))
   try {
     const r = await analyticsService.calculateExposure(p, null, riskFreeRate.value / 100)
@@ -444,15 +396,6 @@ async function runExposure() {
     exposureResult.value = r.data
     topHoldings.value = r.data.top_holdings ?? null
     portfolioRiskResult.value = r.data.risk_metrics ?? null
-    if (p.length >= 1) {
-      portfolioScoreLoading.value = true
-      try {
-        const sr = await scoreService.getPortfolioScore(p, riskFreeRate.value / 100)
-        if (run !== analysisRun) return
-        portfolioScoreResult.value = sr.data
-      } catch(e) { if (run === analysisRun) scoreError.value = 'Portfolio quality score unavailable: ' + (e.response?.data?.detail || e.message) }
-        finally { if (run === analysisRun) portfolioScoreLoading.value = false }
-    }
     if (p.length >= 2) {
       pairSuggestionsLoading.value = true
       try {
@@ -465,14 +408,7 @@ async function runExposure() {
   } catch(e){if (run === analysisRun) exposureError.value=e.response?.data?.detail||e.message} finally{if (run === analysisRun) exposureLoading.value=false}
 }
 
-const scoreBadgeClass = (s) => s >= 7 ? 'score-high' : s >= 5 ? 'score-mid' : s >= 3.5 ? 'score-low' : 'score-poor'
 const hhiClass     = (v) => v == null ? '' : v < 200  ? 'cell-green' : v < 1000 ? 'cell-yellow' : 'cell-red'
-
-const fmtPct = v => v !== null && v !== undefined ? `${v >= 0 ? '+' : ''}${v.toFixed(2)}%` : '—'
-const signClass = v  => v === null ? '' : v >= 0 ? 'cell-green' : 'cell-red'
-const volClass  = v  => v === null ? '' : v < 12 ? 'cell-green' : v < 22 ? 'cell-yellow' : 'cell-red'
-const sharpeClass = v => v === null ? '' : v >= 1 ? 'cell-green' : v >= 0 ? 'cell-yellow' : 'cell-red'
-const ddClass   = v  => v === null ? '' : v > -10 ? 'cell-green' : v > -20 ? 'cell-yellow' : 'cell-red'
 const diversityClass = v => v == null ? '' : v >= 0.6 ? 'cell-green' : v >= 0.35 ? 'cell-yellow' : 'cell-red'
 const terClass = v => v == null ? '' : v <= 0.25 ? 'cell-green' : v <= 0.75 ? 'cell-yellow' : 'cell-red'
 const fmtDiversity = v => v == null ? '—' : `${(v * 100).toFixed(1)}%`
@@ -533,7 +469,7 @@ onMounted(() => {
 .overlap-section{margin-bottom:1.5rem}
 .overlap-pair{border:1px solid var(--border);border-radius:8px;padding:.875rem 1rem;margin-bottom:.75rem}
 .table-wrap{overflow-x:auto}
-.portfolio-donut-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem;margin-top:1.5rem}
+.portfolio-donut-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1rem;margin-top:1.5rem}
 .portfolio-donut-card{padding:1rem;min-width:0}
 .portfolio-donut-head{display:flex;justify-content:space-between;gap:1rem;align-items:baseline}
 .portfolio-donut-head .card-title{margin:0}
@@ -569,6 +505,9 @@ onMounted(() => {
 [data-theme="dark"] .score-mid{background:#2d1b00;color:#fde68a}
 [data-theme="dark"] .score-low{background:#3d1a00;color:#fdba74}
 [data-theme="dark"] .score-poor{background:#3d0000;color:#fca5a5}
+@media (max-width:900px){
+  .portfolio-donut-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
 @media (max-width:640px){
   .portfolio-donut-grid{grid-template-columns:1fr}
   .portfolio-donut-chart{height:240px}

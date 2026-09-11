@@ -14,7 +14,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 from app.schemas import ETF, Performance
 from app.services.asset_classes import equity_analytics_supported, normalize_asset_class
-from app.services.analytics_service import _holdings_snapshot, _allocation_snapshot
+from app.services.analytics_service import _holdings_snapshot, _allocation_snapshot, allocation_diversity
 
 # ---------------------------------------------------------------------------
 # Scoring configuration
@@ -108,16 +108,7 @@ def _compute_raw_metrics(db: Session, etf: ETF, rf_annual: float) -> Optional[Di
     # ── Allocations: Country and sector diversification ───────────────────────
     country = _allocation_snapshot(db, etf.id, "country")
     sector = _allocation_snapshot(db, etf.id, "sector")
-
-    def diversity(allocation):
-        if allocation["status"] != "available":
-            return None
-        weights = list(allocation["weights"].values())
-        # Conservative bound: unresolved exposure belongs to the largest known bucket.
-        weights[weights.index(max(weights))] += max(0, 100 - sum(weights))
-        return 1.0 - sum((w / 100) ** 2 for w in weights)
-
-    geo_div, sector_div = diversity(country), diversity(sector)
+    geo_div, sector_div = allocation_diversity(country), allocation_diversity(sector)
 
     ter_pct = float(etf.ter) if etf.ter is not None else None
 
