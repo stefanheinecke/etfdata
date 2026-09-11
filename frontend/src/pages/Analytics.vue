@@ -485,7 +485,7 @@ onMounted(() => {
 .overlap-section{margin-bottom:1.5rem}
 .overlap-pair{border:1px solid var(--border);border-radius:8px;padding:.875rem 1rem;margin-bottom:.75rem}
 .table-wrap{overflow-x:auto}
-.portfolio-donut-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1rem;margin-top:1.5rem}
+.portfolio-donut-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1rem;margin-top:1.5rem}
 .portfolio-donut-card{padding:1rem;min-width:0}
 .portfolio-donut-head{display:flex;justify-content:space-between;gap:1rem;align-items:baseline}
 .portfolio-donut-head .card-title{margin:0}
@@ -494,10 +494,10 @@ onMounted(() => {
 .donut-unavailable{height:250px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.65rem;text-align:center;color:var(--text-muted);font-size:.85rem}
 .empty-donut{width:145px;height:145px;border:25px solid var(--border);border-radius:50%;box-sizing:border-box}
 .portfolio-donut-legend{display:flex;flex-direction:column;gap:.3rem}
-.portfolio-donut-legend div{display:flex;align-items:center;justify-content:space-between;gap:.5rem;min-width:0;font-size:.75rem;color:var(--text-muted)}
-.portfolio-donut-legend span{display:flex;align-items:center;gap:.35rem;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.portfolio-donut-legend i{width:8px;height:8px;border-radius:50%;flex-shrink:0}
-.portfolio-donut-legend strong{color:var(--text);font-size:.73rem;font-variant-numeric:tabular-nums}
+.portfolio-donut-legend div{display:flex;align-items:flex-start;justify-content:space-between;gap:.5rem;min-width:0;font-size:.75rem;color:var(--text-muted)}
+.portfolio-donut-legend span{display:flex;align-items:center;gap:.35rem;min-width:0;white-space:normal;word-break:break-word}
+.portfolio-donut-legend i{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:.2rem}
+.portfolio-donut-legend strong{color:var(--text);font-size:.73rem;font-variant-numeric:tabular-nums;flex-shrink:0}
 .etf-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:1rem}
 .etf-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1.25rem;box-shadow:var(--shadow)}
 .etf-card-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem}
@@ -511,7 +511,11 @@ onMounted(() => {
 .alloc-pct{width:45px;text-align:right;font-size:.8rem;font-weight:600;color:var(--text)}
 .meth-link{background:none;border:none;padding:0;cursor:pointer;font-size:.76rem;color:#0f4c81;text-decoration:underline;margin-top:.2rem;display:inline-block}
 .meth-link:hover{color:#1a6ab8}
+@media (max-width:900px){
+  .portfolio-donut-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
 @media (max-width:640px){
+  .portfolio-donut-grid{grid-template-columns:1fr}
   .portfolio-donut-chart{height:240px}
 }
 </style>
