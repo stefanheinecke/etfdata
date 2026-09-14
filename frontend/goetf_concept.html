@@ -130,7 +130,7 @@
 
     /* ── Strip ──────────────────────────────────────────────────── */
     .strip { background: var(--bg-dark); }
-    .strip-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: rgba(255,255,255,.07); }
+    .strip-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: rgba(255,255,255,.07); }
     .strip-item { padding: 36px 28px; background: var(--bg-dark); transition: background .2s; }
     .strip-item:hover { background: var(--bg-dark2); }
     .strip-icon { width: 40px; height: 40px; background: rgba(0,201,167,.12); border-radius: 10px; display: flex; align-items: center; justify-content: center; margin-bottom: 16px; }
@@ -353,7 +353,7 @@
       <!-- Text -->
       <div class="hero-text">
         <div class="hero-eyebrow">
-          <span class="badge badge-accent"><span class="live-dot"></span>Beta&ensp;·&ensp;8 ETFs tracked</span>
+          <span class="badge badge-accent"><span class="live-dot"></span>Beta&ensp;·&ensp;<span id="etfCount">1,449</span> ETFs tracked</span>
         </div>
         <h1>ETF Analysis<br>that actually computes.</h1>
         <p class="lead">GoETF scores every ETF with a weighted rating, reveals true portfolio overlap, and suggests simplifications. Real analysis instead of price lists.</p>
@@ -404,17 +404,10 @@
     </div>
     <div class="strip-item animate-on-scroll">
       <div class="strip-icon">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
-      </div>
-      <h3>Portfolio Simplifier</h3>
-      <p>6 ETFs → 1 ETF with identical exposure. Less complexity, lower TER, no loss of information.</p>
-    </div>
-    <div class="strip-item animate-on-scroll">
-      <div class="strip-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/></svg>
       </div>
       <h3>API & MCP</h3>
-      <p>REST API with free key, fully documented. MCP integration planned for LLM workflows.</p>
+      <p>REST API with free key, fully documented. MCP server available for LLM workflows.</p>
     </div>
   </div>
 </div>
@@ -431,24 +424,34 @@
 
         <div class="score-pillars mt-6" id="pillars">
           <div class="pillar">
-            <span class="pillar-label">Performance</span>
-            <div class="pillar-bar-track"><div class="pillar-bar" data-width="40" style="background:#0F4C81"></div></div>
-            <span class="pillar-pct">40%</span>
+            <span class="pillar-label">Holdings HHI</span>
+            <div class="pillar-bar-track"><div class="pillar-bar" data-width="16.7" style="background:#0F4C81"></div></div>
+            <span class="pillar-pct">16.7%</span>
           </div>
           <div class="pillar">
-            <span class="pillar-label">Risk</span>
-            <div class="pillar-bar-track"><div class="pillar-bar" data-width="30" style="background:#1A6AB8"></div></div>
-            <span class="pillar-pct">30%</span>
+            <span class="pillar-label">Country Diversity</span>
+            <div class="pillar-bar-track"><div class="pillar-bar" data-width="16.7" style="background:#1A6AB8"></div></div>
+            <span class="pillar-pct">16.7%</span>
           </div>
           <div class="pillar">
-            <span class="pillar-label">Diversification</span>
-            <div class="pillar-bar-track"><div class="pillar-bar" data-width="20" style="background:#00C9A7"></div></div>
-            <span class="pillar-pct">20%</span>
+            <span class="pillar-label">Sector Diversity</span>
+            <div class="pillar-bar-track"><div class="pillar-bar" data-width="16.7" style="background:#00C9A7"></div></div>
+            <span class="pillar-pct">16.7%</span>
           </div>
           <div class="pillar">
-            <span class="pillar-label">Consistency</span>
-            <div class="pillar-bar-track"><div class="pillar-bar" data-width="10" style="background:#6B7280"></div></div>
-            <span class="pillar-pct">10%</span>
+            <span class="pillar-label">Currency Diversity</span>
+            <div class="pillar-bar-track"><div class="pillar-bar" data-width="16.7" style="background:#009F86"></div></div>
+            <span class="pillar-pct">16.7%</span>
+          </div>
+          <div class="pillar">
+            <span class="pillar-label">Fund Size</span>
+            <div class="pillar-bar-track"><div class="pillar-bar" data-width="16.7" style="background:#6B7280"></div></div>
+            <span class="pillar-pct">16.7%</span>
+          </div>
+          <div class="pillar">
+            <span class="pillar-label">Number of Holdings</span>
+            <div class="pillar-bar-track"><div class="pillar-bar" data-width="16.7" style="background:#9CA3AF"></div></div>
+            <span class="pillar-pct">16.7%</span>
           </div>
         </div>
 
@@ -463,40 +466,40 @@
               <tr>
                 <th>ETF</th>
                 <th>Score</th>
-                <th>TER</th>
-                <th>Sharpe</th>
+                <th>Holdings</th>
+                <th>Fund Size</th>
               </tr>
             </thead>
             <tbody>
               <tr>
-                <td><span class="ticker-tag">SWDA</span></td>
-                <td><span class="score-chip" style="background:rgba(34,197,94,.12);color:#16A34A">7.8</span></td>
-                <td>0.20%</td>
-                <td>0.82</td>
+                <td>iShares MSCI World ex-USA UCITS ETF USD (Acc)</td>
+                <td><span class="score-chip" style="background:rgba(34,197,94,.12);color:#16A34A">9.8</span></td>
+                <td>734</td>
+                <td>$3.7bn</td>
               </tr>
               <tr>
-                <td><span class="ticker-tag">CSSPX</span></td>
-                <td><span class="score-chip" style="background:rgba(34,197,94,.12);color:#16A34A">7.2</span></td>
-                <td>0.07%</td>
-                <td>0.91</td>
+                <td>iShares Core MSCI Europe UCITS ETF EUR (Dist)</td>
+                <td><span class="score-chip" style="background:rgba(34,197,94,.12);color:#16A34A">9.7</span></td>
+                <td>387</td>
+                <td>$14.1bn</td>
               </tr>
               <tr>
-                <td><span class="ticker-tag">VUSA</span></td>
-                <td><span class="score-chip" style="background:rgba(34,197,94,.12);color:#16A34A">6.9</span></td>
-                <td>0.07%</td>
-                <td>0.88</td>
+                <td>iShares MSCI World Industrials Sector Advanced UCITS ETF</td>
+                <td><span class="score-chip" style="background:rgba(245,158,11,.12);color:#B45309">6.7</span></td>
+                <td>224</td>
+                <td>$124.7m</td>
               </tr>
               <tr>
-                <td><span class="ticker-tag">ISF</span></td>
-                <td><span class="score-chip" style="background:rgba(245,158,11,.12);color:#B45309">6.5</span></td>
-                <td>0.07%</td>
-                <td>0.64</td>
+                <td>iShares S&P 500 Health Care Sector UCITS ETF USD (Acc)</td>
+                <td><span class="score-chip" style="background:rgba(239,68,68,.12);color:#DC2626">3.9</span></td>
+                <td>59</td>
+                <td>$3.2bn</td>
               </tr>
               <tr>
-                <td><span class="ticker-tag">SEDY</span></td>
-                <td><span class="score-chip" style="background:rgba(245,158,11,.12);color:#B45309">5.9</span></td>
-                <td>0.40%</td>
-                <td>0.51</td>
+                <td>iShares Nasdaq 100 Top 30 UCITS ETF USD (Acc)</td>
+                <td><span class="score-chip" style="background:rgba(239,68,68,.12);color:#DC2626">3.8</span></td>
+                <td>31</td>
+                <td>$47.2m</td>
               </tr>
             </tbody>
           </table>
@@ -509,8 +512,7 @@
         <div class="score-card">
           <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:18px;">
             <div>
-              <div style="font-family:var(--mono); font-weight:700; font-size:.95rem">SWDA</div>
-              <div style="font-size:.8rem; color:var(--text-muted)">iShares Core MSCI World</div>
+              <div style="font-weight:700; font-size:.95rem">iShares MSCI World ex-USA UCITS ETF USD (Acc)</div>
             </div>
             <span class="badge badge-blue">iShares</span>
           </div>
@@ -520,7 +522,7 @@
             <svg class="gauge-svg" width="200" height="120" viewBox="0 0 200 120">
               <!-- Track -->
               <path d="M 20 110 A 80 80 0 0 1 180 110" fill="none" stroke="#F3F4F6" stroke-width="14" stroke-linecap="round"/>
-              <!-- Score arc — 7.8/10 = 78% of 180deg -->
+              <!-- Score arc — 9.8/10 = 98% of 180deg -->
               <path id="gaugeArc" d="M 20 110 A 80 80 0 0 1 180 110" fill="none" stroke="#22C55E" stroke-width="14" stroke-linecap="round"
                     stroke-dasharray="251.2" stroke-dashoffset="251.2"/>
               <text x="100" y="105" text-anchor="middle" class="gauge-text" id="gaugeNum">0.0</text>
@@ -530,47 +532,57 @@
 
           <div class="score-meta">
             <div class="meta-item">
-              <div class="meta-label">TER</div>
-              <div class="meta-val">0.20%</div>
-            </div>
-            <div class="meta-item">
               <div class="meta-label">Fund size</div>
-              <div class="meta-val">$101.7bn</div>
+              <div class="meta-val">$3.7bn</div>
             </div>
             <div class="meta-item">
-              <div class="meta-label">Sharpe Ratio</div>
-              <div class="meta-val">0.82</div>
+              <div class="meta-label">Holdings</div>
+              <div class="meta-val">734</div>
             </div>
             <div class="meta-item">
-              <div class="meta-label">Max. Drawdown</div>
-              <div class="meta-val">−32.9%</div>
+              <div class="meta-label">Holdings HHI</div>
+              <div class="meta-val">43.8</div>
+            </div>
+            <div class="meta-item">
+              <div class="meta-label">Country Diversity</div>
+              <div class="meta-val">89.3%</div>
             </div>
           </div>
 
           <div style="margin-top:20px; display:flex; flex-direction:column; gap:10px">
             <div class="pillar">
-              <span class="pillar-label" style="font-size:.8rem; width:120px">Performance</span>
-              <div class="pillar-bar-track"><div class="pillar-bar" data-width="82" style="background:var(--score-hi)"></div></div>
-              <span class="pillar-pct">8.2</span>
+              <span class="pillar-label" style="font-size:.8rem; width:120px">Holdings HHI</span>
+              <div class="pillar-bar-track"><div class="pillar-bar" data-width="100" style="background:var(--score-hi)"></div></div>
+              <span class="pillar-pct">10.0</span>
             </div>
             <div class="pillar">
-              <span class="pillar-label" style="font-size:.8rem; width:120px">Risk</span>
-              <div class="pillar-bar-track"><div class="pillar-bar" data-width="71" style="background:var(--score-md)"></div></div>
-              <span class="pillar-pct">7.1</span>
+              <span class="pillar-label" style="font-size:.8rem; width:120px">Country Diversity</span>
+              <div class="pillar-bar-track"><div class="pillar-bar" data-width="100" style="background:var(--score-hi)"></div></div>
+              <span class="pillar-pct">10.0</span>
             </div>
             <div class="pillar">
-              <span class="pillar-label" style="font-size:.8rem; width:120px">Diversification</span>
-              <div class="pillar-bar-track"><div class="pillar-bar" data-width="78" style="background:var(--accent)"></div></div>
-              <span class="pillar-pct">7.8</span>
+              <span class="pillar-label" style="font-size:.8rem; width:120px">Sector Diversity</span>
+              <div class="pillar-bar-track"><div class="pillar-bar" data-width="100" style="background:var(--score-hi)"></div></div>
+              <span class="pillar-pct">10.0</span>
             </div>
             <div class="pillar">
-              <span class="pillar-label" style="font-size:.8rem; width:120px">Cost</span>
-              <div class="pillar-bar-track"><div class="pillar-bar" data-width="65" style="background:#9CA3AF"></div></div>
-              <span class="pillar-pct">6.5</span>
+              <span class="pillar-label" style="font-size:.8rem; width:120px">Currency Diversity</span>
+              <div class="pillar-bar-track"><div class="pillar-bar" data-width="100" style="background:var(--score-hi)"></div></div>
+              <span class="pillar-pct">10.0</span>
+            </div>
+            <div class="pillar">
+              <span class="pillar-label" style="font-size:.8rem; width:120px">Fund Size</span>
+              <div class="pillar-bar-track"><div class="pillar-bar" data-width="86" style="background:var(--accent)"></div></div>
+              <span class="pillar-pct">8.6</span>
+            </div>
+            <div class="pillar">
+              <span class="pillar-label" style="font-size:.8rem; width:120px">Holdings Count</span>
+              <div class="pillar-bar-track"><div class="pillar-bar" data-width="100" style="background:var(--score-hi)"></div></div>
+              <span class="pillar-pct">10.0</span>
             </div>
           </div>
 
-          <a href="/etfs/swda" class="btn btn-outline" style="width:100%; justify-content:center; margin-top:22px">SWDA Full Analysis</a>
+          <a href="/etfs" class="btn btn-outline" style="width:100%; justify-content:center; margin-top:22px">Full ETF Analysis</a>
         </div>
       </div>
     </div>
@@ -589,11 +601,11 @@
     <div class="animate-on-scroll">
       <!-- ETF Toggles -->
       <div class="overlap-selectors" id="overlapToggles">
-        <button class="etf-toggle active" data-etf="SWDA">SWDA</button>
-        <button class="etf-toggle active" data-etf="CSSPX">CSSPX</button>
-        <button class="etf-toggle active" data-etf="VUSA">VUSA</button>
-        <button class="etf-toggle active" data-etf="ISF">ISF</button>
-        <button class="etf-toggle" data-etf="SEDY">SEDY</button>
+        <button class="etf-toggle active" data-etf="WORLD" title="iShares MSCI World UCITS ETF USD (Dist)">iShares World</button>
+        <button class="etf-toggle active" data-etf="SPX500" title="iShares Core S&P 500 UCITS ETF USD (Dist)">Core S&P 500</button>
+        <button class="etf-toggle active" data-etf="NDQ100" title="iShares NASDAQ 100 Swap UCITS ETF USD (Acc)">NASDAQ 100</button>
+        <button class="etf-toggle active" data-etf="FTSE100" title="iShares Core FTSE 100 UCITS ETF GBP (Dist)">Core FTSE 100</button>
+        <button class="etf-toggle" data-etf="EM" title="iShares MSCI Emerging Markets UCITS ETF (Dist)">MSCI Emerging Markets</button>
       </div>
 
       <!-- Matrix -->
@@ -610,48 +622,11 @@
       </div>
 
       <div class="overlap-insight mt-6" id="overlapInsight">
-        <p><strong>Insight:</strong> SWDA, CSSPX and VUSA share 71–95% of their positions. Holding all three means paying triple the TER for nearly identical exposure. <strong>A single ETF would do.</strong></p>
+        <p><strong>Insight:</strong> The iShares World, Core S&P 500 and NASDAQ 100 ETFs share 55–78% of their positions. Holding all three means paying triple the TER for largely overlapping US exposure. <strong>A single ETF would do.</strong></p>
       </div>
 
       <div style="text-align:center; margin-top:36px">
         <a href="/portfolio" class="btn btn-accent">Analyse my portfolio</a>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ── Portfolio Tools ────────────────────────────────────── -->
-<section class="section tools-section">
-  <div class="container">
-    <div class="animate-on-scroll mb-6">
-      <p class="section-label">Portfolio Tools</p>
-      <h2>Fewer ETFs. Better portfolio.</h2>
-    </div>
-    <div class="tools-grid">
-      <!-- Simplifier -->
-      <div class="tool-card animate-on-scroll">
-        <div class="tool-icon icon-blue">⟳</div>
-        <h3>Portfolio Simplifier</h3>
-        <p>You hold 5 ETFs and pay 5× transaction fees, 5× rebalancing overhead, 5× mental load. GoETF finds the one ETF that covers the same exposure, risk profile, and geographic mix.</p>
-        <div class="tool-demo">
-          <div class="demo-row"><span class="etf">SWDA</span> <span class="demo-arrow">+</span> <span class="etf">CSSPX</span> <span class="demo-arrow">+</span> <span class="etf">VUSA</span></div>
-          <div class="demo-row" style="margin-top:6px; color:#6B7280; font-size:.8rem">⬇ Overlap 78–95% detected</div>
-          <div class="demo-row" style="margin-top:6px"><span class="demo-result">→ SWDA</span> <span class="savings" style="margin-left:8px">−0.14% TER saved</span></div>
-        </div>
-        <a href="/portfolio/simplifier" class="btn btn-outline">Try it →</a>
-      </div>
-
-      <!-- Enhancer -->
-      <div class="tool-card animate-on-scroll">
-        <div class="tool-icon icon-accent">＋</div>
-        <h3>Portfolio Enhancer</h3>
-        <p>You want more biotech exposure, more CHF allocation, or more emerging markets — but without duplicating existing holdings. GoETF suggests ETFs that complement your portfolio, not repeat it.</p>
-        <div class="tool-demo">
-          <div class="demo-row" style="font-size:.8rem; color:#6B7280">Existing portfolio: SWDA + ISF</div>
-          <div class="demo-row" style="margin-top:6px; font-size:.8rem; color:#6B7280">Goal: +Biotech, minimum overlap</div>
-          <div class="demo-row" style="margin-top:6px"><span class="demo-result">→ XBIO</span> <span style="font-size:.8rem; color:#6B7280; margin-left:8px">Overlap with portfolio: 3.2%</span></div>
-        </div>
-        <a href="/portfolio/enhancer" class="btn btn-outline">Try it →</a>
       </div>
     </div>
   </div>
@@ -749,7 +724,7 @@
           </div>
           <div class="api-point">
             <div class="api-point-dot"></div>
-            <p><strong>MCP integration</strong> planned — use GoETF directly in LLM workflows, no scraping required.</p>
+            <p><strong>MCP server</strong> — use GoETF directly in Claude Desktop or any MCP-compatible client, no scraping or API code required.</p>
           </div>
           <div class="api-point">
             <div class="api-point-dot"></div>
@@ -769,6 +744,7 @@
             <button class="code-tab active" data-tab="python">Python</button>
             <button class="code-tab" data-tab="js">JavaScript</button>
             <button class="code-tab" data-tab="curl">cURL</button>
+            <button class="code-tab" data-tab="mcp">MCP</button>
           </div>
           <div class="code-content active" id="tab-python">
 <pre><span class="kw">import</span> requests
@@ -825,6 +801,25 @@ overlap = r.<span class="fn">json</span>()
      -H <span class="st">"Content-Type: application/json"</span> \
      -d <span class="st">'{"tickers":["SWDA","CSSPX","VUSA"]}'</span> \
      https://api.goetf.ch/v1/analytics/overlap</pre>
+          </div>
+          <div class="code-content" id="tab-mcp">
+<pre><span class="cm">// claude_desktop_config.json</span>
+{
+  <span class="st">"mcpServers"</span>: {
+    <span class="st">"goetf"</span>: {
+      <span class="st">"command"</span>: <span class="st">"python"</span>,
+      <span class="st">"args"</span>: [<span class="st">"/path/to/mcp-server/server.py"</span>],
+      <span class="st">"env"</span>: {
+        <span class="st">"GOETF_API_URL"</span>: <span class="st">"https://api.goetf.ch"</span>,
+        <span class="st">"GOETF_API_KEY"</span>: <span class="st">"your_key_here"</span>
+      }
+    }
+  }
+}
+
+<span class="cm">// Then just ask Claude, in plain language:</span>
+<span class="cm">// "List the 20 largest iShares ETFs GoETF tracks"</span>
+<span class="cm">// → Claude calls the list_etfs tool and answers directly in the chat.</span></pre>
           </div>
         </div>
       </div>
@@ -940,19 +935,19 @@ overlap = r.<span class="fn">json</span>()
 <script>
 /* ── Data ────────────────────────────────────────────────── */
 const ETF_SCORES = [
-  { ticker: 'SWDA',  name: 'iShares Core MSCI World',    score: 7.8 },
-  { ticker: 'CSSPX', name: 'iShares Core S&P 500',       score: 7.2 },
-  { ticker: 'VUSA',  name: 'Vanguard S&P 500 UCITS ETF', score: 6.9 },
-  { ticker: 'ISF',   name: 'iShares Core FTSE 100',      score: 6.5 },
-  { ticker: 'SEDY',  name: 'SPDR S&P Em. Mkts. Dividend',score: 5.9 },
+  { name: 'iShares MSCI World ex-USA UCITS ETF USD (Acc)',            score: 9.8 },
+  { name: 'iShares Core MSCI Europe UCITS ETF EUR (Dist)',            score: 9.7 },
+  { name: 'iShares MSCI World Industrials Sector Advanced UCITS ETF', score: 6.7 },
+  { name: 'iShares S&P 500 Health Care Sector UCITS ETF USD (Acc)',   score: 3.9 },
+  { name: 'iShares Nasdaq 100 Top 30 UCITS ETF USD (Acc)',            score: 3.8 },
 ];
 
 const OVERLAP = {
-  SWDA:  { SWDA: 100, CSSPX: 78, VUSA: 71, ISF: 12, SEDY: 8  },
-  CSSPX: { SWDA:  78, CSSPX:100, VUSA: 95, ISF:  8, SEDY: 7  },
-  VUSA:  { SWDA:  71, CSSPX: 95, VUSA:100, ISF:  9, SEDY: 6  },
-  ISF:   { SWDA:  12, CSSPX:  8, VUSA:  9, ISF:100, SEDY: 4  },
-  SEDY:  { SWDA:   8, CSSPX:  7, VUSA:  6, ISF:  4, SEDY:100 },
+  WORLD:   { WORLD: 100, SPX500:  78, NDQ100: 55, FTSE100: 12, EM:  8  },
+  SPX500:  { WORLD:  78, SPX500: 100, NDQ100: 62, FTSE100:  8, EM:  7  },
+  NDQ100:  { WORLD:  55, SPX500:  62, NDQ100:100, FTSE100:  5, EM:  4  },
+  FTSE100: { WORLD:  12, SPX500:   8, NDQ100:  5, FTSE100:100, EM:  4  },
+  EM:      { WORLD:   8, SPX500:   7, NDQ100:  4, FTSE100:  4, EM:100  },
 };
 
 /* ── Hero Score Widget ───────────────────────────────────── */
@@ -964,7 +959,6 @@ function renderScoreWidget() {
     const pct = (etf.score / 10 * 100).toFixed(0);
     return `
       <div class="score-row">
-        <span class="score-ticker">${etf.ticker}</span>
         <span class="score-name">${etf.name}</span>
         <div class="score-bar-wrap"><div class="score-bar ${barCls}" style="width:${pct}%"></div></div>
         <span class="score-num ${cls}">${etf.score}</span>
@@ -974,7 +968,7 @@ function renderScoreWidget() {
 renderScoreWidget();
 
 /* ── Overlap Matrix ──────────────────────────────────────── */
-let activeETFs = ['SWDA', 'CSSPX', 'VUSA', 'ISF'];
+let activeETFs = ['WORLD', 'SPX500', 'NDQ100', 'FTSE100'];
 
 function cellClass(val, isSelf) {
   if (isSelf) return 'matrix-cell cell-self';
@@ -983,6 +977,8 @@ function cellClass(val, isSelf) {
   return 'matrix-cell cell-lo';
 }
 
+const ETF_LABELS = { WORLD: 'World', SPX500: 'S&P 500', NDQ100: 'Nasdaq 100', FTSE100: 'FTSE 100', EM: 'EM' };
+
 function renderMatrix() {
   const table = document.getElementById('overlapMatrix');
   if (activeETFs.length < 2) {
@@ -990,10 +986,10 @@ function renderMatrix() {
     return;
   }
   let html = '<thead><tr><th></th>';
-  activeETFs.forEach(e => html += `<th>${e}</th>`);
+  activeETFs.forEach(e => html += `<th>${ETF_LABELS[e] || e}</th>`);
   html += '</tr></thead><tbody>';
   activeETFs.forEach(row => {
-    html += `<tr><th class="row-label">${row}</th>`;
+    html += `<tr><th class="row-label">${ETF_LABELS[row] || row}</th>`;
     activeETFs.forEach(col => {
       const val = OVERLAP[row][col];
       const isSelf = row === col;
@@ -1093,7 +1089,7 @@ applyApiKeyUiState();
 /* ── Score Gauge Animation ───────────────────────────────── */
 const gaugeArc = document.getElementById('gaugeArc');
 const gaugeNum = document.getElementById('gaugeNum');
-const SCORE = 7.8;
+const SCORE = 9.8;
 const CIRC  = 251.2; // π * r = π * 80 ≈ 251.2 (half circle)
 
 let gaugeStarted = false;
@@ -1141,6 +1137,21 @@ const API_BASE_URL = (() => {
 })();
 
 console.log('🔧 Contact Form Debug - API_BASE_URL:', API_BASE_URL);
+
+/* ── Live ETF Count ──────────────────────────────────────── */
+async function fetchAndSetEtfCount() {
+  const el = document.getElementById('etfCount');
+  if (!el) return;
+  try {
+    const res = await fetch(`${API_BASE_URL}/etfs/count`, { headers: { 'x-api-key': 'demo' } });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (typeof data.total === 'number') el.textContent = data.total.toLocaleString('en-US');
+  } catch (err) {
+    console.warn('Could not fetch live ETF count:', err.message);
+  }
+}
+fetchAndSetEtfCount();
 
 /* ── Contact Form ──────────────────────────────────────── */
 const contactForm = document.getElementById('contactForm');

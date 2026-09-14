@@ -13,6 +13,15 @@ from app.services.fx_service import get_latest_rates_map, get_latest_rate
 
 router = APIRouter(prefix="/etfs", tags=["etfs"])
 
+@router.get("/count")
+async def get_etf_count(
+    db: Session = Depends(get_db),
+    api_key: APIKey = Depends(verify_api_key)
+):
+    """Total number of tracked ETFs. Used by the marketing homepage's live counter."""
+    return {"total": db.query(ETF).count()}
+
+
 @router.get("", response_model=List[ETFResponse])
 async def list_etfs(
     skip: int = 0,
