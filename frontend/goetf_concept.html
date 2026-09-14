@@ -601,7 +601,7 @@
     <div class="animate-on-scroll">
       <!-- ETF Toggles -->
       <div class="overlap-selectors" id="overlapToggles">
-        <button class="etf-toggle active" data-etf="WORLD" title="iShares MSCI World UCITS ETF USD (Dist)">iShares World</button>
+        <button class="etf-toggle active" data-etf="WORLD" title="iShares MSCI World UCITS ETF USD (Dist)">MSCI World</button>
         <button class="etf-toggle active" data-etf="SPX500" title="iShares Core S&P 500 UCITS ETF USD (Dist)">Core S&P 500</button>
         <button class="etf-toggle active" data-etf="NDQ100" title="iShares NASDAQ 100 Swap UCITS ETF USD (Acc)">NASDAQ 100</button>
         <button class="etf-toggle active" data-etf="FTSE100" title="iShares Core FTSE 100 UCITS ETF GBP (Dist)">Core FTSE 100</button>
@@ -977,7 +977,7 @@ function cellClass(val, isSelf) {
   return 'matrix-cell cell-lo';
 }
 
-const ETF_LABELS = { WORLD: 'World', SPX500: 'S&P 500', NDQ100: 'Nasdaq 100', FTSE100: 'FTSE 100', EM: 'EM' };
+const ETF_LABELS = { WORLD: 'MSCI World', SPX500: 'Core S&P 500', NDQ100: 'Nasdaq 100', FTSE100: 'Core FTSE 100', EM: 'MSCI EM' };
 
 function renderMatrix() {
   const table = document.getElementById('overlapMatrix');
