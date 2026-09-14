@@ -2,9 +2,10 @@
 GoETF Scoring Service
 Computes individual ETF GoETF Scores (1–10) and Portfolio GoETF Scores.
 
-Individual score = equally weighted absolute quality score across 7 metrics:
-    CAGR, Sortino, Maximum Drawdown, Holdings HHI,
-    Country Diversity, Sector Diversity, and TER
+Individual score = equally weighted absolute quality score across 6 structural
+metrics: Holdings HHI, Country Diversity, Sector Diversity, Currency Diversity,
+Fund Size, and Number of Holdings. Price-history based metrics are intentionally
+excluded for now.
 
 Portfolio score = weighted avg base − overlap penalty + allocation bonus
 """
@@ -12,120 +13,85 @@ import math
 from typing import List, Optional, Dict
 from uuid import UUID
 from sqlalchemy.orm import Session
-from app.schemas import ETF, Performance
+from app.schemas import ETF
 from app.services.asset_classes import equity_analytics_supported, normalize_asset_class
 from app.services.analytics_service import _holdings_snapshot, _allocation_snapshot, allocation_diversity
+from app.services.fx_service import get_latest_rate
 
 # ---------------------------------------------------------------------------
 # Scoring configuration
 # ---------------------------------------------------------------------------
 SCORE_COMPONENTS = (
-    "cagr_pct",
-    "sortino",
-    "max_drawdown_pct",
     "hhi",
     "geo_div",
     "sector_div",
-    "ter_pct",
+    "currency_div",
+    "fund_size_log10",
+    "num_holdings",
 )
-
-MIN_PRICE_OBSERVATIONS = 253  # At least 252 daily returns (approximately one trading year).
 
 # Absolute reference ranges (worst, best) for each metric.
 # Score = clamp((value − worst) / (best − worst), 0, 1)
 # For "lower is better" metrics worst > best, so the formula naturally inverts.
 SCORE_RANGES = {
-    # metric: (worst, best) — score = clamp((value − worst) / (best − worst), 0, 1)
-    # For "lower is better" metrics worst > best, so the formula naturally inverts.
-    # "best" values represent genuinely excellent but achievable equity ETF performance.
-    "cagr_pct":           (-20.0, 20.0),  # %; worst = -20%, best = 20%
-    "sortino":             (-0.5,   1.5), # ratio; worst = -0.5, best = 1.5
-    "max_drawdown_pct":    (-60.0, -5.0), # %; worst = -60%, best = -5%
-    "hhi":                 (5000,   50),  # lower is better; worst = 5000, best = 50
-    "geo_div":             ( 0.0, 0.80),  # fraction; worst = 0, best = 0.80
-    "sector_div":          ( 0.0, 0.80),  # fraction; worst = 0, best = 0.80
-    "ter_pct":             ( 2.0, 0.05),  # lower is better; worst = 2.00%, best = 0.05%
+    "hhi":              (5000,   50),   # lower is better; worst = 5000, best = 50
+    "geo_div":          ( 0.0, 0.80),   # fraction; worst = 0, best = 0.80
+    "sector_div":       ( 0.0, 0.80),   # fraction; worst = 0, best = 0.80
+    "currency_div":     ( 0.0, 0.80),   # fraction; worst = 0, best = 0.80
+    "fund_size_log10":  ( 7.0, 10.0),   # log10(USD); worst = $10M, best = $10B
+    "num_holdings":     (   5,  300),   # count; worst = 5 holdings, best = 300
 }
 
 
 # ---------------------------------------------------------------------------
 # Raw metric computation for a single ETF
 # ---------------------------------------------------------------------------
-def _compute_raw_metrics(db: Session, etf: ETF, rf_annual: float) -> Optional[Dict]:
+def _compute_raw_metrics(db: Session, etf: ETF) -> Optional[Dict]:
     """
-    Compute the 7 GoETF Quality Score metrics from existing DB tables.
-    Returns None if there is insufficient price history for a one-year score.
+    Compute the 6 GoETF Quality Score metrics from existing DB tables.
+    Returns None if the asset class doesn't support equity-style holdings analytics.
     """
     if not equity_analytics_supported(etf.asset_class):
         return None
-    perf = (
-        db.query(Performance)
-        .filter(Performance.etf_id == etf.id)
-        .order_by(Performance.date)
-        .all()
-    )
-    prices = [float(p.close_price) for p in perf if p.close_price is not None and p.close_price > 0]
 
-    if len(prices) < MIN_PRICE_OBSERVATIONS:
-        return None
-
-    rf_daily = rf_annual / 252
-    daily_returns = [math.log(prices[i] / prices[i - 1]) for i in range(1, len(prices))]
-    n = len(daily_returns)
-    mean_r = sum(daily_returns) / n
-    variance = sum((r - mean_r) ** 2 for r in daily_returns) / max(n - 1, 1)
-    daily_vol = math.sqrt(variance)
-    cagr = (prices[-1] / prices[0]) ** (252 / n) - 1
-    ann_vol = daily_vol * math.sqrt(252)
-
-    # 1. Sortino Ratio
-    excess = [r - rf_daily for r in daily_returns]
-    downside = [e for e in excess if e < 0]
-    if len(downside) > 1:
-        down_var = sum(d ** 2 for d in downside) / (len(downside) - 1)
-    else:
-        down_var = variance
-    downside_dev_ann = math.sqrt(down_var) * math.sqrt(252)
-    sortino = (cagr - rf_annual) / downside_dev_ann if downside_dev_ann > 0 else 0.0
-
-    # 2. Maximum Drawdown (peak-to-trough)
-    peak = prices[0]
-    max_dd = 0.0
-    for p in prices[1:]:
-        if p > peak:
-            peak = p
-        dd = (p - peak) / peak
-        if dd < max_dd:
-            max_dd = dd
     # ── Holdings: HHI ────────────────────────────────────────────────────────
     snapshot = _holdings_snapshot(db, etf.id)
     hhi = None
-    num_holdings = 0
+    num_holdings = None
     if snapshot["status"] == "available":
         num_holdings = len(snapshot["weights"])
         hhi = sum(w * w for w in snapshot["weights"].values())
 
-    # ── Allocations: Country and sector diversification ───────────────────────
+    # ── Allocations: country, sector, and currency diversification ─────────
     country = _allocation_snapshot(db, etf.id, "country")
     sector = _allocation_snapshot(db, etf.id, "sector")
-    geo_div, sector_div = allocation_diversity(country), allocation_diversity(sector)
+    currency = _allocation_snapshot(db, etf.id, "currency")
+    geo_div, sector_div, currency_div = (
+        allocation_diversity(country), allocation_diversity(sector), allocation_diversity(currency),
+    )
 
-    ter_pct = float(etf.ter) if etf.ter is not None else None
+    # ── Fund size: convert to USD for a currency-neutral comparison ────────
+    fund_size_usd = None
+    fund_size_log10 = None
+    if etf.fund_size and etf.currency:
+        rate = get_latest_rate(db, etf.currency)
+        if rate:
+            fund_size_usd = etf.fund_size * rate
+            if fund_size_usd > 0:
+                fund_size_log10 = math.log10(fund_size_usd)
 
     return {
-        "sortino": round(sortino, 3),
-        "cagr_pct": round(cagr * 100, 2),
-        "max_drawdown_pct": round(max_dd * 100, 2),
         "hhi": round(hhi, 1) if hhi is not None else None,
         "geo_div": round(geo_div, 4) if geo_div is not None else None,
         "sector_div": round(sector_div, 4) if sector_div is not None else None,
-        "ter_pct": round(ter_pct, 3) if ter_pct is not None else None,
-        # Extra display fields
-        "ann_vol_pct": round(ann_vol * 100, 2),
+        "currency_div": round(currency_div, 4) if currency_div is not None else None,
+        "fund_size_log10": round(fund_size_log10, 4) if fund_size_log10 is not None else None,
         "num_holdings": num_holdings,
-        "data_points": n,
+        # Extra display fields
+        "fund_size_usd": round(fund_size_usd) if fund_size_usd is not None else None,
         "country_coverage": country["coverage"],
         "sector_coverage": sector["coverage"],
+        "currency_coverage": currency["coverage"],
     }
 
 
@@ -150,7 +116,6 @@ def _absolute_score(metric: str, value: float) -> float:
 # ---------------------------------------------------------------------------
 def compute_goetf_scores(
     db: Session,
-    rf_annual: float = 0.04,
     etf_ids: Optional[List[UUID]] = None,
 ) -> List[Dict]:
     """
@@ -165,7 +130,7 @@ def compute_goetf_scores(
     # Step 1: raw metrics per ETF
     rows = []
     for etf in etfs:
-        raw = _compute_raw_metrics(db, etf, rf_annual)
+        raw = _compute_raw_metrics(db, etf)
         rows.append({"etf_id": str(etf.id), "isin": etf.isin, "name": etf.name, "metrics": raw,
                      "asset_class": normalize_asset_class(etf.asset_class),
                      "equity_analytics_supported": equity_analytics_supported(etf.asset_class)})
@@ -182,7 +147,7 @@ def compute_goetf_scores(
                     "goetf_score": None,
                     "insufficient_data": True,
                     "status": "unavailable",
-                    "reason": "Unsupported asset class for equity scoring" if not row["equity_analytics_supported"] else "Insufficient price history (requires 253 observations)",
+                    "reason": "Unsupported asset class for equity scoring",
                     "asset_class": row["asset_class"],
                     "equity_analytics_supported": row["equity_analytics_supported"],
                 }
@@ -247,7 +212,6 @@ def compute_goetf_scores(
 def compute_portfolio_score(
     db: Session,
     portfolio: List[Dict],   # [{"etf_id": str(UUID), "weight": float}, ...]
-    rf_annual: float = 0.04,
 ) -> Dict:
     """
     GoETF Portfolio Score.
@@ -265,10 +229,11 @@ def compute_portfolio_score(
     total_w = sum(p["weight"] for p in active)
 
     # Individual ETF scores used to calculate the portfolio base score.
-    all_scores = compute_goetf_scores(db, rf_annual)
+    all_scores = compute_goetf_scores(db)
     score_map = {s["etf_id"]: s.get("goetf_score") for s in all_scores}
     geo_map = {s["etf_id"]: s.get("geo_div") for s in all_scores}
     isin_map = {s["etf_id"]: s["isin"] for s in all_scores}
+
 
     # 1. Base score
     missing_scores = any(score_map.get(p["etf_id"]) is None for p in active)

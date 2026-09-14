@@ -19,11 +19,7 @@
         <p style="font-size:.8rem;color:var(--text-muted);margin:.2rem 0 0">Absolute quality score against fixed benchmarks, independent of ETF universe size.</p>
         <button class="meth-link" @click="navigateTo('methodology')">How is this calculated?</button>
       </div>
-      <label style="font-size:.8rem;color:var(--text-muted);margin-left:auto">Risk-free rate</label>
-      <input class="input" type="number" v-model.number="goetfRfRate" min="0" max="20" step="0.5"
-        style="width:72px;padding:.3rem .5rem;font-size:.875rem" />
-      <span style="font-size:.8rem;color:var(--text-muted)">% p.a.</span>
-      <button class="btn btn-outline" style="font-size:.875rem" @click="runGoetfScores" :disabled="goetfLoading">
+      <button class="btn btn-outline" style="font-size:.875rem;margin-left:auto" @click="runGoetfScores" :disabled="goetfLoading">
         {{ goetfLoading ? 'Loading…' : 'Recalculate' }}
       </button>
     </div>
@@ -33,7 +29,7 @@
     <div v-if="goetfResult" class="card" style="padding:0;overflow:hidden">
       <div style="padding:.75rem 1.25rem;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
         <h3 class="card-title" style="margin:0">{{ goetfResult.length }} ETF{{ goetfResult.length !== 1 ? 's' : '' }}</h3>
-        <span style="font-size:.75rem;color:var(--text-muted)">Rf = {{ goetfRfRate }}% · Click column header to sort</span>
+        <span style="font-size:.75rem;color:var(--text-muted)">Click column header to sort</span>
       </div>
       <div class="table-wrap">
         <table class="risk-table">
@@ -45,13 +41,12 @@
               </th>
               <th class="sortable-th" @click="toggleGoetfSort('ticker')">Ticker <span class="sort-arrow">{{ goetfSortKey==='ticker' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span></th>
               <th>Name</th>
-              <th class="sortable-th" @click="toggleGoetfSort('cagr_pct')">CAGR <span class="sort-arrow">{{ goetfSortKey==='cagr_pct' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span></th>
-              <th class="sortable-th" @click="toggleGoetfSort('sortino')">Sortino <span class="sort-arrow">{{ goetfSortKey==='sortino' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span></th>
-              <th class="sortable-th" @click="toggleGoetfSort('max_drawdown_pct')">Max Drawdown <span class="sort-arrow">{{ goetfSortKey==='max_drawdown_pct' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span></th>
               <th class="sortable-th" @click="toggleGoetfSort('hhi')">HHI <span class="sort-arrow">{{ goetfSortKey==='hhi' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span></th>
-              <th class="sortable-th" @click="toggleGoetfSort('geo_div')">Geo Div <span class="sort-arrow">{{ goetfSortKey==='geo_div' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span></th>
+              <th class="sortable-th" @click="toggleGoetfSort('geo_div')">Country Div <span class="sort-arrow">{{ goetfSortKey==='geo_div' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span></th>
               <th class="sortable-th" @click="toggleGoetfSort('sector_div')">Sector Div <span class="sort-arrow">{{ goetfSortKey==='sector_div' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span></th>
-              <th class="sortable-th" @click="toggleGoetfSort('ter_pct')">TER <span class="sort-arrow">{{ goetfSortKey==='ter_pct' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span></th>
+              <th class="sortable-th" @click="toggleGoetfSort('currency_div')">Currency Div <span class="sort-arrow">{{ goetfSortKey==='currency_div' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span></th>
+              <th class="sortable-th" @click="toggleGoetfSort('fund_size_usd')">Fund Size <span class="sort-arrow">{{ goetfSortKey==='fund_size_usd' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span></th>
+              <th class="sortable-th" @click="toggleGoetfSort('num_holdings')">Holdings <span class="sort-arrow">{{ goetfSortKey==='num_holdings' ? (goetfSortDir==='asc'?'↑':'↓') : '' }}</span></th>
             </tr>
           </thead>
           <tbody>
@@ -59,7 +54,7 @@
               <td>
                 <div class="score-cell">
                   <template v-if="row.goetf_score != null">
-                    <span class="score-badge" :class="scoreBadgeClass(row.goetf_score)" :title="row.missing_components?.length ? `Calculated without: ${row.missing_components.join(', ')}` : 'All seven components available'">{{ row.goetf_score.toFixed(1) }}</span>
+                    <span class="score-badge" :class="scoreBadgeClass(row.goetf_score)" :title="row.missing_components?.length ? `Calculated without: ${row.missing_components.join(', ')}` : 'All six components available'">{{ row.goetf_score.toFixed(1) }}</span>
                     <button class="score-info-btn" type="button" :aria-label="`Show ${row.isin} Quality Score calculation`" @click.stop="showScoreDetail(row)" @keydown.stop>i</button>
                   </template>
                   <span v-else class="score-badge score-na" :title="row.reason || 'Required data unavailable'">N/A</span>
@@ -67,19 +62,18 @@
               </td>
               <td><strong style="color:var(--green-600)">{{ row.isin }}</strong></td>
               <td style="font-size:.8rem;color:var(--text-muted);max-width:220px"><div>{{ row.name }}</div><small>{{ row.asset_class || 'Unknown' }}</small><div v-if="row.goetf_score == null">{{ row.reason || 'Required data unavailable' }}</div></td>
-              <td :class="signClass(row.cagr_pct)">{{ row.cagr_pct != null ? row.cagr_pct.toFixed(1) + '%' : '—' }}</td>
-              <td :class="sortinoClass(row.sortino)">{{ row.sortino != null ? row.sortino.toFixed(2) : '—' }}</td>
-              <td :class="ddClass(row.max_drawdown_pct)">{{ row.max_drawdown_pct != null ? row.max_drawdown_pct.toFixed(1) + '%' : '—' }}</td>
               <td :class="hhiClass(row.hhi)">{{ row.hhi != null ? row.hhi.toFixed(0) : '—' }}</td>
               <td :class="geodivClass(row.geo_div)">{{ row.geo_div != null ? (row.geo_div * 100).toFixed(1) + '%' : '—' }}</td>
               <td :class="geodivClass(row.sector_div)">{{ row.sector_div != null ? (row.sector_div * 100).toFixed(1) + '%' : '—' }}</td>
-              <td :class="terClass(row.ter_pct)">{{ row.ter_pct != null ? row.ter_pct.toFixed(2) + '%' : '—' }}</td>
+              <td :class="geodivClass(row.currency_div)">{{ row.currency_div != null ? (row.currency_div * 100).toFixed(1) + '%' : '—' }}</td>
+              <td>{{ row.fund_size_usd != null ? formatFundSize(row.fund_size_usd) : '—' }}</td>
+              <td>{{ row.num_holdings != null ? row.num_holdings : '—' }}</td>
             </tr>
           </tbody>
         </table>
       </div>
       <div style="padding:.5rem 1.25rem;border-top:1px solid var(--border);font-size:.7rem;color:var(--text-muted)">
-        All seven components are required and equally weighted. Unsupported asset classes or missing price, holdings, allocation, or TER data produce an unavailable score, not a default rating.
+        All six components are required and equally weighted. Unsupported asset classes or missing holdings, allocation, or fund size data produce an unavailable score, not a default rating.
       </div>
     </div>
     <div v-if="scoreDetail" class="score-detail-backdrop" @click.self="closeScoreDetail">
@@ -120,7 +114,6 @@ const hasApiKey = inject('hasApiKey', ref(!!localStorage.getItem('api_key')))
 const navigateTo = inject('navigateTo')
 const navigateToETF = inject('navigateToETF')
 
-const goetfRfRate = ref(4.0)
 const goetfLoading = ref(false)
 const goetfResult = ref(null)
 const goetfError = ref('')
@@ -129,13 +122,12 @@ const goetfSortDir = ref('desc')
 const scoreDetail = ref(null)
 
 const COMPONENT_LABELS = {
-  cagr_pct: 'CAGR',
-  sortino: 'Sortino Ratio',
-  max_drawdown_pct: 'Maximum Drawdown',
   hhi: 'Holdings HHI',
   geo_div: 'Country Diversity',
   sector_div: 'Sector Diversity',
-  ter_pct: 'TER',
+  currency_div: 'Currency Diversity',
+  fund_size_log10: 'Fund Size',
+  num_holdings: 'Number of Holdings',
 }
 
 const goetfSorted = computed(() => {
@@ -173,10 +165,10 @@ function componentLabel(key) {
 function componentValue(row, key) {
   const value = row[key]
   if (value == null) return 'Unavailable'
-  if (key === 'sortino') return value.toFixed(2)
   if (key === 'hhi') return value.toFixed(0)
-  if (key === 'geo_div' || key === 'sector_div') return `${(value * 100).toFixed(1)}%`
-  if (key === 'ter_pct' || key === 'cagr_pct' || key === 'max_drawdown_pct') return `${value.toFixed(2)}%`
+  if (key === 'geo_div' || key === 'sector_div' || key === 'currency_div') return `${(value * 100).toFixed(1)}%`
+  if (key === 'fund_size_log10') return row.fund_size_usd != null ? formatFundSize(row.fund_size_usd) : 'Unavailable'
+  if (key === 'num_holdings') return String(value)
   return String(value)
 }
 
@@ -200,7 +192,7 @@ async function runGoetfScores() {
   goetfError.value = ''
   goetfResult.value = null
   try {
-    const r = await scoreService.getEtfScores([], goetfRfRate.value / 100)
+    const r = await scoreService.getEtfScores([])
     goetfResult.value = r.data
   } catch (e) {
     goetfError.value = e.response?.data?.detail || e.message
@@ -210,12 +202,14 @@ async function runGoetfScores() {
 }
 
 const scoreBadgeClass = (s) => s >= 7 ? 'score-high' : s >= 5 ? 'score-mid' : s >= 3.5 ? 'score-low' : 'score-poor'
-const signClass = (v) => v == null ? '' : v >= 0 ? 'cell-green' : 'cell-red'
-const sortinoClass = (v) => v == null ? '' : v >= 1.0 ? 'cell-green' : v >= 0.5 ? 'cell-yellow' : 'cell-red'
-const ddClass      = (v) => v == null ? '' : v > -10 ? 'cell-green' : v > -20 ? 'cell-yellow' : 'cell-red'
 const hhiClass     = (v) => v == null ? '' : v < 200  ? 'cell-green' : v < 1000 ? 'cell-yellow' : 'cell-red'
 const geodivClass  = (v) => v == null ? '' : v >= 0.6 ? 'cell-green' : v >= 0.2 ? 'cell-yellow' : 'cell-red'
-const terClass     = (v) => v == null ? '' : v <= 0.25 ? 'cell-green' : v <= 0.75 ? 'cell-yellow' : 'cell-red'
+
+function formatFundSize(usd) {
+  if (usd >= 1e9) return `$${(usd / 1e9).toFixed(1)}B`
+  if (usd >= 1e6) return `$${(usd / 1e6).toFixed(0)}M`
+  return `$${usd.toFixed(0)}`
+}
 
 onMounted(runGoetfScores)
 </script>

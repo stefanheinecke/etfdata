@@ -205,18 +205,14 @@ const groups = [
     label: 'Scores',
     endpoints: [
       { id: 'score-etfs', method: 'GET', short: '/scores/etfs', path: '/scores/etfs',
-        title: `${BRAND.name} Quality Score: Individual ETFs`, desc: `Returns the ${BRAND.name} Quality Score (1-10) for all ETFs or a ticker-filtered subset. Seven available components are equally weighted against fixed worst-to-best benchmark ranges: CAGR, Sortino ratio, maximum drawdown, holdings HHI, country diversity, sector diversity, and TER. Scores require at least one year of price history. Missing holdings, allocation, or TER data is disclosed and excluded from the equal-weight average.`,
+        title: `${BRAND.name} Quality Score: Individual ETFs`, desc: `Returns the ${BRAND.name} Quality Score (1-10) for all ETFs or a ticker-filtered subset. Six available components are equally weighted against fixed worst-to-best benchmark ranges: holdings HHI, country diversity, sector diversity, currency diversity, fund size, and number of holdings. Missing holdings, allocation, or fund size data is disclosed and excluded from the equal-weight average.`,
         params: [
           {name:'tickers',in:'query',type:'string',required:false,desc:'Comma-separated tickers (e.g. SWDA,CSSPX). Omit to score all ETFs.'},
-          {name:'rf_rate',in:'query',type:'float',required:false,desc:'Annual risk-free rate as decimal (default 0.04 = 4%)'},
         ],
       },
       { id: 'score-portfolio', method: 'POST', short: '/scores/portfolio', path: '/scores/portfolio',
         title: `${BRAND.name} Score: Portfolio`, desc: `Computes a composite ${BRAND.name} Portfolio Score (1-10) from: weighted average of individual ${BRAND.name} Scores (base), minus pairwise holdings overlap penalty (up to -2 pts), plus geographic diversification bonus (up to +1 pt).`,
         body: `{\n  "portfolio": [\n    {"etf_id": "SWDA", "weight": 60},\n    {"etf_id": "CSSPX", "weight": 40}\n  ]\n}`,
-        params: [
-          {name:'rf_rate',in:'query',type:'float',required:false,desc:'Annual risk-free rate as decimal (default 0.04 = 4%)'},
-        ],
       },
     ]
   }

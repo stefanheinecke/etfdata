@@ -16,14 +16,13 @@ router = APIRouter(prefix="/scores", tags=["scores"])
 @router.get("/etfs")
 async def get_etf_scores(
     isins: Optional[str] = None,
-    rf_rate: float = 0.04,
     db: Session = Depends(get_db),
     api_key: APIKey = Depends(verify_api_key),
 ):
     """
     GoETF Score for all ETFs (or a comma-separated ISIN subset).
-    Each ETF receives a 1-10 quality score based on seven equally weighted
-    return, risk, diversification, and cost components.
+    Each ETF receives a 1-10 quality score based on six equally weighted
+    holdings-concentration, diversification, and fund-size components.
     """
     etf_ids = None
 
@@ -32,13 +31,12 @@ async def get_etf_scores(
         resolved = [resolve_etf(db, t) for t in isin_list]
         etf_ids = [e.id for e in resolved]
 
-    return compute_goetf_scores(db, rf_annual=rf_rate, etf_ids=etf_ids)
+    return compute_goetf_scores(db, etf_ids=etf_ids)
 
 
 @router.post("/portfolio")
 async def get_portfolio_score(
     request: ExposureRequest,
-    rf_rate: float = 0.04,
     db: Session = Depends(get_db),
     api_key: APIKey = Depends(verify_api_key),
 ):
@@ -57,4 +55,4 @@ async def get_portfolio_score(
         for item in request.portfolio
     ]
 
-    return compute_portfolio_score(db, resolved_portfolio, rf_annual=rf_rate)
+    return compute_portfolio_score(db, resolved_portfolio)

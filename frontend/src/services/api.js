@@ -55,13 +55,13 @@ export const analyticsService = {
 }
 
 export const scoreService = {
-  getEtfScores(tickers = [], rfRate = 0.04) {
-    const params = { rf_rate: rfRate }
+  getEtfScores(tickers = []) {
+    const params = {}
     if (tickers.length > 0) params.tickers = tickers.join(',')
     return api.get('/scores/etfs', { params })
   },
-  getPortfolioScore(portfolio, rfRate = 0.04) {
-    return api.post('/scores/portfolio', { portfolio }, { params: { rf_rate: rfRate } })
+  getPortfolioScore(portfolio) {
+    return api.post('/scores/portfolio', { portfolio })
   },
 }
 

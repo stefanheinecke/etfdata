@@ -11,7 +11,7 @@
         <span class="meth-badge">1-10</span>
         <div>
           <h2 class="meth-title">{{ BRAND.name }} Quality Score: Individual ETF</h2>
-          <p class="meth-sub">A transparent historical return, downside-risk, diversification, and cost summary measured against fixed quality benchmarks.</p>
+          <p class="meth-sub">A transparent holdings-concentration, diversification, and fund-size summary measured against fixed quality benchmarks.</p>
         </div>
       </div>
 
@@ -19,9 +19,9 @@
       <div class="card meth-card">
         <h3 class="card-title">How it works</h3>
         <ol class="meth-steps">
-          <li><strong>Compute raw metrics</strong>: 7 metrics are calculated from price history, holdings, country and sector allocations, and the fund's TER.</li>
+          <li><strong>Compute raw metrics</strong>: 6 metrics are calculated from holdings, country, sector, and currency allocations, and fund size. Price-history based metrics are not used at this time.</li>
           <li><strong>Benchmark normalization</strong>: each metric is mapped to a 0-1 quality score using a fixed worst-to-best reference range. The direction (higher/lower is better) is taken into account, and values outside the range are capped.</li>
-          <li><strong>Equal-weight score</strong>: all seven required metric scores receive equal weight. The resulting 0-1 value is scaled to 1-10. Scores are unavailable when a required component is missing or the asset class is unsupported.</li>
+          <li><strong>Equal-weight score</strong>: all six required metric scores receive equal weight. The resulting 0-1 value is scaled to 1-10. Scores are unavailable when a required component is missing or the asset class is unsupported.</li>
         </ol>
         <div class="meth-formula-box">
           <code>metric_score<sub>i</sub> = clamp((value<sub>i</sub> − worst<sub>i</sub>) ÷ (best<sub>i</sub> − worst<sub>i</sub>), 0, 1)</code>
@@ -33,7 +33,7 @@
       <!-- Metrics table -->
       <div class="card meth-card" style="padding:0;overflow:hidden">
         <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--border)">
-          <h3 class="card-title" style="margin:0">The 7 Equal-Weight Metrics</h3>
+          <h3 class="card-title" style="margin:0">The 6 Equal-Weight Metrics</h3>
         </div>
         <div class="table-wrap">
           <table class="meth-table">
@@ -48,59 +48,52 @@
             </thead>
             <tbody>
               <tr>
-                <td><strong>CAGR</strong></td>
-                <td class="meth-weight">14.3%</td>
-                <td class="meth-dir meth-up">↑ Higher</td>
-                <td class="meth-src">Price history</td>
-                <td>Compound annual growth rate, calculated from the first and last available close price over the observed trading period.</td>
-              </tr>
-              <tr>
-                <td><strong>Sortino Ratio</strong></td>
-                <td class="meth-weight">14.3%</td>
-                <td class="meth-dir meth-up">↑ Higher</td>
-                <td class="meth-src">Price history</td>
-                <td>Annualised excess return divided by downside deviation. Unlike the Sharpe ratio, it penalises only volatility below the risk-free rate.</td>
-              </tr>
-              <tr>
-                <td><strong>Maximum Drawdown</strong></td>
-                <td class="meth-weight">14.3%</td>
-                <td class="meth-dir meth-up">↑ Smaller loss</td>
-                <td class="meth-src">Price history</td>
-                <td>The largest peak-to-trough decline in the observed price history. A less negative drawdown receives a higher quality score.</td>
-              </tr>
-              <tr>
                 <td><strong>HHI</strong></td>
-                <td class="meth-weight">14.3%</td>
+                <td class="meth-weight">16.7%</td>
                 <td class="meth-dir meth-down">↓ Lower</td>
                 <td class="meth-src">Holdings</td>
                 <td>Herfindahl-Hirschman Index of holdings concentration: Σw² × 10,000. Ranges from ~0 (highly diversified) to 10,000 (single holding).</td>
               </tr>
               <tr>
                 <td><strong>Country Diversity</strong></td>
-                <td class="meth-weight">14.3%</td>
+                <td class="meth-weight">16.7%</td>
                 <td class="meth-dir meth-up">↑ Higher</td>
                 <td class="meth-src">Allocations</td>
                 <td>1 − (country HHI ÷ 10,000). Derived from the country allocation breakdown. 0 = single country, ~1 = perfectly spread.</td>
               </tr>
               <tr>
                 <td><strong>Sector Diversity</strong></td>
-                <td class="meth-weight">14.3%</td>
+                <td class="meth-weight">16.7%</td>
                 <td class="meth-dir meth-up">↑ Higher</td>
                 <td class="meth-src">Allocations</td>
                 <td>1 − (sector HHI ÷ 10,000). A higher value represents a more even spread across economic sectors.</td>
               </tr>
               <tr>
-                <td><strong>TER</strong></td>
-                <td class="meth-weight">14.3%</td>
-                <td class="meth-dir meth-down">↓ Lower</td>
+                <td><strong>Currency Diversity</strong></td>
+                <td class="meth-weight">16.7%</td>
+                <td class="meth-dir meth-up">↑ Higher</td>
+                <td class="meth-src">Allocations</td>
+                <td>1 − (currency HHI ÷ 10,000). A higher value represents exposure spread across more settlement currencies.</td>
+              </tr>
+              <tr>
+                <td><strong>Fund Size</strong></td>
+                <td class="meth-weight">16.7%</td>
+                <td class="meth-dir meth-up">↑ Higher</td>
                 <td class="meth-src">Fund metadata</td>
-                <td>Total expense ratio: the recurring annual management cost charged by the fund. Lower cost receives a higher quality score.</td>
+                <td>Fund assets under management, converted to USD and compared on a log<sub>10</sub> scale. Larger funds score higher as a proxy for operational stability and liquidity.</td>
+              </tr>
+              <tr>
+                <td><strong>Number of Holdings</strong></td>
+                <td class="meth-weight">16.7%</td>
+                <td class="meth-dir meth-up">↑ Higher</td>
+                <td class="meth-src">Holdings</td>
+                <td>Count of distinct holdings at the latest snapshot. Rewards breadth independently of how evenly weight is distributed across those holdings.</td>
               </tr>
             </tbody>
           </table>
         </div>
         <div style="padding:.6rem 1.25rem;font-size:.72rem;color:var(--text-muted);border-top:1px solid var(--border)">
-          Risk-free rate is configurable (default 4% p.a.). Scores require at least 252 daily returns and all seven components. Fixed benchmark ranges make scores stable when the ETF universe changes. Missing TER, holdings, or allocation data produces an unavailable score, not an assumed neutral rating. The catalog is multi-asset; holdings analytics and quality scores currently support equities and listed real estate only.
+          Fixed benchmark ranges make scores stable when the ETF universe changes. Missing holdings, allocation, or fund size data produces an unavailable score, not an assumed neutral rating. The catalog is multi-asset; holdings analytics and quality scores currently support equities and listed real estate only.
         </div>
       </div>
     </div>
@@ -253,7 +246,7 @@
     <!-- Disclaimer -->
     <div class="card" style="background:var(--bg-3);border-color:var(--border)">
       <p style="font-size:.8rem;color:var(--text-muted);margin:0;line-height:1.7">
-        <strong>Note:</strong> {{ BRAND.name }} Scores are quantitative summaries derived from historical data and fixed reference benchmarks. They are provided for informational purposes only and do not constitute investment advice or an invitation to buy or sell any ETF. Past performance and historical statistics are not indicative of future results. Score values depend on the available data history, the risk-free rate, and the benchmark ranges defined by {{ BRAND.name }}.
+        <strong>Note:</strong> {{ BRAND.name }} Scores are quantitative summaries derived from holdings, allocation, and fund-size data against fixed reference benchmarks. They are provided for informational purposes only and do not constitute investment advice or an invitation to buy or sell any ETF. Past performance and historical statistics are not indicative of future results. Score values depend on the available data and the benchmark ranges defined by {{ BRAND.name }}.
       </p>
     </div>
   </div>
