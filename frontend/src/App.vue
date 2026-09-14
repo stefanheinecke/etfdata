@@ -87,7 +87,7 @@
           </div>
           <div class="footer-bottom">
             <p>© 2026 {{ BRAND.domain }} · Not investment advice · All data for informational purposes only.</p>
-            <button class="footer-contact-link" type="button" @click="showContactModal = true">Contact us</button>
+            <button class="footer-contact-link" type="button" @click="showContactModal = true"></button>
           </div>
         </div>
       </div>

@@ -98,8 +98,8 @@
       </div>
     </div>
 
-    <!-- Portfolio Score -->
-    <div class="meth-section">
+    <!-- Portfolio Score (hidden for now — removed from Portfolio Analysis, re-enable together) -->
+    <div v-if="false" class="meth-section">
       <div class="meth-section-head">
         <span class="meth-badge meth-badge-port">1-10</span>
         <div>

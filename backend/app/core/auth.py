@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from app.db.database import get_db
 from app.schemas import APIKey
 
-# Public demo key — read-only, restricted to SWDA ETF only
+# Public demo key — read-only, full catalog access, low rate limit
 DEMO_API_KEY = "demo"
 
 def generate_api_key():

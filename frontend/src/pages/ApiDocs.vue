@@ -100,7 +100,7 @@
                     (activeTryout.status >= 200 && activeTryout.status < 300) ? 'status-ok' : 'status-err']">
                     {{ activeTryout.status }}
                   </span>
-                  <span class="tryout-live-label">live · SWDA · demo key</span>
+                  <span class="tryout-live-label">live · demo key</span>
                   <button class="refresh-btn" @click="runTryout" :disabled="activeTryout.loading" title="Re-run">↺ Refresh</button>
                 </div>
                 <pre v-if="activeTryout.result" class="tryout-pre">{{ activeTryout.result }}</pre>
@@ -155,34 +155,34 @@ const groups = [
       },
       { id: 'get-etf', method: 'GET', short: '/etfs/{id}', path: '/etfs/{etf_id}',
         title: 'Get ETF by ID', desc: 'Returns full details of a single ETF.',
-        params: [{name:'etf_id',in:'path',type:'string',required:true,desc:'ETF UUID or ticker symbol (e.g. SWDA)'}],
+        params: [{name:'etf_id',in:'path',type:'string',required:true,desc:'ETF UUID or ISIN (e.g. IE00B0M62Q58)'}],
       },
       { id: 'holdings', method: 'GET', short: '/etfs/{id}/holdings', path: '/etfs/{etf_id}/holdings',
         title: 'Get Holdings', desc: 'Returns all holdings for an ETF on a given date (defaults to latest available date).',
         params: [
-          {name:'etf_id',in:'path',type:'string',required:true,desc:'ETF UUID or ticker symbol (e.g. SWDA)'},
+          {name:'etf_id',in:'path',type:'string',required:true,desc:'ETF UUID or ISIN (e.g. IE00B0M62Q58)'},
           {name:'date',in:'query',type:'date',required:false,desc:'Date in YYYY-MM-DD format'},
         ],
       },
       { id: 'allocations', method: 'GET', short: '/etfs/{id}/allocations', path: '/etfs/{etf_id}/allocations',
         title: 'Get Allocations', desc: 'Returns sector, country and currency allocations for an ETF.',
         params: [
-          {name:'etf_id',in:'path',type:'string',required:true,desc:'ETF UUID or ticker symbol (e.g. SWDA)'},
+          {name:'etf_id',in:'path',type:'string',required:true,desc:'ETF UUID or ISIN (e.g. IE00B0M62Q58)'},
           {name:'type',in:'query',type:'string',required:false,desc:'Filter: sector | country | currency'},
           {name:'date',in:'query',type:'date',required:false,desc:'Date in YYYY-MM-DD format'},
         ],
       },
       { id: 'etf-risk-metrics', method: 'GET', short: '/etfs/risk-metrics', path: '/etfs/risk-metrics',
-        title: 'ETF Risk Metrics', desc: 'Returns annualised risk statistics (return, volatility, Sharpe ratio, max drawdown, HHI) for one or more ETFs. Omit tickers to return all ETFs.',
+        title: 'ETF Risk Metrics', desc: 'Returns annualised risk statistics (return, volatility, Sharpe ratio, max drawdown, HHI, country/sector diversity) for one or more ETFs. Omit isins to return all ETFs.',
         params: [
-          {name:'tickers',in:'query',type:'string',required:false,desc:'Comma-separated tickers or UUIDs (e.g. SWDA,CSSPX). Omit to return all.'},
+          {name:'isins',in:'query',type:'string',required:false,desc:'Comma-separated ISINs (e.g. IE00B0M62Q58,IE0031442068). Omit to return all.'},
           {name:'rf_rate',in:'query',type:'float',required:false,desc:'Annual risk-free rate as decimal (default 0.04 = 4%)'},
         ],
       },
       { id: 'etf-performance', method: 'GET', short: '/etfs/{id}/performance', path: '/etfs/{etf_id}/performance',
         title: 'ETF Performance Data', desc: 'Returns daily close price, NAV and dividend data for an ETF (newest first, up to 1 000 rows).',
         params: [
-          {name:'etf_id',in:'path',type:'string',required:true,desc:'ETF UUID or ticker symbol (e.g. SWDA)'},
+          {name:'etf_id',in:'path',type:'string',required:true,desc:'ETF UUID or ISIN (e.g. IE00B0M62Q58)'},
           {name:'from_date',in:'query',type:'date',required:false,desc:'Start date YYYY-MM-DD'},
           {name:'to_date',in:'query',type:'date',required:false,desc:'End date YYYY-MM-DD'},
         ],
@@ -194,9 +194,24 @@ const groups = [
     endpoints: [
       { id: 'exposure', method: 'POST', short: '/analytics/exposure', path: '/analytics/exposure',
         title: 'Portfolio Exposure & Risk', desc: 'Analyses a weighted portfolio of ETFs. Returns sector, country and currency exposure breakdown plus per-ETF risk metrics (volatility, Sharpe, max drawdown, HHI) and a portfolio-level weighted summary.',
-        body: `{\n  "portfolio": [\n    {"etf_id": "SWDA", "weight": 60},  // UUID or ticker\n    {"etf_id": "CSSPX", "weight": 40}\n  ]\n}`,
+        body: `{\n  "portfolio": [\n    {"etf_id": "IE00B0M62Q58", "weight": 60},  // UUID or ISIN\n    {"etf_id": "IE0031442068", "weight": 40}\n  ]\n}`,
         params: [
           {name:'rf_rate',in:'query',type:'float',required:false,desc:'Annual risk-free rate as decimal for Sharpe (default 0.04 = 4%)'},
+        ],
+      },
+      { id: 'analytics-alternatives', method: 'POST', short: '/analytics/alternatives/{id}', path: '/analytics/alternatives/{etf_id}',
+        title: 'Suggest Lower-Overlap Alternatives', desc: 'Given a portfolio and one of its ETFs, suggests catalog ETFs that would reduce holdings overlap if used as a replacement.',
+        body: `{\n  "portfolio": [\n    {"etf_id": "IE00B0M62Q58", "weight": 60},\n    {"etf_id": "IE0031442068", "weight": 40}\n  ]\n}`,
+        params: [
+          {name:'etf_id',in:'path',type:'string',required:true,desc:'ETF UUID or ISIN of the portfolio member to find alternatives for'},
+          {name:'top_n',in:'query',type:'integer',required:false,desc:'Max number of suggestions to return (default 5)'},
+        ],
+      },
+      { id: 'pair-suggestions', method: 'POST', short: '/analytics/pair-suggestions', path: '/analytics/pair-suggestions',
+        title: 'Overlapping Pair Suggestions', desc: 'For each overlapping ETF pair in the portfolio, returns the securities overlap. Optionally searches the catalog for the replacement with the biggest overlap reduction per pair.',
+        body: `{\n  "portfolio": [\n    {"etf_id": "IE00B0M62Q58", "weight": 60},\n    {"etf_id": "IE0031442068", "weight": 40}\n  ]\n}`,
+        params: [
+          {name:'include_replacements',in:'query',type:'boolean',required:false,desc:'Also search the catalog for the best replacement per overlapping pair (slower, default false)'},
         ],
       },
     ]
@@ -205,14 +220,14 @@ const groups = [
     label: 'Scores',
     endpoints: [
       { id: 'score-etfs', method: 'GET', short: '/scores/etfs', path: '/scores/etfs',
-        title: `${BRAND.name} Quality Score: Individual ETFs`, desc: `Returns the ${BRAND.name} Quality Score (1-10) for all ETFs or a ticker-filtered subset. Six available components are equally weighted against fixed worst-to-best benchmark ranges: holdings HHI, country diversity, sector diversity, currency diversity, fund size, and number of holdings. Missing holdings, allocation, or fund size data is disclosed and excluded from the equal-weight average.`,
+        title: `${BRAND.name} Quality Score: Individual ETFs`, desc: `Returns the ${BRAND.name} Quality Score (1-10) for all ETFs or an ISIN-filtered subset. Six available components are equally weighted against fixed worst-to-best benchmark ranges: holdings HHI, country diversity, sector diversity, currency diversity, fund size, and number of holdings. Missing holdings, allocation, or fund size data is disclosed and excluded from the equal-weight average.`,
         params: [
-          {name:'tickers',in:'query',type:'string',required:false,desc:'Comma-separated tickers (e.g. SWDA,CSSPX). Omit to score all ETFs.'},
+          {name:'isins',in:'query',type:'string',required:false,desc:'Comma-separated ISINs (e.g. IE00B0M62Q58,IE0031442068). Omit to score all ETFs.'},
         ],
       },
       { id: 'score-portfolio', method: 'POST', short: '/scores/portfolio', path: '/scores/portfolio',
         title: `${BRAND.name} Score: Portfolio`, desc: `Computes a composite ${BRAND.name} Portfolio Score (1-10) from: weighted average of individual ${BRAND.name} Scores (base), minus pairwise holdings overlap penalty (up to -2 pts), plus geographic diversification bonus (up to +1 pt).`,
-        body: `{\n  "portfolio": [\n    {"etf_id": "SWDA", "weight": 60},\n    {"etf_id": "CSSPX", "weight": 40}\n  ]\n}`,
+        body: `{\n  "portfolio": [\n    {"etf_id": "IE00B0M62Q58", "weight": 60},\n    {"etf_id": "IE0031442068", "weight": 40}\n  ]\n}`,
       },
     ]
   }
@@ -227,8 +242,7 @@ const secondEtfId = ref(null)
 
 async function fetchEtfIds() {
   if (swdaId.value) return
-  // Always use the demo key for swdaId — demo always returns SWDA, so all single-ETF
-  // demos work with the demo key used in runTryout.
+  // Always use the demo key here so single-ETF demos work even without a user API key.
   try {
     const demoRes = await axios.get(`${BASE}/etfs`, { headers: { 'x-api-key': 'demo' } })
     swdaId.value = demoRes.data[0]?.id ?? null
@@ -251,11 +265,15 @@ const tryoutConfigs = {
   'allocations':  { build: (id)  => ({ method: 'GET',  url: `${BASE}/etfs/${id}/allocations` }) },
   'exposure':          { build: (id, id2) => ({ method: 'POST', url: `${BASE}/analytics/exposure`,
                                         body: { portfolio: [{ etf_id: id, weight: 60 }, { etf_id: id2, weight: 40 }] } }) },
-  'etf-risk-metrics':  { build: ()    => ({ method: 'GET',  url: `${BASE}/etfs/risk-metrics`, params: { tickers: 'SWDA' } }) },
+  'analytics-alternatives': { build: (id, id2) => ({ method: 'POST', url: `${BASE}/analytics/alternatives/${id}`,
+                                        body: { portfolio: [{ etf_id: id, weight: 60 }, { etf_id: id2, weight: 40 }] } }) },
+  'pair-suggestions':  { build: (id, id2) => ({ method: 'POST', url: `${BASE}/analytics/pair-suggestions`,
+                                        body: { portfolio: [{ etf_id: id, weight: 60 }, { etf_id: id2, weight: 40 }] } }) },
+  'etf-risk-metrics':  { build: (id)  => ({ method: 'GET',  url: `${BASE}/etfs/risk-metrics`, params: { isins: id } }) },
   'etf-performance':   { build: (id)  => ({ method: 'GET',  url: `${BASE}/etfs/${id}/performance` }) },
-  'score-etfs':        { build: ()    => ({ method: 'GET',  url: `${BASE}/scores/etfs`, params: { tickers: 'SWDA' } }) },
-  'score-portfolio':   { build: (id) => ({ method: 'POST', url: `${BASE}/scores/portfolio`,
-                                        body: { portfolio: [{ etf_id: id, weight: 60 }, { etf_id: 'CSSPX', weight: 40 }] } }) },
+  'score-etfs':        { build: (id)  => ({ method: 'GET',  url: `${BASE}/scores/etfs`, params: { isins: id } }) },
+  'score-portfolio':   { build: (id, id2) => ({ method: 'POST', url: `${BASE}/scores/portfolio`,
+                                        body: { portfolio: [{ etf_id: id, weight: 60 }, { etf_id: id2, weight: 40 }] } }) },
 }
 
 const activeTryoutConfig = computed(() => tryoutConfigs[activeId.value])
@@ -367,51 +385,35 @@ allocs = r.json()`,
   { headers: { "x-api-key": "YOUR_API_KEY" } }
 ).then(r => r.json());`,
   },
-  'performance': {
-    cURL: `curl "${DOC_BASE}/etfs/SWDA/performance" \\
+  'etf-performance': {
+    cURL: `curl ${DOC_BASE}/etfs/{ETF_ID}/performance \\
   -H "x-api-key: YOUR_API_KEY"`,
     Python: `import requests
 
 r = requests.get(
-    "${DOC_BASE}/etfs/SWDA/performance",
+    "${DOC_BASE}/etfs/{ETF_ID}/performance",
     params={"from_date": "2025-01-01"},
     headers={"x-api-key": "YOUR_API_KEY"}
 )
 history = r.json()`,
     JavaScript: `const history = await fetch(
-  "${DOC_BASE}/etfs/SWDA/performance",
-  { headers: { "x-api-key": "YOUR_API_KEY" } }
-).then(r => r.json());`,
-  },
-  'performance': {
-    cURL: `curl "${DOC_BASE}/etfs/SWDA/performance" \\
-  -H "x-api-key: YOUR_API_KEY"`,
-    Python: `import requests
-
-r = requests.get(
-    "${DOC_BASE}/etfs/SWDA/performance",
-    params={"from_date": "2025-01-01"},
-    headers={"x-api-key": "YOUR_API_KEY"}
-)
-history = r.json()`,
-    JavaScript: `const history = await fetch(
-  "${DOC_BASE}/etfs/SWDA/performance",
+  "${DOC_BASE}/etfs/{ETF_ID}/performance",
   { headers: { "x-api-key": "YOUR_API_KEY" } }
 ).then(r => r.json());`,
   },
   'etf-risk-metrics': {
-    cURL: `curl "${DOC_BASE}/etfs/SWDA/risk-metrics" \\
+    cURL: `curl "${DOC_BASE}/etfs/risk-metrics?isins=IE00B0M62Q58&rf_rate=0.04" \\
   -H "x-api-key: YOUR_API_KEY"`,
     Python: `import requests
 
 r = requests.get(
-    "${DOC_BASE}/etfs/SWDA/risk-metrics",
-    params={"rf_rate": 0.04},
+    "${DOC_BASE}/etfs/risk-metrics",
+    params={"isins": "IE00B0M62Q58", "rf_rate": 0.04},
     headers={"x-api-key": "YOUR_API_KEY"}
 )
 metrics = r.json()`,
     JavaScript: `const metrics = await fetch(
-  "${DOC_BASE}/etfs/SWDA/risk-metrics?rf_rate=0.04",
+  "${DOC_BASE}/etfs/risk-metrics?isins=IE00B0M62Q58&rf_rate=0.04",
   { headers: { "x-api-key": "YOUR_API_KEY" } }
 ).then(r => r.json());`,
   },
@@ -419,7 +421,7 @@ metrics = r.json()`,
     cURL: `curl -X POST "${DOC_BASE}/analytics/exposure?rf_rate=0.04" \\
   -H "x-api-key: YOUR_API_KEY" \\
   -H "Content-Type: application/json" \\
-  -d '{"portfolio": [{"etf_id": "SWDA", "weight": 60}, {"etf_id": "CSSPX", "weight": 40}]}'`,
+  -d '{"portfolio": [{"etf_id": "IE00B0M62Q58", "weight": 60}, {"etf_id": "IE0031442068", "weight": 40}]}'`,
     Python: `import requests
 
 r = requests.post(
@@ -427,8 +429,8 @@ r = requests.post(
     params={"rf_rate": 0.04},
     headers={"x-api-key": "YOUR_API_KEY"},
     json={"portfolio": [
-        {"etf_id": "SWDA", "weight": 60},
-        {"etf_id": "CSSPX", "weight": 40}
+        {"etf_id": "IE00B0M62Q58", "weight": 60},
+        {"etf_id": "IE0031442068", "weight": 40}
     ]}
 )
 # Response includes sectors, countries, currencies + risk_metrics per ETF
@@ -443,52 +445,127 @@ result = r.json()`,
     },
     body: JSON.stringify({
       portfolio: [
-        { etf_id: "SWDA", weight: 60 },
-        { etf_id: "CSSPX", weight: 40 }
+        { etf_id: "IE00B0M62Q58", weight: 60 },
+        { etf_id: "IE0031442068", weight: 40 }
       ]
     })
   }
 ).then(r => r.json());
 // result.sectors / result.countries / result.currencies / result.risk_metrics`,
   },
-  'risk-metrics-get': {
-    cURL: `curl "${DOC_BASE}/analytics/risk-metrics" \\
-  -H "x-api-key: YOUR_API_KEY"`,
-    Python: `import requests
-
-r = requests.get(
-    "${DOC_BASE}/analytics/risk-metrics",
-    params={"rf_rate": 0.04},
-    headers={"x-api-key": "YOUR_API_KEY"}
-)
-all_metrics = r.json()`,
-    JavaScript: `const allMetrics = await fetch(
-  "${DOC_BASE}/analytics/risk-metrics?rf_rate=0.04",
-  { headers: { "x-api-key": "YOUR_API_KEY" } }
-).then(r => r.json());`,
-  },
-  'risk-metrics-post': {
-    cURL: `curl -X POST ${DOC_BASE}/analytics/risk-metrics \\
+  'analytics-alternatives': {
+    cURL: `curl -X POST "${DOC_BASE}/analytics/alternatives/IE00B0M62Q58?top_n=5" \\
   -H "x-api-key: YOUR_API_KEY" \\
   -H "Content-Type: application/json" \\
-  -d '{"etf_ids": ["SWDA", "CSSPX"]}'`,
+  -d '{"portfolio": [{"etf_id": "IE00B0M62Q58", "weight": 60}, {"etf_id": "IE0031442068", "weight": 40}]}'`,
     Python: `import requests
 
 r = requests.post(
-    "${DOC_BASE}/analytics/risk-metrics",
+    "${DOC_BASE}/analytics/alternatives/IE00B0M62Q58",
+    params={"top_n": 5},
     headers={"x-api-key": "YOUR_API_KEY"},
-    json={"etf_ids": ["SWDA", "CSSPX"]}
+    json={"portfolio": [
+        {"etf_id": "IE00B0M62Q58", "weight": 60},
+        {"etf_id": "IE0031442068", "weight": 40}
+    ]}
 )
-metrics = r.json()`,
-    JavaScript: `const metrics = await fetch(
-  "${DOC_BASE}/analytics/risk-metrics",
+suggestions = r.json()`,
+    JavaScript: `const suggestions = await fetch(
+  "${DOC_BASE}/analytics/alternatives/IE00B0M62Q58?top_n=5",
   {
     method: "POST",
     headers: {
       "x-api-key": "YOUR_API_KEY",
       "Content-Type": "application/json"
     },
-    body: JSON.stringify({ etf_ids: ["SWDA", "CSSPX"] })
+    body: JSON.stringify({
+      portfolio: [
+        { etf_id: "IE00B0M62Q58", weight: 60 },
+        { etf_id: "IE0031442068", weight: 40 }
+      ]
+    })
+  }
+).then(r => r.json());`,
+  },
+  'pair-suggestions': {
+    cURL: `curl -X POST "${DOC_BASE}/analytics/pair-suggestions" \\
+  -H "x-api-key: YOUR_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{"portfolio": [{"etf_id": "IE00B0M62Q58", "weight": 60}, {"etf_id": "IE0031442068", "weight": 40}]}'`,
+    Python: `import requests
+
+r = requests.post(
+    "${DOC_BASE}/analytics/pair-suggestions",
+    headers={"x-api-key": "YOUR_API_KEY"},
+    json={"portfolio": [
+        {"etf_id": "IE00B0M62Q58", "weight": 60},
+        {"etf_id": "IE0031442068", "weight": 40}
+    ]}
+)
+pairs = r.json()`,
+    JavaScript: `const pairs = await fetch(
+  "${DOC_BASE}/analytics/pair-suggestions",
+  {
+    method: "POST",
+    headers: {
+      "x-api-key": "YOUR_API_KEY",
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      portfolio: [
+        { etf_id: "IE00B0M62Q58", weight: 60 },
+        { etf_id: "IE0031442068", weight: 40 }
+      ]
+    })
+  }
+).then(r => r.json());`,
+  },
+  'score-etfs': {
+    cURL: `curl "${DOC_BASE}/scores/etfs?isins=IE00B0M62Q58" \\
+  -H "x-api-key: YOUR_API_KEY"`,
+    Python: `import requests
+
+r = requests.get(
+    "${DOC_BASE}/scores/etfs",
+    params={"isins": "IE00B0M62Q58"},
+    headers={"x-api-key": "YOUR_API_KEY"}
+)
+scores = r.json()`,
+    JavaScript: `const scores = await fetch(
+  "${DOC_BASE}/scores/etfs?isins=IE00B0M62Q58",
+  { headers: { "x-api-key": "YOUR_API_KEY" } }
+).then(r => r.json());`,
+  },
+  'score-portfolio': {
+    cURL: `curl -X POST "${DOC_BASE}/scores/portfolio" \\
+  -H "x-api-key: YOUR_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{"portfolio": [{"etf_id": "IE00B0M62Q58", "weight": 60}, {"etf_id": "IE0031442068", "weight": 40}]}'`,
+    Python: `import requests
+
+r = requests.post(
+    "${DOC_BASE}/scores/portfolio",
+    headers={"x-api-key": "YOUR_API_KEY"},
+    json={"portfolio": [
+        {"etf_id": "IE00B0M62Q58", "weight": 60},
+        {"etf_id": "IE0031442068", "weight": 40}
+    ]}
+)
+portfolio_score = r.json()`,
+    JavaScript: `const portfolioScore = await fetch(
+  "${DOC_BASE}/scores/portfolio",
+  {
+    method: "POST",
+    headers: {
+      "x-api-key": "YOUR_API_KEY",
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      portfolio: [
+        { etf_id: "IE00B0M62Q58", weight: 60 },
+        { etf_id: "IE0031442068", weight: 40 }
+      ]
+    })
   }
 ).then(r => r.json());`,
   },

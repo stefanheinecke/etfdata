@@ -55,9 +55,9 @@ export const analyticsService = {
 }
 
 export const scoreService = {
-  getEtfScores(tickers = []) {
+  getEtfScores(isins = []) {
     const params = {}
-    if (tickers.length > 0) params.tickers = tickers.join(',')
+    if (isins.length > 0) params.isins = isins.join(',')
     return api.get('/scores/etfs', { params })
   },
   getPortfolioScore(portfolio) {
