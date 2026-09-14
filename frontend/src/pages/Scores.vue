@@ -28,7 +28,7 @@
 
     <div v-if="goetfResult" class="card" style="padding:0;overflow:hidden">
       <div style="padding:.75rem 1.25rem;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
-        <h3 class="card-title" style="margin:0">{{ goetfResult.length }} ETF{{ goetfResult.length !== 1 ? 's' : '' }}</h3>
+        <h3 class="card-title" style="margin:0">{{ goetfSorted.length }} ETF{{ goetfSorted.length !== 1 ? 's' : '' }}</h3>
         <span style="font-size:.75rem;color:var(--text-muted)">Click column header to sort</span>
       </div>
       <div class="table-wrap">
@@ -132,13 +132,15 @@ const COMPONENT_LABELS = {
 
 const goetfSorted = computed(() => {
   if (!goetfResult.value) return []
-  return [...goetfResult.value].sort((a, b) => {
-    let va = a[goetfSortKey.value], vb = b[goetfSortKey.value]
-    if (va === null || va === undefined) va = goetfSortDir.value === 'asc' ? Infinity : -Infinity
-    if (vb === null || vb === undefined) vb = goetfSortDir.value === 'asc' ? Infinity : -Infinity
-    if (typeof va === 'string') return goetfSortDir.value === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va)
-    return goetfSortDir.value === 'asc' ? va - vb : vb - va
-  })
+  return goetfResult.value
+    .filter(row => row.goetf_score != null)
+    .sort((a, b) => {
+      let va = a[goetfSortKey.value], vb = b[goetfSortKey.value]
+      if (va === null || va === undefined) va = goetfSortDir.value === 'asc' ? Infinity : -Infinity
+      if (vb === null || vb === undefined) vb = goetfSortDir.value === 'asc' ? Infinity : -Infinity
+      if (typeof va === 'string') return goetfSortDir.value === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va)
+      return goetfSortDir.value === 'asc' ? va - vb : vb - va
+    })
 })
 
 function toggleGoetfSort(key) {
