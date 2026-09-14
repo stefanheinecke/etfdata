@@ -6,6 +6,7 @@
         <ul class="nav-links">
           <li><a href="#" :class="{ active: currentPage === 'etfs' || currentPage === 'etf-detail' }" @click.prevent="goToPage('etfs')">ETF Explorer</a></li>
           <li><a href="#" @click.prevent="goToPage('analytics', 'exposure')">Portfolio</a></li>
+          <li><a href="#" :class="{ active: currentPage === 'scores' }" @click.prevent="goToPage('scores')">Scores</a></li>
           <li><a href="#" :class="{ active: currentPage === 'docs' }" @click.prevent="goToPage('docs')">API</a></li>
           <li><a href="#" :class="{ active: currentPage === 'methodology' }" @click.prevent="goToPage('methodology')">Methodology</a></li>
           <li v-if="adminActive || isAdminApiUser"><a href="#" :class="{ active: currentPage === 'admin' }" @click.prevent="goToPage('admin')" style="color:#dc2626;font-weight:600">Admin</a></li>
@@ -26,6 +27,7 @@
       <div class="drawer-panel">
         <a href="#" @click.prevent="goToPage('etfs')">ETF Explorer</a>
         <a href="#" @click.prevent="goToPage('analytics', 'exposure')">Portfolio</a>
+        <a href="#" @click.prevent="goToPage('scores')">Scores</a>
         <a href="#" @click.prevent="goToPage('docs')">API</a>
         <a href="#" @click.prevent="goToPage('methodology')">Methodology</a>
         <a v-if="adminActive || isAdminApiUser" href="#" @click.prevent="goToPage('admin'); mobileMenuOpen = false" style="color:#dc2626;font-weight:600">Admin</a>
@@ -61,6 +63,7 @@
                 <ul>
                   <li><a href="#" @click.prevent="goToPage('etfs')">ETF Explorer</a></li>
                   <li><a href="#" @click.prevent="goToPage('analytics', 'exposure')">Portfolio</a></li>
+                  <li><a href="#" @click.prevent="goToPage('scores')">Scores</a></li>
                   <li><a href="#" @click.prevent="goToPage('methodology')">Methodology</a></li>
                 </ul>
               </div>
