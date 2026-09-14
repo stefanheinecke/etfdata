@@ -192,7 +192,7 @@ def compute_goetf_scores(
     results = []
     for etf in etfs:
         supported = equity_analytics_supported(etf.asset_class)
-        cached = cached_by_id.get(etf.id) if supported else None
+        cached = cached_by_id.get(etf.id)
         if cached is not None:
             payload = dict(cached.data)
             calculated_at = cached.calculated_at
