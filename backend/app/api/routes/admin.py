@@ -200,6 +200,26 @@ def refresh_fx_rates_endpoint(
     return refresh_all_fx_rates(db)
 
 
+@router.post("/recalculate-scores")
+def recalculate_scores_endpoint(
+    db: Session = Depends(get_db),
+    _: None = Depends(verify_admin_secret),
+):
+    """
+    Force-recompute the GoETF Quality Score for every ETF and overwrite the
+    cached values in the etf_scores table. Normal /scores/etfs requests reuse
+    the cache, so run this after holdings, allocation, or fund size data changes.
+    """
+    from app.services.scoring_service import compute_goetf_scores
+    results = compute_goetf_scores(db, force_recalculate=True)
+    available = [r for r in results if r["status"] == "available"]
+    return {
+        "total": len(results),
+        "available": len(available),
+        "unavailable": len(results) - len(available),
+    }
+
+
 @router.post("/backfill-eodhd-symbols")
 def backfill_eodhd_symbols(
     db: Session = Depends(get_db),

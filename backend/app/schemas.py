@@ -94,6 +94,17 @@ class Performance(Base):
         Index("idx_performance_etf_date", "etf_id", "date"),
     )
 
+class ETFScore(Base):
+    """Cached GoETF Quality Score per ETF, so scores don't get recomputed on
+    every request. Refreshed via the admin 'Recalculate All Scores' action."""
+    __tablename__ = "etf_scores"
+
+    etf_id = Column(PGUUID(as_uuid=True), ForeignKey("etfs.id", ondelete="CASCADE"), primary_key=True)
+    goetf_score = Column(Numeric(4, 1))
+    status = Column(String(20), nullable=False)  # "available" | "unavailable"
+    data = Column(JSON, nullable=False)  # full metrics/score payload (see scoring_service.py)
+    calculated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
 class FXRate(Base):
     __tablename__ = "fx_rates"
 

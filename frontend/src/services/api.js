@@ -129,6 +129,9 @@ export const adminService = {
   refreshFxRates(adminSecret) {
     return api.post('/admin/refresh-fx-rates', null, { headers: { 'x-admin-secret': adminSecret } })
   },
+  recalculateScores(adminSecret) {
+    return api.post('/admin/recalculate-scores', null, { headers: { 'x-admin-secret': adminSecret } })
+  },
   deleteETFs(adminSecret, etfIds) {
     return api.delete('/admin/etfs', {
       data: etfIds,

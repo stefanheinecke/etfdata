@@ -7,13 +7,17 @@ metrics: Holdings HHI, Country Diversity, Sector Diversity, Currency Diversity,
 Fund Size, and Number of Holdings. Price-history based metrics are intentionally
 excluded for now.
 
+Scores are cached per ETF in the etf_scores table (see compute_goetf_scores)
+so repeat requests don't recompute holdings/allocation snapshots every time.
+
 Portfolio score = weighted avg base − overlap penalty + allocation bonus
 """
 import math
+from datetime import datetime
 from typing import List, Optional, Dict
 from uuid import UUID
 from sqlalchemy.orm import Session
-from app.schemas import ETF
+from app.schemas import ETF, ETFScore
 from app.services.asset_classes import equity_analytics_supported, normalize_asset_class
 from app.services.analytics_service import _holdings_snapshot, _allocation_snapshot, allocation_diversity
 from app.services.fx_service import get_latest_rate
@@ -112,14 +116,67 @@ def _absolute_score(metric: str, value: float) -> float:
 
 
 # ---------------------------------------------------------------------------
+# Score a single ETF (no caching — always recomputes from raw data)
+# ---------------------------------------------------------------------------
+def _score_one_etf(db: Session, etf: ETF) -> Dict:
+    raw = _compute_raw_metrics(db, etf)
+    if raw is None:
+        return {
+            "goetf_score": None, "insufficient_data": True, "status": "unavailable",
+            "reason": "Unsupported asset class for equity scoring",
+        }
+
+    available_components = [c for c in SCORE_COMPONENTS if raw.get(c) is not None]
+    missing_components = [c for c in SCORE_COMPONENTS if c not in available_components]
+    metric_scores = {c: _absolute_score(c, raw[c]) for c in available_components}
+
+    if len(metric_scores) != len(SCORE_COMPONENTS):
+        return {
+            "goetf_score": None, "insufficient_data": True, "status": "unavailable",
+            "reason": "Missing or unreliable score components: " + ", ".join(missing_components),
+            **raw,
+            "available_components": available_components,
+            "missing_components": missing_components,
+        }
+
+    raw_score = sum(metric_scores.values()) / len(SCORE_COMPONENTS)
+    return {
+        "goetf_score": round(1.0 + raw_score * 9.0, 1),
+        "status": "available", "reason": None, "insufficient_data": False,
+        **raw,
+        "metric_scores": {m: round(v, 3) for m, v in metric_scores.items()},
+        "available_components": available_components,
+        "missing_components": missing_components,
+    }
+
+
+def _store_score(db: Session, etf_id: UUID, payload: Dict) -> datetime:
+    """Upsert the cached score row for one ETF. Returns the stored timestamp."""
+    now = datetime.utcnow()
+    row = db.query(ETFScore).filter(ETFScore.etf_id == etf_id).first()
+    if row is None:
+        row = ETFScore(etf_id=etf_id)
+        db.add(row)
+    row.goetf_score = payload.get("goetf_score")
+    row.status = payload["status"]
+    row.data = payload
+    row.calculated_at = now
+    db.commit()
+    return now
+
+
+# ---------------------------------------------------------------------------
 # Public API: compute_goetf_scores
 # ---------------------------------------------------------------------------
 def compute_goetf_scores(
     db: Session,
     etf_ids: Optional[List[UUID]] = None,
+    force_recalculate: bool = False,
 ) -> List[Dict]:
     """
     Compute GoETF Score for all ETFs (or a UUID-filtered subset).
+    Cached results are reused unless force_recalculate=True (used by the admin
+    "Recalculate All Scores" action) or no cache entry exists yet for an ETF.
     Returns list sorted by score descending (None scores last).
     """
     query = db.query(ETF)
@@ -127,80 +184,31 @@ def compute_goetf_scores(
         query = query.filter(ETF.id.in_(etf_ids))
     etfs = query.order_by(ETF.isin).all()
 
-    # Step 1: raw metrics per ETF
-    rows = []
-    for etf in etfs:
-        raw = _compute_raw_metrics(db, etf)
-        rows.append({"etf_id": str(etf.id), "isin": etf.isin, "name": etf.name, "metrics": raw,
-                     "asset_class": normalize_asset_class(etf.asset_class),
-                     "equity_analytics_supported": equity_analytics_supported(etf.asset_class)})
+    cached_by_id = {}
+    if not force_recalculate and etfs:
+        cached_rows = db.query(ETFScore).filter(ETFScore.etf_id.in_([e.id for e in etfs])).all()
+        cached_by_id = {row.etf_id: row for row in cached_rows}
 
-    # Step 2: score each ETF against fixed absolute reference ranges
     results = []
-    for row in rows:
-        if row["metrics"] is None:
-            results.append(
-                {
-                    "etf_id": row["etf_id"],
-                    "isin": row["isin"],
-                    "name": row["name"],
-                    "goetf_score": None,
-                    "insufficient_data": True,
-                    "status": "unavailable",
-                    "reason": "Unsupported asset class for equity scoring",
-                    "asset_class": row["asset_class"],
-                    "equity_analytics_supported": row["equity_analytics_supported"],
-                }
-            )
-            continue
+    for etf in etfs:
+        supported = equity_analytics_supported(etf.asset_class)
+        cached = cached_by_id.get(etf.id) if supported else None
+        if cached is not None:
+            payload = dict(cached.data)
+            calculated_at = cached.calculated_at
+        else:
+            payload = _score_one_etf(db, etf)
+            calculated_at = _store_score(db, etf.id, payload)
 
-        available_components = [
-            component for component in SCORE_COMPONENTS
-            if row["metrics"].get(component) is not None
-        ]
-        metric_scores = {
-            component: _absolute_score(component, row["metrics"][component])
-            for component in available_components
-        }
-        raw_score = sum(metric_scores.values()) / len(SCORE_COMPONENTS) if len(metric_scores) == len(SCORE_COMPONENTS) else None
-        if raw_score is None:
-            results.append(
-                {
-                    "etf_id": row["etf_id"],
-                    "isin": row["isin"],
-                    "name": row["name"],
-                    "goetf_score": None,
-                    "insufficient_data": True,
-                    "status": "unavailable",
-                    "reason": "Missing or unreliable score components: " + ", ".join(c for c in SCORE_COMPONENTS if c not in available_components),
-                    "asset_class": row["asset_class"],
-                    "equity_analytics_supported": row["equity_analytics_supported"],
-                    **row["metrics"],
-                    "available_components": available_components,
-                    "missing_components": [c for c in SCORE_COMPONENTS if c not in available_components],
-                }
-            )
-            continue
-        goetf_score = round(1.0 + raw_score * 9.0, 1)
-
-        results.append(
-            {
-                "etf_id": row["etf_id"],
-                "isin": row["isin"],
-                "name": row["name"],
-                "goetf_score": goetf_score,
-                "status": "available", "reason": None, "insufficient_data": False,
-                "asset_class": row["asset_class"],
-                "equity_analytics_supported": row["equity_analytics_supported"],
-                **row["metrics"],
-                "metric_scores": {m: round(metric_scores[m], 3) for m in metric_scores},
-                "available_components": available_components,
-                "missing_components": [
-                    component for component in SCORE_COMPONENTS
-                    if component not in available_components
-                ],
-            }
-        )
+        results.append({
+            "etf_id": str(etf.id),
+            "isin": etf.isin,
+            "name": etf.name,
+            "asset_class": normalize_asset_class(etf.asset_class),
+            "equity_analytics_supported": supported,
+            "calculated_at": calculated_at.isoformat() if calculated_at else None,
+            **payload,
+        })
 
     results.sort(key=lambda x: x.get("goetf_score") or 0, reverse=True)
     return results

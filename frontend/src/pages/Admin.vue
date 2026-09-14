@@ -118,6 +118,12 @@
             </button>
             <p style="font-size:.75rem;color:var(--text-muted);margin-top:.3rem">Fetches the latest EODHD forex rate to USD for every ETF currency in use, so fund sizes can be compared across currencies.</p>
           </div>
+          <div>
+            <button class="btn btn-outline" style="width:100%" @click="triggerRecalculateScores" :disabled="!adminVerified || scoresLoading">
+              {{ scoresLoading ? 'Recalculating…' : '🧮 Recalculate All Scores' }}
+            </button>
+            <p style="font-size:.75rem;color:var(--text-muted);margin-top:.3rem">GoETF Quality Scores are cached per ETF. Run this after holdings, allocation, or fund size data changes to refresh them.</p>
+          </div>
         </div>
         <div v-if="refreshPricesResult" class="success-msg" style="margin-top:.75rem">{{ refreshPricesResult }}</div>
         <div v-if="refreshPricesError" class="error-box" style="margin-top:.75rem">{{ refreshPricesError }}</div>
@@ -125,6 +131,8 @@
         <div v-if="backfillError" class="error-box" style="margin-top:.75rem">{{ backfillError }}</div>
         <div v-if="fxRatesResult" class="success-msg" style="margin-top:.75rem">{{ fxRatesResult }}</div>
         <div v-if="fxRatesError" class="error-box" style="margin-top:.75rem;white-space:pre-wrap">{{ fxRatesError }}</div>
+        <div v-if="scoresResult" class="success-msg" style="margin-top:.75rem">{{ scoresResult }}</div>
+        <div v-if="scoresError" class="error-box" style="margin-top:.75rem">{{ scoresError }}</div>
         <div v-if="dbResult" class="success-msg" style="margin-top:.75rem">{{ dbResult }}</div>
         <div v-if="dbError" class="error-box" style="margin-top:.75rem">{{ dbError }}</div>
       </div>
@@ -931,6 +939,9 @@ const backfillLoading = ref(false)
 const fxRatesLoading = ref(false)
 const fxRatesResult = ref('')
 const fxRatesError = ref('')
+const scoresLoading = ref(false)
+const scoresResult = ref('')
+const scoresError = ref('')
 const providerUbsFile = ref(null)
 const providerIsharesFile = ref(null)
 const providerImportLoading = ref(false)
@@ -1194,6 +1205,18 @@ async function triggerRefreshFxRates() {
     fxRatesError.value = e.response?.data?.detail || e.message
   } finally {
     fxRatesLoading.value = false
+  }
+}
+
+async function triggerRecalculateScores() {
+  scoresLoading.value = true; scoresResult.value = ''; scoresError.value = ''
+  try {
+    const { data } = await adminService.recalculateScores(adminSecret.value)
+    scoresResult.value = `✓ Recalculated ${data.total} ETF(s): ${data.available} scored, ${data.unavailable} unavailable.`
+  } catch (e) {
+    scoresError.value = e.response?.data?.detail || e.message
+  } finally {
+    scoresLoading.value = false
   }
 }
 
