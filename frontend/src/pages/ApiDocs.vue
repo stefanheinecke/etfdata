@@ -197,23 +197,8 @@ const groups = [
         body: `{\n  "portfolio": [\n    {"etf_id": "IE00B0M62Q58", "weight": 60},  // UUID or ISIN\n    {"etf_id": "IE0031442068", "weight": 40}\n  ]\n}`,
         params: [
           {name:'rf_rate',in:'query',type:'float',required:false,desc:'Annual risk-free rate as decimal for Sharpe (default 0.04 = 4%)'},
-        ],
-      },
-      { id: 'analytics-alternatives', method: 'POST', short: '/analytics/alternatives/{id}', path: '/analytics/alternatives/{etf_id}',
-        title: 'Suggest Lower-Overlap Alternatives', desc: 'Given a portfolio and one of its ETFs, suggests catalog ETFs that would reduce holdings overlap if used as a replacement.',
-        body: `{\n  "portfolio": [\n    {"etf_id": "IE00B0M62Q58", "weight": 60},\n    {"etf_id": "IE0031442068", "weight": 40}\n  ]\n}`,
-        params: [
-          {name:'etf_id',in:'path',type:'string',required:true,desc:'ETF UUID or ISIN of the portfolio member to find alternatives for'},
-          {name:'top_n',in:'query',type:'integer',required:false,desc:'Max number of suggestions to return (default 5)'},
-        ],
-      },
-      { id: 'pair-suggestions', method: 'POST', short: '/analytics/pair-suggestions', path: '/analytics/pair-suggestions',
-        title: 'Overlapping Pair Suggestions', desc: 'For each overlapping ETF pair in the portfolio, returns the securities overlap. Optionally searches the catalog for the replacement with the biggest overlap reduction per pair.',
-        body: `{\n  "portfolio": [\n    {"etf_id": "IE00B0M62Q58", "weight": 60},\n    {"etf_id": "IE0031442068", "weight": 40}\n  ]\n}`,
-        params: [
-          {name:'include_replacements',in:'query',type:'boolean',required:false,desc:'Also search the catalog for the best replacement per overlapping pair (slower, default false)'},
-        ],
-      },
+        ]
+      }
     ]
   },
   {
@@ -224,11 +209,7 @@ const groups = [
         params: [
           {name:'isins',in:'query',type:'string',required:false,desc:'Comma-separated ISINs (e.g. IE00B0M62Q58,IE0031442068). Omit to score all ETFs.'},
         ],
-      },
-      { id: 'score-portfolio', method: 'POST', short: '/scores/portfolio', path: '/scores/portfolio',
-        title: `${BRAND.name} Score: Portfolio`, desc: `Computes a composite ${BRAND.name} Portfolio Score (1-10) from: weighted average of individual ${BRAND.name} Scores (base), minus pairwise holdings overlap penalty (up to -2 pts), plus geographic diversification bonus (up to +1 pt).`,
-        body: `{\n  "portfolio": [\n    {"etf_id": "IE00B0M62Q58", "weight": 60},\n    {"etf_id": "IE0031442068", "weight": 40}\n  ]\n}`,
-      },
+      }
     ]
   }
 ]
