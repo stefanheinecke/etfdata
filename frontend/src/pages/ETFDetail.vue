@@ -176,8 +176,7 @@
               <p v-for="(para, i) in explanation.text.split('\n\n').filter(Boolean)" :key="i">{{ para }}</p>
             </div>
             <div class="ai-insight-footer">
-              <span>{{ explanation.cached ? 'Cached' : 'Freshly generated' }} · {{ new Date(explanation.generated_at).toLocaleString() }}</span>
-              <button class="show-more-btn" @click="loadExplanation(true)" :disabled="explanationLoading">Regenerate</button>
+              <span>{{ new Date(explanation.generated_at).toLocaleString() }}</span>
             </div>
           </div>
           <div v-else class="empty-state"><p>No explanation available.</p></div>
@@ -433,12 +432,12 @@ async function loadTab(tab) {
   if (tab === 'Performance') await renderChart()
 }
 
-async function loadExplanation(force = false) {
+async function loadExplanation() {
   if (!etf.value) return
   explanationLoading.value = true
   explanationError.value = ''
   try {
-    const r = await etfService.getExplanation(etf.value.id, force)
+    const r = await etfService.getExplanation(etf.value.id)
     explanation.value = r.data
   } catch (e) {
     explanationError.value = e.response?.data?.detail || e.message

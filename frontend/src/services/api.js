@@ -38,8 +38,8 @@ export const etfService = {
   getPerformance(etfId, fromDate = null, toDate = null) {
     return api.get(`/etfs/${etfId}/performance`, { params: { from_date: fromDate, to_date: toDate } })
   },
-  getExplanation(etfId, force = false) {
-    return api.get(`/etfs/${etfId}/explain`, { params: { force } })
+  getExplanation(etfId) {
+    return api.get(`/etfs/${etfId}/explain`)
   },
   deleteETF(etfId) {
     return api.delete(`/etfs/${etfId}`)

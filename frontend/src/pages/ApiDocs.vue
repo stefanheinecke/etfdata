@@ -188,10 +188,9 @@ const groups = [
         ],
       },
       { id: 'etf-explain', method: 'GET', short: '/etfs/{id}/explain', path: '/etfs/{etf_id}/explain',
-        title: 'AI ETF Explanation', desc: `Returns an AI-generated plain-English explanation of the ETF, grounded strictly in its own holdings, allocation and ${BRAND.name} Quality Score data already in our database — no external knowledge about the fund or issuer is used. Cached per ETF; generating a new explanation (first request, or force=true) requires a personal API key.`,
+        title: 'AI ETF Explanation', desc: `Returns an AI-generated plain-English explanation of the ETF, grounded strictly in its own holdings, allocation and ${BRAND.name} Quality Score data already in our database — no external knowledge about the fund or issuer is used. Cached per ETF and never regenerated once created; the first request for an ETF requires a personal API key.`,
         params: [
           {name:'etf_id',in:'path',type:'string',required:true,desc:'ETF UUID or ISIN (e.g. IE00B0M62Q58)'},
-          {name:'force',in:'query',type:'boolean',required:false,desc:'Regenerate instead of using the cached explanation (default false)'},
         ],
       },
     ]

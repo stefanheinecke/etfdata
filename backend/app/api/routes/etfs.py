@@ -163,29 +163,26 @@ async def get_etf_performance(
 @router.get("/{etf_id}/explain")
 async def get_etf_explanation(
     etf_id: str,
-    force: bool = False,
     db: Session = Depends(get_db),
     api_key: APIKey = Depends(verify_api_key)
 ):
     """
     AI-generated plain-English explanation of this ETF, grounded strictly in
     its own holdings/allocation/score data already in the database (no
-    external knowledge about the fund or issuer is used). Cached per ETF.
-    Generating a new explanation (cache miss, or force=true) triggers a paid
-    LLM call, so it requires a personal API key — the public demo key can
-    only read explanations that are already cached.
+    external knowledge about the fund or issuer is used). Cached per ETF and
+    never regenerated once created. Generating it for the first time (cache
+    miss) triggers a paid LLM call, so it requires a personal API key — the
+    public demo key can only read explanations that are already cached.
     """
     from app.services.etf_explainer import generate_etf_explanation, _load_cached
     is_demo = getattr(api_key, "name", None) == "__demo__"
     etf = resolve_etf(db, etf_id)
     if is_demo:
-        if force:
-            raise HTTPException(status_code=403, detail="Regeneration requires a personal API key")
         cached = _load_cached(db, etf.id)
         if cached is None:
             raise HTTPException(status_code=403, detail="No cached explanation yet for this ETF — generating a new one requires a personal API key")
         return {"text": cached.text, "model": cached.model, "generated_at": cached.generated_at.isoformat(), "cached": True}
     try:
-        return generate_etf_explanation(db, etf, force=force)
+        return generate_etf_explanation(db, etf)
     except RuntimeError as e:
         raise HTTPException(status_code=503, detail=str(e))
