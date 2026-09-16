@@ -106,7 +106,7 @@
           <div><span class="etf-ticker">{{ etf.isin }}</span><span v-if="etf.provider" class="badge" style="margin-left:.5rem">{{ etf.provider }}</span></div>
           <span class="etf-ter">TER {{ etf.ter != null ? etf.ter + '%' : '—' }}</span>
         </div>
-        <h3 class="etf-name">{{ etf.name }}</h3>
+        <h3 class="etf-name" @click.stop="navigateToDetail(etf)" style="cursor:pointer" title="View ETF details">{{ etf.name }}</h3>
         <span class="badge">{{ etf.asset_class || 'Unknown' }}</span>
         <p v-if="!etf.equity_analytics_supported" class="analytics-availability">Equity holdings analysis unavailable for this asset class.</p>
         <p class="etf-isin">{{ etf.isin || '' }}</p>
@@ -140,6 +140,7 @@ import { ref, computed, watch, onMounted, inject } from 'vue'
 
 const showApiKeyModal = inject('showApiKeyModal')
 const navigateToPortfolio = inject('navigateToPortfolio')
+const navigateToDetail = inject('navigateToDetail')
 const hasApiKey = inject('hasApiKey', ref(!!localStorage.getItem('api_key')))
 import { etfService } from '../services/api.js'
 

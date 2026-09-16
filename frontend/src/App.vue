@@ -39,6 +39,7 @@
     <main class="main" :class="{ 'main-home': currentPage === 'home' }">
       <Home v-if="currentPage === 'home'" :key="homeRenderKey" @navigate="currentPage = $event" />
       <ETFList v-else-if="currentPage === 'etfs'" />
+      <ETFDetail v-else-if="currentPage === 'etf-detail'" />
       <Scores v-else-if="currentPage === 'scores'" />
       <Analytics v-else-if="currentPage === 'analytics'" />
       <Methodology v-else-if="currentPage === 'methodology'" />
@@ -163,6 +164,7 @@ async function doAdminLogin() {
 }
 import Home from './pages/Home.vue'
 import ETFList from './pages/ETFList.vue'
+import ETFDetail from './pages/ETFDetail.vue'
 import Scores from './pages/Scores.vue'
 import Analytics from './pages/Analytics.vue'
 import ApiDocs from './pages/ApiDocs.vue'
@@ -196,6 +198,13 @@ provide('hasApiKey', hasApiKey)
 
 const portfolioInit = ref(null)
 provide('portfolioInit', portfolioInit)
+const selectedETF = ref(null)
+provide('selectedETF', selectedETF)
+provide('navigateToDetail', (etf) => {
+  selectedETF.value = etf
+  currentPage.value = 'etf-detail'
+  window.scrollTo({ top: 0, behavior: 'auto' })
+})
 provide('navigateToETF', (etf) => {
   portfolioInit.value = { etf_id: etf.id, weight: 100 }
   currentPage.value = 'analytics'
