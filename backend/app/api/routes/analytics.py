@@ -42,25 +42,6 @@ async def calculate_exposure(
             "allocation_overlap": allocation_overlap, "analysis_warnings": warnings}
 
 
-@router.post("/alternatives/{etf_id}")
-async def find_alternatives(
-    etf_id: str,
-    request: ExposureRequest,
-    top_n: int = 5,
-    db: Session = Depends(get_db),
-    api_key: APIKey = Depends(verify_api_key)
-):
-    """Find ETFs that would reduce holdings overlap when replacing etf_id in the portfolio."""
-    resolved_portfolio = [
-        {"etf_id": str(resolve_etf(db, item["etf_id"]).id), "weight": item["weight"]}
-        for item in request.portfolio
-    ]
-    target = resolve_etf(db, etf_id)
-    return AnalyticsService.suggest_lower_overlap_alternatives(
-        db, resolved_portfolio, str(target.id), top_n
-    )
-
-
 @router.post("/pair-suggestions")
 async def pair_suggestions(
     request: ExposureRequest,

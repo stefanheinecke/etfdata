@@ -28,11 +28,18 @@ export const etfService = {
   getAllocations(etfId, type = null, date = null) {
     return api.get(`/etfs/${etfId}/allocations`, { params: { type, date } })
   },
-  getRiskMetrics(tickers = [], rfRate = 0.04) {
-    return api.get('/etfs/risk-metrics', { params: { tickers: tickers.join(','), rf_rate: rfRate } })
+  getRiskMetrics(isins = [], rfRate = 0.04) {
+    return api.get('/etfs/risk-metrics', { params: { isins: isins.join(','), rf_rate: rfRate } })
+  },
+  getETFRiskMetrics(etfId, rfRate = 0.04) {
+    return api.get('/etfs/risk-metrics', { params: { isins: etfId, rf_rate: rfRate } })
+      .then(r => ({ ...r, data: r.data[0] ?? null }))
   },
   getPerformance(etfId, fromDate = null, toDate = null) {
     return api.get(`/etfs/${etfId}/performance`, { params: { from_date: fromDate, to_date: toDate } })
+  },
+  getExplanation(etfId, force = false) {
+    return api.get(`/etfs/${etfId}/explain`, { params: { force } })
   },
   deleteETF(etfId) {
     return api.delete(`/etfs/${etfId}`)
@@ -46,9 +53,6 @@ export const analyticsService = {
   calculateExposure(portfolio, date = null, rfRate = 0.04) {
     return api.post('/analytics/exposure', { portfolio }, { params: { date, rf_rate: rfRate } })
   },
-  findAlternatives(etfId, portfolio, topN = 5) {
-    return api.post(`/analytics/alternatives/${etfId}`, { portfolio }, { params: { top_n: topN } })
-  },
   getPairSuggestions(portfolio) {
     return api.post('/analytics/pair-suggestions', { portfolio })
   },
@@ -59,9 +63,6 @@ export const scoreService = {
     const params = {}
     if (isins.length > 0) params.isins = isins.join(',')
     return api.get('/scores/etfs', { params })
-  },
-  getPortfolioScore(portfolio) {
-    return api.post('/scores/portfolio', { portfolio })
   },
 }
 

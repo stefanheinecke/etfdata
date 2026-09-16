@@ -164,6 +164,25 @@
           <div v-else class="empty-state"><p>No price history to compute risk metrics.</p></div>
         </div>
 
+        <!-- ── AI Insight ───────────────────────────────── -->
+        <div v-if="activeTab === 'AI Insight'">
+          <div v-if="explanationLoading" class="loading"><div class="spinner"></div> Generating explanation…</div>
+          <div v-else-if="explanationError" class="empty-state"><p>{{ explanationError }}</p></div>
+          <div v-else-if="explanation">
+            <p class="ai-insight-note">
+              AI-generated summary based strictly on this ETF's data in our database (metadata, holdings, allocations, GoETF Quality Score). Not investment advice.
+            </p>
+            <div class="ai-insight-text">
+              <p v-for="(para, i) in explanation.text.split('\n\n').filter(Boolean)" :key="i">{{ para }}</p>
+            </div>
+            <div class="ai-insight-footer">
+              <span>{{ explanation.cached ? 'Cached' : 'Freshly generated' }} · {{ new Date(explanation.generated_at).toLocaleString() }}</span>
+              <button class="show-more-btn" @click="loadExplanation(true)" :disabled="explanationLoading">Regenerate</button>
+            </div>
+          </div>
+          <div v-else class="empty-state"><p>No explanation available.</p></div>
+        </div>
+
       </div>
     </div>
   </div>
@@ -178,13 +197,16 @@ const etf = inject('selectedETF')
 const navigateTo = inject('navigateTo')
 function goBack() { navigateTo('etfs') }
 
-const tabs = ['Overview', 'Holdings', 'Allocations', 'Performance', 'Risk']
+const tabs = ['Overview', 'Holdings', 'Allocations', 'Performance', 'Risk', 'AI Insight']
 const activeTab = ref('Overview')
 const detailLoading = ref(false)
 const holdings = ref([])
 const allocations = ref([])
 const performance = ref([])
 const etfRisk = ref(null)
+const explanation = ref(null)
+const explanationLoading = ref(false)
+const explanationError = ref('')
 const expandedGroups = ref(new Set())
 const chartCanvas = ref(null)
 let chartInstance = null
@@ -387,6 +409,7 @@ async function switchTab(tab) {
   else if (tab === 'Performance' && !performance.value.length) await loadTab('Performance')
   else if (tab === 'Performance' && performance.value.length) renderChart()
   else if (tab === 'Risk' && !etfRisk.value) await loadTab('Risk')
+  else if (tab === 'AI Insight' && !explanation.value) await loadExplanation()
 }
 
 async function loadTab(tab) {
@@ -408,6 +431,20 @@ async function loadTab(tab) {
     }
   } catch (e) { console.error(e) } finally { detailLoading.value = false }
   if (tab === 'Performance') await renderChart()
+}
+
+async function loadExplanation(force = false) {
+  if (!etf.value) return
+  explanationLoading.value = true
+  explanationError.value = ''
+  try {
+    const r = await etfService.getExplanation(etf.value.id, force)
+    explanation.value = r.data
+  } catch (e) {
+    explanationError.value = e.response?.data?.detail || e.message
+  } finally {
+    explanationLoading.value = false
+  }
 }
 
 watch(() => etf.value?.id, () => {
@@ -550,6 +587,11 @@ watch(() => etf.value?.id, () => {
 .rl-mid  { color: #ca8a04; font-weight: 600; }
 .rl-high { color: #ef4444; font-weight: 600; }
 .risk-note { font-size: .72rem; color: var(--text-muted); line-height: 1.5; }
+
+.ai-insight-note { font-size: .78rem; color: var(--text-muted); background: var(--bg-3); border-radius: 8px; padding: .6rem .85rem; margin-bottom: 1rem; line-height: 1.5; }
+.ai-insight-text { max-width: 70ch; }
+.ai-insight-text p { font-size: .92rem; line-height: 1.7; color: var(--text); margin-bottom: .9rem; }
+.ai-insight-footer { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-top: 1rem; padding-top: .75rem; border-top: 1px solid var(--border); font-size: .72rem; color: var(--text-muted); }
 
 /* ── Mobile responsive ── */
 @media (max-width: 640px) {

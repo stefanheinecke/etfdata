@@ -187,6 +187,13 @@ const groups = [
           {name:'to_date',in:'query',type:'date',required:false,desc:'End date YYYY-MM-DD'},
         ],
       },
+      { id: 'etf-explain', method: 'GET', short: '/etfs/{id}/explain', path: '/etfs/{etf_id}/explain',
+        title: 'AI ETF Explanation', desc: `Returns an AI-generated plain-English explanation of the ETF, grounded strictly in its own holdings, allocation and ${BRAND.name} Quality Score data already in our database — no external knowledge about the fund or issuer is used. Cached per ETF; generating a new explanation (first request, or force=true) requires a personal API key.`,
+        params: [
+          {name:'etf_id',in:'path',type:'string',required:true,desc:'ETF UUID or ISIN (e.g. IE00B0M62Q58)'},
+          {name:'force',in:'query',type:'boolean',required:false,desc:'Regenerate instead of using the cached explanation (default false)'},
+        ],
+      },
     ]
   },
   {
@@ -218,6 +225,11 @@ const allEndpoints = computed(() => groups.flatMap(g => g.endpoints))
 const active = computed(() => allEndpoints.value.find(e => e.id === activeId.value))
 
 // ── Try it out ─────────────────────────────────────────────────────────────
+// Fixed to two ETFs known to have real holdings/allocations data loaded, so the
+// "Try it out" demos (e.g. holdings) never show a misleadingly empty result.
+const DEMO_ISIN_1 = 'IE00B0M62Q58'  // iShares MSCI World UCITS ETF USD (Dist)
+const DEMO_ISIN_2 = 'IE0031442068'  // iShares Core S&P 500 UCITS ETF USD (Dist)
+
 const swdaId = ref(null)
 const secondEtfId = ref(null)
 
@@ -225,17 +237,11 @@ async function fetchEtfIds() {
   if (swdaId.value) return
   // Always use the demo key here so single-ETF demos work even without a user API key.
   try {
-    const demoRes = await axios.get(`${BASE}/etfs`, { headers: { 'x-api-key': 'demo' } })
-    swdaId.value = demoRes.data[0]?.id ?? null
+    const res1 = await axios.get(`${BASE}/etfs/${DEMO_ISIN_1}`, { headers: { 'x-api-key': 'demo' } })
+    swdaId.value = res1.data?.id ?? null
+    const res2 = await axios.get(`${BASE}/etfs/${DEMO_ISIN_2}`, { headers: { 'x-api-key': 'demo' } })
+    secondEtfId.value = res2.data?.id ?? swdaId.value
   } catch {}
-  // For the exposure demo (2 ETFs), try to pick a second ETF via the user's own key.
-  const userKey = localStorage.getItem('api_key')
-  if (userKey && swdaId.value) {
-    try {
-      const res = await axios.get(`${BASE}/etfs`, { headers: { 'x-api-key': userKey }, params: { limit: 10 } })
-      secondEtfId.value = res.data.find(e => e.id !== swdaId.value)?.id ?? swdaId.value
-    } catch {}
-  }
   if (!secondEtfId.value) secondEtfId.value = swdaId.value
 }
 
@@ -246,15 +252,10 @@ const tryoutConfigs = {
   'allocations':  { build: (id)  => ({ method: 'GET',  url: `${BASE}/etfs/${id}/allocations` }) },
   'exposure':          { build: (id, id2) => ({ method: 'POST', url: `${BASE}/analytics/exposure`,
                                         body: { portfolio: [{ etf_id: id, weight: 60 }, { etf_id: id2, weight: 40 }] } }) },
-  'analytics-alternatives': { build: (id, id2) => ({ method: 'POST', url: `${BASE}/analytics/alternatives/${id}`,
-                                        body: { portfolio: [{ etf_id: id, weight: 60 }, { etf_id: id2, weight: 40 }] } }) },
-  'pair-suggestions':  { build: (id, id2) => ({ method: 'POST', url: `${BASE}/analytics/pair-suggestions`,
-                                        body: { portfolio: [{ etf_id: id, weight: 60 }, { etf_id: id2, weight: 40 }] } }) },
   'etf-risk-metrics':  { build: (id)  => ({ method: 'GET',  url: `${BASE}/etfs/risk-metrics`, params: { isins: id } }) },
   'etf-performance':   { build: (id)  => ({ method: 'GET',  url: `${BASE}/etfs/${id}/performance` }) },
+  'etf-explain':       { build: (id)  => ({ method: 'GET',  url: `${BASE}/etfs/${id}/explain` }) },
   'score-etfs':        { build: (id)  => ({ method: 'GET',  url: `${BASE}/scores/etfs`, params: { isins: id } }) },
-  'score-portfolio':   { build: (id, id2) => ({ method: 'POST', url: `${BASE}/scores/portfolio`,
-                                        body: { portfolio: [{ etf_id: id, weight: 60 }, { etf_id: id2, weight: 40 }] } }) },
 }
 
 const activeTryoutConfig = computed(() => tryoutConfigs[activeId.value])
@@ -320,65 +321,84 @@ etfs = r.json()`,
 ).then(r => r.json());`,
   },
   'get-etf': {
-    cURL: `curl ${DOC_BASE}/etfs/{ETF_ID} \\
+    cURL: `curl ${DOC_BASE}/etfs/IE00B0M62Q58 \\
   -H "x-api-key: YOUR_API_KEY"`,
     Python: `import requests
 
 r = requests.get(
-    "${DOC_BASE}/etfs/{ETF_ID}",
+    "${DOC_BASE}/etfs/IE00B0M62Q58",  # any ETF UUID or ISIN from GET /etfs
     headers={"x-api-key": "YOUR_API_KEY"}
 )
 etf = r.json()`,
     JavaScript: `const etf = await fetch(
-  "${DOC_BASE}/etfs/{ETF_ID}",
+  "${DOC_BASE}/etfs/IE00B0M62Q58",
   { headers: { "x-api-key": "YOUR_API_KEY" } }
 ).then(r => r.json());`,
   },
   'holdings': {
-    cURL: `curl ${DOC_BASE}/etfs/{ETF_ID}/holdings \\
+    cURL: `curl ${DOC_BASE}/etfs/IE00B0M62Q58/holdings \\
   -H "x-api-key: YOUR_API_KEY"`,
     Python: `import requests
 
 r = requests.get(
-    "${DOC_BASE}/etfs/{ETF_ID}/holdings",
+    "${DOC_BASE}/etfs/IE00B0M62Q58/holdings",
     headers={"x-api-key": "YOUR_API_KEY"}
 )
 holdings = r.json()
 for h in holdings[:5]:
-    print(h["instrument_name"], h["weight"])`,
+    print(h["instrument_name"], h["weight"])
+# Note: not every ETF has holdings loaded — check GET /etfs for holdings_count,
+# or GET /scores/etfs for equity_analytics_supported, before assuming a non-empty result.`,
     JavaScript: `const holdings = await fetch(
-  "${DOC_BASE}/etfs/{ETF_ID}/holdings",
+  "${DOC_BASE}/etfs/IE00B0M62Q58/holdings",
   { headers: { "x-api-key": "YOUR_API_KEY" } }
-).then(r => r.json());`,
+).then(r => r.json());
+// Note: not every ETF has holdings loaded — check holdings_count on GET /etfs first.`,
   },
   'allocations': {
-    cURL: `curl ${DOC_BASE}/etfs/{ETF_ID}/allocations \\
+    cURL: `curl ${DOC_BASE}/etfs/IE00B0M62Q58/allocations \\
   -H "x-api-key: YOUR_API_KEY"`,
     Python: `import requests
 
 r = requests.get(
-    "${DOC_BASE}/etfs/{ETF_ID}/allocations",
+    "${DOC_BASE}/etfs/IE00B0M62Q58/allocations",
     headers={"x-api-key": "YOUR_API_KEY"}
 )
 allocs = r.json()`,
     JavaScript: `const allocs = await fetch(
-  "${DOC_BASE}/etfs/{ETF_ID}/allocations",
+  "${DOC_BASE}/etfs/IE00B0M62Q58/allocations",
   { headers: { "x-api-key": "YOUR_API_KEY" } }
 ).then(r => r.json());`,
   },
   'etf-performance': {
-    cURL: `curl ${DOC_BASE}/etfs/{ETF_ID}/performance \\
+    cURL: `curl ${DOC_BASE}/etfs/IE00B0M62Q58/performance \\
   -H "x-api-key: YOUR_API_KEY"`,
     Python: `import requests
 
 r = requests.get(
-    "${DOC_BASE}/etfs/{ETF_ID}/performance",
+    "${DOC_BASE}/etfs/IE00B0M62Q58/performance",
     params={"from_date": "2025-01-01"},
     headers={"x-api-key": "YOUR_API_KEY"}
 )
 history = r.json()`,
     JavaScript: `const history = await fetch(
-  "${DOC_BASE}/etfs/{ETF_ID}/performance",
+  "${DOC_BASE}/etfs/IE00B0M62Q58/performance",
+  { headers: { "x-api-key": "YOUR_API_KEY" } }
+).then(r => r.json());`,
+  },
+  'etf-explain': {
+    cURL: `curl ${DOC_BASE}/etfs/IE00B0M62Q58/explain \\
+  -H "x-api-key: YOUR_API_KEY"`,
+    Python: `import requests
+
+r = requests.get(
+    "${DOC_BASE}/etfs/IE00B0M62Q58/explain",
+    headers={"x-api-key": "YOUR_API_KEY"}
+)
+explanation = r.json()
+print(explanation["text"])`,
+    JavaScript: `const explanation = await fetch(
+  "${DOC_BASE}/etfs/IE00B0M62Q58/explain",
   { headers: { "x-api-key": "YOUR_API_KEY" } }
 ).then(r => r.json());`,
   },
@@ -434,73 +454,6 @@ result = r.json()`,
 ).then(r => r.json());
 // result.sectors / result.countries / result.currencies / result.risk_metrics`,
   },
-  'analytics-alternatives': {
-    cURL: `curl -X POST "${DOC_BASE}/analytics/alternatives/IE00B0M62Q58?top_n=5" \\
-  -H "x-api-key: YOUR_API_KEY" \\
-  -H "Content-Type: application/json" \\
-  -d '{"portfolio": [{"etf_id": "IE00B0M62Q58", "weight": 60}, {"etf_id": "IE0031442068", "weight": 40}]}'`,
-    Python: `import requests
-
-r = requests.post(
-    "${DOC_BASE}/analytics/alternatives/IE00B0M62Q58",
-    params={"top_n": 5},
-    headers={"x-api-key": "YOUR_API_KEY"},
-    json={"portfolio": [
-        {"etf_id": "IE00B0M62Q58", "weight": 60},
-        {"etf_id": "IE0031442068", "weight": 40}
-    ]}
-)
-suggestions = r.json()`,
-    JavaScript: `const suggestions = await fetch(
-  "${DOC_BASE}/analytics/alternatives/IE00B0M62Q58?top_n=5",
-  {
-    method: "POST",
-    headers: {
-      "x-api-key": "YOUR_API_KEY",
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      portfolio: [
-        { etf_id: "IE00B0M62Q58", weight: 60 },
-        { etf_id: "IE0031442068", weight: 40 }
-      ]
-    })
-  }
-).then(r => r.json());`,
-  },
-  'pair-suggestions': {
-    cURL: `curl -X POST "${DOC_BASE}/analytics/pair-suggestions" \\
-  -H "x-api-key: YOUR_API_KEY" \\
-  -H "Content-Type: application/json" \\
-  -d '{"portfolio": [{"etf_id": "IE00B0M62Q58", "weight": 60}, {"etf_id": "IE0031442068", "weight": 40}]}'`,
-    Python: `import requests
-
-r = requests.post(
-    "${DOC_BASE}/analytics/pair-suggestions",
-    headers={"x-api-key": "YOUR_API_KEY"},
-    json={"portfolio": [
-        {"etf_id": "IE00B0M62Q58", "weight": 60},
-        {"etf_id": "IE0031442068", "weight": 40}
-    ]}
-)
-pairs = r.json()`,
-    JavaScript: `const pairs = await fetch(
-  "${DOC_BASE}/analytics/pair-suggestions",
-  {
-    method: "POST",
-    headers: {
-      "x-api-key": "YOUR_API_KEY",
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      portfolio: [
-        { etf_id: "IE00B0M62Q58", weight: 60 },
-        { etf_id: "IE0031442068", weight: 40 }
-      ]
-    })
-  }
-).then(r => r.json());`,
-  },
   'score-etfs': {
     cURL: `curl "${DOC_BASE}/scores/etfs?isins=IE00B0M62Q58" \\
   -H "x-api-key: YOUR_API_KEY"`,
@@ -515,39 +468,6 @@ scores = r.json()`,
     JavaScript: `const scores = await fetch(
   "${DOC_BASE}/scores/etfs?isins=IE00B0M62Q58",
   { headers: { "x-api-key": "YOUR_API_KEY" } }
-).then(r => r.json());`,
-  },
-  'score-portfolio': {
-    cURL: `curl -X POST "${DOC_BASE}/scores/portfolio" \\
-  -H "x-api-key: YOUR_API_KEY" \\
-  -H "Content-Type: application/json" \\
-  -d '{"portfolio": [{"etf_id": "IE00B0M62Q58", "weight": 60}, {"etf_id": "IE0031442068", "weight": 40}]}'`,
-    Python: `import requests
-
-r = requests.post(
-    "${DOC_BASE}/scores/portfolio",
-    headers={"x-api-key": "YOUR_API_KEY"},
-    json={"portfolio": [
-        {"etf_id": "IE00B0M62Q58", "weight": 60},
-        {"etf_id": "IE0031442068", "weight": 40}
-    ]}
-)
-portfolio_score = r.json()`,
-    JavaScript: `const portfolioScore = await fetch(
-  "${DOC_BASE}/scores/portfolio",
-  {
-    method: "POST",
-    headers: {
-      "x-api-key": "YOUR_API_KEY",
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      portfolio: [
-        { etf_id: "IE00B0M62Q58", weight: 60 },
-        { etf_id: "IE0031442068", weight: 40 }
-      ]
-    })
-  }
 ).then(r => r.json());`,
   },
 }

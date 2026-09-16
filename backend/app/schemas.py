@@ -105,6 +105,16 @@ class ETFScore(Base):
     data = Column(JSON, nullable=False)  # full metrics/score payload (see scoring_service.py)
     calculated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+class ETFExplanation(Base):
+    """Cached AI-generated plain-English explanation of an ETF, grounded strictly
+    in this ETF's own DB data (see etf_explainer.py). Regenerated only on demand."""
+    __tablename__ = "etf_explanations"
+
+    etf_id = Column(PGUUID(as_uuid=True), ForeignKey("etfs.id", ondelete="CASCADE"), primary_key=True)
+    text = Column(Text, nullable=False)
+    model = Column(String(50))
+    generated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
 class FXRate(Base):
     __tablename__ = "fx_rates"
 
