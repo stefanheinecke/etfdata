@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { BRAND } from '../brand.js'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://etfdata-production.up.railway.app'
 
@@ -39,7 +40,7 @@ export const etfService = {
     return api.get(`/etfs/${etfId}/performance`, { params: { from_date: fromDate, to_date: toDate } })
   },
   getExplanation(etfId) {
-    return api.get(`/etfs/${etfId}/explain`)
+    return api.get(`/etfs/${etfId}/explain`, { params: { brand: BRAND.name } })
   },
   deleteETF(etfId) {
     return api.delete(`/etfs/${etfId}`)

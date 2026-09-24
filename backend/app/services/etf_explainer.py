@@ -104,6 +104,16 @@ def build_etf_context(db: Session, etf: ETF) -> str:
     return "\n".join(lines)
 
 
+def rebrand(text: str, brand_name: Optional[str]) -> str:
+    """Generated/cached text always says 'GoETF' (see SYSTEM_PROMPT/build_etf_context
+    above) regardless of which domain the request came from — substitute the
+    requesting site's actual brand name (see frontend/src/brand.js) at read time,
+    so cached text stays correct no matter which domain first generated it."""
+    if not brand_name or brand_name == "GoETF":
+        return text
+    return text.replace("GoETF", brand_name)
+
+
 def _load_cached(db: Session, etf_id) -> Optional[ETFExplanation]:
     return db.query(ETFExplanation).filter(ETFExplanation.etf_id == etf_id).first()
 

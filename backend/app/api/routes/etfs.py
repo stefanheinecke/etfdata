@@ -193,6 +193,7 @@ async def get_etf_performance(
 @router.get("/{etf_id}/explain")
 async def get_etf_explanation(
     etf_id: str,
+    brand: Optional[str] = None,
     db: Session = Depends(get_db),
     api_key: APIKey = Depends(verify_api_key)
 ):
@@ -203,16 +204,19 @@ async def get_etf_explanation(
     never regenerated once created. Generating it for the first time (cache
     miss) triggers a paid LLM call, so it requires a personal API key — the
     public demo key can only read explanations that are already cached.
+    `brand` (e.g. "TrueETF") relabels the generic "GoETF Quality Score"
+    wording for the requesting site — see frontend/src/brand.js.
     """
-    from app.services.etf_explainer import generate_etf_explanation, _load_cached
+    from app.services.etf_explainer import generate_etf_explanation, _load_cached, rebrand
     is_demo = getattr(api_key, "name", None) == "__demo__"
     etf = resolve_etf(db, etf_id)
     if is_demo:
         cached = _load_cached(db, etf.id)
         if cached is None:
             raise HTTPException(status_code=403, detail="No cached explanation yet for this ETF — generating a new one requires a personal API key")
-        return {"text": cached.text, "model": cached.model, "generated_at": cached.generated_at.isoformat(), "cached": True}
+        return {"text": rebrand(cached.text, brand), "model": cached.model, "generated_at": cached.generated_at.isoformat(), "cached": True}
     try:
-        return generate_etf_explanation(db, etf)
+        result = generate_etf_explanation(db, etf)
+        return {**result, "text": rebrand(result["text"], brand)}
     except RuntimeError as e:
         raise HTTPException(status_code=503, detail=str(e))
