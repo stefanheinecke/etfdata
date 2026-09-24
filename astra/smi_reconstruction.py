@@ -1173,6 +1173,60 @@ def fetch_ishares(etf_isin: str, *, product_url: str | None = None,
                   "source_binding": "ETF ISIN verified on issuer product page"}
 
 
+def fetch_ishares_nav_history(etf_isin: str, *, product_url: str | None = None,
+                              cache_dir: str | Path = ".smi_cache") -> tuple[list[dict], dict]:
+    """Full daily NAV history from the issuer's own product page performance
+    chart — the same page already used by fetch_ishares() for holdings, so no
+    extra resolution mechanism or endpoint. Unlike AUM/shares outstanding
+    (point-in-time only), iShares embeds the complete since-inception NAV
+    series directly in this page's 'performance' component.
+    Source mechanism inspected on 2026-09-24; schema changes fail explicitly.
+    Returns (rows, meta); each row is {"date": "YYYY-MM-DD", "nav": float}.
+    """
+    etf_isin = validate_isin(etf_isin)
+    if product_url is None:
+        url = "https://www.ishares.com/varnish-api/core-search/search/products?" + urlencode({
+            "site": "ishares-uk", "locale": "en-gb", "rows": 20, "start": 0,
+            "userType": "individual", "query": etf_isin})
+        search = json.loads(download_provider(url, "ishares", cache_dir))
+        candidates = search.get("results", [])
+        if len(candidates) != 1 or not str(candidates[0].get("portfolioId", "")).isdigit():
+            raise ValueError("iShares ISIN search did not identify one product. Supply its --product-url; "
+                             "the page's ETF ISIN will be verified before use.")
+        product_url = "https://www.ishares.com/uk/individual/en/products/" + str(candidates[0]["portfolioId"])
+    page = ProviderPage()
+    page.feed(download_provider(product_url, "ishares", cache_dir).decode("utf-8-sig"))
+    facts_component = page.components.get("keyFundFacts", {})
+    facts = {}
+    for container in facts_component.get("containersByNameMap", {}).values():
+        facts.update({key: point.get("value") for key, point in container.get("dataPointsByNameMap", {}).items()})
+    if facts.get("isin") != etf_isin:
+        raise ValueError(f"Product-page ETF ISIN is {facts.get('isin')!r}, expected {etf_isin}. "
+                         "Use the correct share-class URL, or an explicitly supplied holdings export.")
+    try:
+        chart = page.components["performance"]["containersByNameMap"]["chart"]["dataPointsByNameMap"]
+        nav = chart["navData"]
+        dates, values = nav["asOfDate"], nav["formattedValue"]
+        currency = (chart.get("currencySymbol") or {}).get("formattedValue") or facts.get("baseCurrencyCode")
+    except (KeyError, TypeError) as exc:
+        raise ValueError("Unsupported iShares performance response schema") from exc
+    if not dates or len(dates) != len(values):
+        raise ValueError("Misaligned or missing NAV history columns")
+    rows = []
+    for raw_date, raw_value in zip(dates, values):
+        try:
+            nav_value = float(str(raw_value).replace(",", ""))
+        except (TypeError, ValueError):
+            continue
+        rows.append({"date": date_text(raw_date), "nav": nav_value})
+    if not rows:
+        raise ValueError("No usable NAV history rows returned")
+    rows.sort(key=lambda r: r["date"])
+    return rows, {"etf_isin": etf_isin, "currency": currency, "product_url": product_url,
+                  "source": "iShares product page performance chart",
+                  "count": len(rows), "first_date": rows[0]["date"], "last_date": rows[-1]["date"]}
+
+
 def field_key(value: str) -> str:
     return re.sub(r"[^a-z0-9]", "", str(value).lower().replace("ä", "a").replace("ö", "o").replace("ü", "u"))
 

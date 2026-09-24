@@ -131,6 +131,31 @@ def import_holdings_endpoint(
             os.unlink(temp_path)
 
 
+@router.post("/import-prices-ishares")
+def import_prices_ishares_endpoint(
+    isin: str,
+    db: Session = Depends(get_db),
+    _: None = Depends(verify_admin_secret),
+):
+    """Fetch the full since-inception daily NAV history for an ETF straight from
+    its iShares product page (astra/smi_reconstruction.py fetch_ishares_nav_history)
+    and upsert it into the Performance table. Unlike EODHD/yfinance, this needs
+    no ticker/exchange resolution — only the ISIN — and iShares embeds the
+    complete history in the page, not just a recent window.
+    The ETF must already exist; only its Performance rows are affected."""
+    from app.schemas import ETF
+    from app.services.price_fetcher_ishares import fetch_prices_ishares
+
+    etf_isin = isin.strip().upper()
+    etf = db.query(ETF).filter(ETF.isin == etf_isin).first()
+    if not etf:
+        raise HTTPException(status_code=404, detail=f"ETF with ISIN {etf_isin} not found")
+    result = fetch_prices_ishares(etf.id, etf_isin, db)
+    if not result["success"]:
+        raise HTTPException(status_code=502, detail=result["error"])
+    return result
+
+
 @router.post("/refresh-prices")
 def refresh_prices_endpoint(_: None = Depends(verify_admin_secret)):
     """

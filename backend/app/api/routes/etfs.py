@@ -121,6 +121,7 @@ async def get_allocations(
     api_key: APIKey = Depends(verify_api_key)
 ):
     from app.schemas import Allocation
+    from app.services.analytics_service import _allocation_snapshot
 
     etf = resolve_etf(db, etf_id)
 
@@ -139,7 +140,23 @@ async def get_allocations(
             query = query.filter(Allocation.date == latest_date)
 
     allocations = query.all()
-    return [a for a in allocations]
+    if allocations:
+        return allocations
+
+    # No explicit Allocation rows for this ETF (e.g. its holdings were imported
+    # via the iShares CSV path, which only writes Holding rows — see
+    # holdings_db_import.py). Derive the same country/sector/currency
+    # breakdown from holdings, reusing the fallback analytics/scoring already
+    # rely on via _allocation_snapshot, instead of showing an empty tab.
+    derived = []
+    for alloc_type in ([type] if type else ["country", "sector", "currency"]):
+        snapshot = _allocation_snapshot(db, etf.id, alloc_type, date)
+        if snapshot["status"] != "available":
+            continue
+        for bucket, weight in snapshot["weights"].items():
+            derived.append({"type": alloc_type, "bucket": bucket, "weight": round(weight, 4),
+                            "date": snapshot["as_of"], "etf_id": str(etf.id)})
+    return derived
 
 @router.get("/{etf_id}/performance")
 async def get_etf_performance(
