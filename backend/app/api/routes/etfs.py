@@ -168,12 +168,25 @@ async def get_etf_performance(
 ):
     from app.schemas import Performance
     etf = resolve_etf(db, etf_id)
+
+    has_any = db.query(Performance.id).filter(Performance.etf_id == etf.id).first() is not None
+    if not has_any and (etf.provider or "").strip().lower() == "ishares":
+        # First-ever view of this ETF's Performance tab: fetch its full NAV
+        # history from the issuer's own product page once, then every later
+        # request is served straight from the DB. Best-effort — a scrape
+        # failure must not break the page, just leave Performance empty.
+        try:
+            from app.services.price_fetcher_ishares import fetch_prices_ishares
+            fetch_prices_ishares(etf.id, etf.isin, db)
+        except Exception:
+            pass
+
     query = db.query(Performance).filter(Performance.etf_id == etf.id)
     if from_date:
         query = query.filter(Performance.date >= from_date)
     if to_date:
         query = query.filter(Performance.date <= to_date)
-    rows = query.order_by(Performance.date.desc()).limit(1000).all()
+    rows = query.order_by(Performance.date.desc()).all()
     return [{"date": str(r.date), "close_price": r.close_price, "nav": r.nav, "currency": r.currency, "dividend": r.dividend} for r in rows]
 
 

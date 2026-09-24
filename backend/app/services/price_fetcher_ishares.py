@@ -34,11 +34,14 @@ def _smi_module():
     raise RuntimeError("smi_reconstruction.py not found (expected in astra/)")
 
 
-def fetch_prices_ishares(etf_id, isin: str, db, product_url: str | None = None) -> dict:
+def fetch_prices_ishares(etf_id, isin: str, db, product_url: str | None = None, chunk_size: int = 500) -> dict:
     """Fetch the full since-inception NAV history from the iShares product page
     and upsert it into the Performance table. Stored as both close_price
     (consumed by the existing Performance chart and risk-metrics calculations)
-    and nav (semantically correct field), same value in both columns."""
+    and nav (semantically correct field), same value in both columns.
+    Upserted in chunks (one multi-row statement each) instead of row-by-row,
+    since a full history can be 5000+ rows — this matters when called
+    synchronously from a user-facing request (see etfs.py get_etf_performance)."""
     script = _smi_module()
     try:
         rows, meta = script.fetch_ishares_nav_history(isin, product_url=product_url)
@@ -48,16 +51,18 @@ def fetch_prices_ishares(etf_id, isin: str, db, product_url: str | None = None) 
 
     currency = meta.get("currency") or "USD"
     count = 0
-    for row in rows:
-        nav = Decimal(str(row["nav"]))
-        stmt = pg_insert(Performance).values(
-            etf_id=etf_id, date=row["date"], close_price=nav, nav=nav, currency=currency,
-        ).on_conflict_do_update(
+    for i in range(0, len(rows), chunk_size):
+        batch = rows[i:i + chunk_size]
+        values = [{"etf_id": etf_id, "date": r["date"], "close_price": Decimal(str(r["nav"])),
+                   "nav": Decimal(str(r["nav"])), "currency": currency} for r in batch]
+        stmt = pg_insert(Performance).values(values)
+        stmt = stmt.on_conflict_do_update(
             index_elements=["etf_id", "date"],
-            set_={"close_price": nav, "nav": nav, "currency": currency},
+            set_={"close_price": stmt.excluded.close_price, "nav": stmt.excluded.nav,
+                  "currency": stmt.excluded.currency},
         )
         db.execute(stmt)
-        count += 1
+        count += len(batch)
     db.commit()
     return {
         "success": True, "price_count": count, "currency": currency,

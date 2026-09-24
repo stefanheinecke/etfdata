@@ -156,6 +156,82 @@ def import_prices_ishares_endpoint(
     return result
 
 
+@router.post("/import-prices-ishares/bulk")
+def import_prices_ishares_bulk_endpoint(
+    isins: Optional[str] = None,
+    only_missing: bool = True,
+    _: None = Depends(verify_admin_secret),
+):
+    """Start an async bulk NAV-history import across many ETFs (see
+    /admin/import-prices-ishares for the single-ISIN version). Returns a
+    job_id immediately; poll GET /admin/refresh-prices/status/{job_id} (same
+    job store/shape as the yfinance/EODHD refresh job) for live progress.
+
+    Defaults to every ETF whose provider is iShares — this only works for
+    iShares-branded products. Pass isins= (comma-separated) to restrict to a
+    specific subset instead. only_missing=true (default) skips ETFs that
+    already have at least one Performance row, so re-running the job is cheap;
+    pass only_missing=false to force a full re-fetch for every matched ETF."""
+    from app.schemas import ETF, Performance
+
+    db = SessionLocal()
+    try:
+        query = db.query(ETF)
+        if isins:
+            isin_list = [i.strip().upper() for i in isins.split(",") if i.strip()]
+            query = query.filter(ETF.isin.in_(isin_list))
+        else:
+            query = query.filter(ETF.provider.ilike("ishares"))
+        etfs = query.order_by(ETF.isin).all()
+
+        if only_missing and etfs:
+            have_prices = {row[0] for row in db.query(Performance.etf_id).filter(
+                Performance.etf_id.in_([e.id for e in etfs])).distinct().all()}
+            etfs = [e for e in etfs if e.id not in have_prices]
+
+        etf_ids = [e.id for e in etfs]
+    finally:
+        db.close()
+
+    job_id = str(uuid4())
+    _refresh_jobs[job_id] = {
+        "status": "running", "done": 0, "total": len(etf_ids), "current_ticker": "",
+        "total_rows_upserted": 0, "etfs": [], "errors": [],
+    }
+
+    def _run():
+        import time
+        from app.services.price_fetcher_ishares import fetch_prices_ishares
+
+        db2 = SessionLocal()
+        try:
+            for i, etf_id in enumerate(etf_ids):
+                etf = db2.query(ETF).filter(ETF.id == etf_id).first()
+                if not etf:
+                    continue
+                _refresh_jobs[job_id].update({"done": i, "current_ticker": etf.isin})
+                try:
+                    result = fetch_prices_ishares(etf.id, etf.isin, db2)
+                    if result["success"]:
+                        _refresh_jobs[job_id]["total_rows_upserted"] += result["price_count"]
+                        _refresh_jobs[job_id]["etfs"].append(
+                            {"isin": etf.isin, "rows_upserted": result["price_count"], "source": "ishares"})
+                    else:
+                        _refresh_jobs[job_id]["errors"].append(f"{etf.isin}: {result['error']}")
+                except Exception as exc:
+                    db2.rollback()
+                    _refresh_jobs[job_id]["errors"].append(f"{etf.isin}: {exc}")
+                time.sleep(1.5)  # be a good citizen to the issuer's site between requests
+            _refresh_jobs[job_id].update({"status": "done", "done": len(etf_ids), "current_ticker": ""})
+        except Exception as exc:
+            _refresh_jobs[job_id].update({"status": "error", "errors": _refresh_jobs[job_id]["errors"] + [str(exc)]})
+        finally:
+            db2.close()
+
+    threading.Thread(target=_run, daemon=True).start()
+    return {"job_id": job_id, "total": len(etf_ids)}
+
+
 @router.post("/refresh-prices")
 def refresh_prices_endpoint(_: None = Depends(verify_admin_secret)):
     """
