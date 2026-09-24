@@ -423,7 +423,8 @@ async function loadTab(tab) {
       allocations.value = r.data
     } else if (tab === 'Performance') {
       const r = await etfService.getPerformance(etf.value.id)
-      performance.value = r.data
+      // API returns newest-first; chart/stats below assume oldest-first (left-to-right).
+      performance.value = r.data.slice().sort((a, b) => a.date.localeCompare(b.date))
     } else if (tab === 'Risk') {
       const r = await etfService.getETFRiskMetrics(etf.value.id)
       etfRisk.value = r.data
