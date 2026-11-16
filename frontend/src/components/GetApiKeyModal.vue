@@ -36,7 +36,12 @@
 
           <!-- Form state -->
           <template v-else>
-            <p class="modal-sub">Enter your email address to receive a free API key (60 req/min).</p>
+            <p class="modal-sub">Sign in with Google for the web app, or request a free API key by email (60 req/min).</p>
+
+            <div v-if="googleClientId" class="google-signin">
+              <div ref="googleButton"></div>
+              <div class="auth-divider"><span>or</span></div>
+            </div>
 
             <div class="form-field">
               <label class="label">Email Address</label>
@@ -124,11 +129,14 @@
 import { ref, watch, nextTick } from 'vue'
 import { authService } from '../services/api.js'
 
+const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
+let googleScriptPromise
+
 const props = defineProps({
   show: Boolean,
   initialTab: { type: String, default: 'request' }
 })
-const emit  = defineEmits(['close', 'key-saved'])
+const emit  = defineEmits(['close', 'key-saved', 'google-authenticated'])
 
 const activeTab  = ref(props.initialTab)
 const email      = ref('')
@@ -136,6 +144,7 @@ const loading    = ref(false)
 const errorMsg   = ref('')
 const sent       = ref(false)
 const emailInput = ref(null)
+const googleButton = ref(null)
 
 const apiKey   = ref('')
 const showKey  = ref(false)
@@ -149,6 +158,62 @@ function switchTab(tab) {
   keyError.value = ''
 }
 
+function loadGoogleIdentityServices() {
+  if (window.google?.accounts?.id) return Promise.resolve()
+  if (googleScriptPromise) return googleScriptPromise
+
+  googleScriptPromise = new Promise((resolve, reject) => {
+    const script = document.createElement('script')
+    script.src = 'https://accounts.google.com/gsi/client'
+    script.async = true
+    script.defer = true
+    script.onload = resolve
+    script.onerror = () => {
+      googleScriptPromise = null
+      reject(new Error('Google sign-in could not be loaded.'))
+    }
+    document.head.appendChild(script)
+  })
+  return googleScriptPromise
+}
+
+async function handleGoogleCredential(response) {
+  loading.value = true
+  errorMsg.value = ''
+  try {
+    const result = await authService.googleSignIn(response.credential)
+    emit('google-authenticated', result.data)
+    close()
+  } catch (e) {
+    errorMsg.value = e.response?.data?.detail || e.message
+  } finally {
+    loading.value = false
+  }
+}
+
+async function initializeGoogleButton() {
+  if (!googleClientId || !googleButton.value) return
+  try {
+    await loadGoogleIdentityServices()
+    if (!props.show || !googleButton.value) return
+    googleButton.value.replaceChildren()
+    window.google.accounts.id.initialize({
+      client_id: googleClientId,
+      callback: handleGoogleCredential,
+      auto_select: false,
+    })
+    window.google.accounts.id.renderButton(googleButton.value, {
+      theme: 'outline',
+      size: 'large',
+      shape: 'rect',
+      text: 'continue_with',
+      width: 360,
+    })
+  } catch (e) {
+    errorMsg.value = e.message
+  }
+}
+
 watch(() => props.show, async (val) => {
   if (val) {
     activeTab.value = props.initialTab
@@ -157,12 +222,18 @@ watch(() => props.show, async (val) => {
     showKey.value = false; keyError.value = ''; keySaved.value = false
     await nextTick()
     if (activeTab.value === 'enter') keyInput.value?.focus()
-    else emailInput.value?.focus()
+    else {
+      emailInput.value?.focus()
+      initializeGoogleButton()
+    }
   }
 })
 
 watch(() => props.initialTab, (val) => {
-  if (props.show) activeTab.value = val
+  if (props.show) {
+    activeTab.value = val
+    if (val === 'request') nextTick(initializeGoogleButton)
+  }
 })
 
 async function submit() {
@@ -333,6 +404,29 @@ function close() {
   color: var(--text-muted, #aaa);
   text-align: center;
   margin-top: .75rem;
+}
+.google-signin {
+  margin: 0 0 1rem;
+}
+.google-signin > div:first-child {
+  display: flex;
+  justify-content: center;
+  min-height: 40px;
+}
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  margin-top: .9rem;
+  color: var(--text-muted, #888);
+  font-size: .8rem;
+}
+.auth-divider::before,
+.auth-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border, #e5e7eb);
 }
 
 /* Reuse global button / input / label styles */

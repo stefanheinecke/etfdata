@@ -162,7 +162,7 @@ python app/main.py
 
 ## API-Tests
 
-### 1. API Key generieren (erforderlich für alle Requests)
+### 1. API Key generieren (für externe API-Requests)
 
 ```bash
 curl -X POST http://localhost:8000/api/keys \
@@ -171,6 +171,21 @@ curl -X POST http://localhost:8000/api/keys \
 ```
 
 Falls kein Endpoint vorhanden ist, nutze den Test-Key: `test-key`
+
+### Google-Anmeldung für die Web-App
+
+Google-Anmeldung verwendet eine separate Web-Sitzung; sie ersetzt oder rotiert
+keine API-Keys für externe Integrationen. Zur Einrichtung:
+
+1. In der Google Cloud Console einen OAuth-Client vom Typ **Web application**
+   anlegen und die Frontend-Domains als autorisierte JavaScript-Ursprünge eintragen.
+2. Dieselbe OAuth-Client-ID als `GOOGLE_CLIENT_ID` im Backend und
+   `VITE_GOOGLE_CLIENT_ID` im Frontend setzen.
+3. Die Frontend-Ursprünge in `CORS_ORIGINS` eintragen. Für Produktion muss
+   `SESSION_COOKIE_SECURE=true` gelten und die App über HTTPS laufen.
+
+Für den Login werden nur die Identitätsinformationen `openid`, `email` und
+`profile` verwendet; Gmail-Postfachzugriff wird nicht angefordert.
 
 ### 2. GET /etfs - Alle ETFs abrufen
 

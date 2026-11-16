@@ -10,19 +10,30 @@ import secrets
 import requests as _requests
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Response
 from fastapi.responses import HTMLResponse
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy.orm import Session
+from google.auth import exceptions as google_auth_exceptions
+from google.auth.transport.requests import Request as GoogleRequest
+from google.oauth2 import id_token
 
 from app.db.database import get_db
-from app.core.auth import create_api_key, generate_api_key, hash_api_key, verify_api_key
+from app.core.auth import (
+    create_api_key,
+    generate_api_key,
+    get_google_account_for_session,
+    hash_api_key,
+    verify_api_key,
+)
 from app.core.email import send_confirmation_email, send_api_key_email, is_email_configured
-from app.schemas import APIKey, PendingKeyRequest, ContactMessage, Settings
+from app.schemas import APIKey, GoogleAccount, PendingKeyRequest, ContactMessage, Settings, WebSession
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 _APP_NAME = "GoETF.ch API"
+_GOOGLE_SESSION_COOKIE = "web_session"
+_GOOGLE_SESSION_DAYS = 7
 
 
 # ── HTML templates ────────────────────────────────────────────────────────────
@@ -197,6 +208,144 @@ class ContactFormRequest(BaseModel):
 class ContactFormResponse(BaseModel):
     message: str
     success: bool
+
+
+class GoogleLoginRequest(BaseModel):
+    credential: str = Field(min_length=1, max_length=8192)
+
+
+def _verified_google_claims(credential: str) -> dict:
+    client_id = os.getenv("GOOGLE_CLIENT_ID", "").strip()
+    if not client_id:
+        raise HTTPException(status_code=503, detail="Google sign-in is not configured.")
+
+    try:
+        claims = id_token.verify_oauth2_token(
+            credential,
+            GoogleRequest(),
+            client_id,
+        )
+    except ValueError:
+        raise HTTPException(status_code=401, detail="Invalid Google sign-in credential.")
+    except google_auth_exceptions.GoogleAuthError:
+        raise HTTPException(status_code=503, detail="Google sign-in verification is unavailable.")
+
+    email = claims.get("email")
+    subject = claims.get("sub")
+    if (
+        not isinstance(email, str)
+        or not email
+        or not isinstance(subject, str)
+        or not subject
+        or claims.get("email_verified") is not True
+    ):
+        raise HTTPException(status_code=401, detail="A verified Google email address is required.")
+
+    name = claims.get("name")
+    if not isinstance(name, str) or not name.strip():
+        name = email.split("@")[0]
+
+    return {
+        "google_sub": subject,
+        "email": email.strip().lower()[:255],
+        "name": name.strip()[:255],
+    }
+
+
+def _session_cookie_secure() -> bool:
+    return os.getenv("SESSION_COOKIE_SECURE", "true").strip().lower() in {"1", "true", "yes"}
+
+
+def _session_cookie_samesite() -> str:
+    return "none" if _session_cookie_secure() else "lax"
+
+
+@router.post("/google/session")
+def google_session(
+    payload: GoogleLoginRequest,
+    response: Response,
+    db: Session = Depends(get_db),
+):
+    """Verify a Google ID token and start a server-side web session."""
+    claims = _verified_google_claims(payload.credential)
+    account = db.query(GoogleAccount).filter(
+        GoogleAccount.google_sub == claims["google_sub"]
+    ).first()
+    if account:
+        account.email = claims["email"]
+        account.name = claims["name"]
+        account.updated_at = datetime.utcnow()
+    else:
+        account = GoogleAccount(**claims)
+        db.add(account)
+        db.flush()
+
+    session_token = secrets.token_urlsafe(32)
+    expires_at = datetime.utcnow() + timedelta(days=_GOOGLE_SESSION_DAYS)
+    db.add(WebSession(
+        google_account_id=account.id,
+        token_hash=hash_api_key(session_token),
+        expires_at=expires_at,
+    ))
+    db.commit()
+
+    response.set_cookie(
+        key=_GOOGLE_SESSION_COOKIE,
+        value=session_token,
+        max_age=_GOOGLE_SESSION_DAYS * 24 * 60 * 60,
+        httponly=True,
+        secure=_session_cookie_secure(),
+        samesite=_session_cookie_samesite(),
+        path="/",
+    )
+    admin_email = os.getenv("ADMIN_EMAIL", "").strip().lower()
+    return {
+        "name": account.name,
+        "email": account.email,
+        "is_admin": bool(admin_email and account.email == admin_email),
+    }
+
+
+@router.get("/session")
+def get_web_session(
+    web_session: str = Cookie(None),
+    db: Session = Depends(get_db),
+):
+    account = get_google_account_for_session(web_session, db)
+    if not account:
+        raise HTTPException(status_code=401, detail="No active Google session.")
+
+    admin_email = os.getenv("ADMIN_EMAIL", "").strip().lower()
+    return {
+        "name": account.name,
+        "email": account.email,
+        "is_admin": bool(admin_email and account.email == admin_email),
+    }
+
+
+@router.post("/logout")
+def logout_google_session(
+    response: Response,
+    web_session: str = Cookie(None),
+    db: Session = Depends(get_db),
+):
+    if web_session:
+        session = db.query(WebSession).filter(
+            WebSession.token_hash == hash_api_key(web_session),
+            WebSession.revoked_at.is_(None),
+        ).first()
+        if session:
+            session.revoked_at = datetime.utcnow()
+            db.commit()
+
+    response.delete_cookie(
+        key=_GOOGLE_SESSION_COOKIE,
+        path="/",
+        httponly=True,
+        secure=_session_cookie_secure(),
+        samesite=_session_cookie_samesite(),
+    )
+    return {"message": "Signed out."}
 
 
 @router.post("/contact", response_model=ContactFormResponse)

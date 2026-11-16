@@ -7,7 +7,7 @@ function getApiKey() {
   return localStorage.getItem('api_key') || ''
 }
 
-const api = axios.create({ baseURL: API_BASE_URL })
+const api = axios.create({ baseURL: API_BASE_URL, withCredentials: true })
 
 // Inject API key dynamically on every request
 api.interceptors.request.use(config => {
@@ -76,6 +76,15 @@ export const healthService = {
 export const authService = {
   requestKey(email) {
     return api.post('/auth/request-key', null, { params: { email } })
+  },
+  googleSignIn(credential) {
+    return api.post('/auth/google/session', { credential })
+  },
+  session() {
+    return api.get('/auth/session')
+  },
+  logout() {
+    return api.post('/auth/logout')
   },
   me() {
     return api.get('/auth/me')
@@ -209,4 +218,3 @@ export const adminService = {
     })
   },
 }
-

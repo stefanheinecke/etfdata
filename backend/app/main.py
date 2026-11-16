@@ -48,7 +48,11 @@ class RequestLogMiddleware(BaseHTTPMiddleware):
 
         body_str = None
         content_type = request.headers.get("content-type", "")
-        if request.method in ("POST", "PUT", "PATCH") and "application/json" in content_type:
+        if (
+            request.url.path != "/auth/google/session"
+            and request.method in ("POST", "PUT", "PATCH")
+            and "application/json" in content_type
+        ):
             body_bytes = getattr(request, "_body", None)
             if body_bytes:
                 body_str = body_bytes[:4096].decode("utf-8", errors="replace")
@@ -101,9 +105,23 @@ app = FastAPI(
     version="1.0.0"
 )
 
+_DEFAULT_CORS_ORIGINS = (
+    "https://goetf.ch",
+    "https://www.goetf.ch",
+    "https://trueetf.com",
+    "https://www.trueetf.com",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+)
+_cors_origins = [
+    origin.strip()
+    for origin in os.getenv("CORS_ORIGINS", ",".join(_DEFAULT_CORS_ORIGINS)).split(",")
+    if origin.strip()
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

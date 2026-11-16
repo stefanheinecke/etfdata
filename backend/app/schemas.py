@@ -143,6 +143,31 @@ class APIKey(Base):
     last_used_at = Column(DateTime)
     expires_at = Column(DateTime)
 
+class GoogleAccount(Base):
+    __tablename__ = "google_accounts"
+
+    id = Column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    google_sub = Column(String(255), unique=True, nullable=False, index=True)
+    email = Column(String(255), nullable=False, index=True)
+    name = Column(String(255))
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+class WebSession(Base):
+    __tablename__ = "web_sessions"
+
+    id = Column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    google_account_id = Column(
+        PGUUID(as_uuid=True),
+        ForeignKey("google_accounts.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    token_hash = Column(String(64), unique=True, nullable=False, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    expires_at = Column(DateTime, nullable=False, index=True)
+    revoked_at = Column(DateTime)
+
 class RequestLog(Base):
     __tablename__ = "request_logs"
 

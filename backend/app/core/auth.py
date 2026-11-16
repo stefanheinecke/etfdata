@@ -2,10 +2,10 @@ import hashlib
 import secrets
 from types import SimpleNamespace
 from datetime import datetime
-from fastapi import HTTPException, Header, Depends
+from fastapi import HTTPException, Header, Cookie, Depends
 from sqlalchemy.orm import Session
 from app.db.database import get_db
-from app.schemas import APIKey
+from app.schemas import APIKey, GoogleAccount, WebSession
 
 # Public demo key — read-only, full catalog access, low rate limit
 DEMO_API_KEY = "demo"
@@ -16,10 +16,38 @@ def generate_api_key():
 def hash_api_key(key: str) -> str:
     return hashlib.sha256(key.encode()).hexdigest()
 
+def get_google_account_for_session(session_token: str, db: Session):
+    if not session_token:
+        return None
+
+    session = db.query(WebSession).filter(
+        WebSession.token_hash == hash_api_key(session_token),
+        WebSession.revoked_at.is_(None),
+        WebSession.expires_at > datetime.utcnow(),
+    ).first()
+    if not session:
+        return None
+
+    return db.query(GoogleAccount).filter(
+        GoogleAccount.id == session.google_account_id
+    ).first()
+
 async def verify_api_key(
     x_api_key: str = Header(None),
+    web_session: str = Cookie(None),
     db: Session = Depends(get_db)
 ) -> APIKey:
+    account = get_google_account_for_session(web_session, db)
+    if account:
+        return SimpleNamespace(
+            name=account.name or account.email.split("@")[0],
+            id=None,
+            is_active=True,
+            rate_limit_per_minute=60,
+            email=account.email,
+            key=None,
+        )
+
     if not x_api_key:
         raise HTTPException(status_code=401, detail="API Key required")
 

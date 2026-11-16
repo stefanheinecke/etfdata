@@ -11,8 +11,9 @@
           <li><a href="#" :class="{ active: currentPage === 'methodology' }" @click.prevent="goToPage('methodology')">Methodology</a></li>
           <li v-if="adminActive || isAdminApiUser"><a href="#" :class="{ active: currentPage === 'admin' }" @click.prevent="goToPage('admin')" style="color:#dc2626;font-weight:600">Admin</a></li>
         </ul>
-        <a v-if="!hasApiKey" href="#" class="btn btn-outline nav-cta" @click.prevent="openApiKeyModal('request')">Get API Key</a>
+        <a v-if="!hasAuth" href="#" class="btn btn-outline nav-cta" @click.prevent="openApiKeyModal('request')">Get API Key</a>
         <template v-else>
+          <a v-if="!hasApiKey" href="#" class="btn btn-outline nav-cta" @click.prevent="openApiKeyModal('request')">Get API Key</a>
           <span class="api-online-pill"><span class="status-dot"></span><span v-if="currentUserEmail" class="user-email">{{ currentUserEmail }}</span><span v-else>API Online</span></span>
           <button class="switch-key-btn" @click="logout" title="Log out">Log out</button>
         </template>
@@ -94,7 +95,13 @@
       </div>
     </footer>
     <!-- Get API Key Modal -->
-    <GetApiKeyModal :show="showApiKeyModal" :initialTab="apiKeyModalTab" @close="showApiKeyModal = false" @key-saved="onApiKeySaved" />
+    <GetApiKeyModal
+      :show="showApiKeyModal"
+      :initialTab="apiKeyModalTab"
+      @close="showApiKeyModal = false"
+      @key-saved="onApiKeySaved"
+      @google-authenticated="onGoogleAuthenticated"
+    />
 
     <!-- Contact Modal -->
     <ContactModal :show="showContactModal" @close="showContactModal = false" />
@@ -128,7 +135,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, provide } from 'vue'
+import { ref, computed, onMounted, onUnmounted, provide } from 'vue'
 import { healthService, adminService, authService } from './services/api.js'
 import { BRAND, BRAND_PREFIX } from './brand.js'
 
@@ -184,6 +191,8 @@ const showApiKeyModal = ref(false)
 const apiKeyModalTab = ref('request')
 const mobileMenuOpen = ref(false)
 const hasApiKey = ref(!!localStorage.getItem('api_key'))
+const hasGoogleSession = ref(false)
+const hasAuth = computed(() => hasApiKey.value || hasGoogleSession.value)
 const currentUserEmail = ref('')
 const isAdminApiUser = ref(false)
 const homeRenderKey = ref(0)
@@ -194,7 +203,7 @@ function openApiKeyModal(tab = 'request') {
 }
 
 provide('showApiKeyModal', showApiKeyModal)
-provide('hasApiKey', hasApiKey)
+provide('hasAuth', hasAuth)
 
 const portfolioInit = ref(null)
 provide('portfolioInit', portfolioInit)
@@ -245,10 +254,25 @@ function onApiKeySaved() {
   }).catch(() => {})
 }
 
-function logout() {
+function onGoogleAuthenticated(user) {
+  hasGoogleSession.value = true
+  currentUserEmail.value = user.email || ''
+  isAdminApiUser.value = !!user.is_admin
+  homeRenderKey.value += 1
+}
+
+async function logout() {
+  try {
+    await authService.logout()
+  } catch (e) {
+    console.error('Could not sign out:', e)
+    window.alert('Sign-out failed. Please try again.')
+    return
+  }
   localStorage.removeItem('api_key')
   sessionStorage.removeItem('admin_secret')
   hasApiKey.value = false
+  hasGoogleSession.value = false
   currentUserEmail.value = ''
   isAdminApiUser.value = false
   setAdminActive(false)
@@ -329,6 +353,16 @@ onMounted(async () => {
       currentUserEmail.value = res.data.email || ''
       isAdminApiUser.value = !!res.data.is_admin
     } catch { /* key may be invalid — silently ignore */ }
+  }
+  try {
+    const res = await authService.session()
+    hasGoogleSession.value = true
+    currentUserEmail.value = res.data.email || ''
+    isAdminApiUser.value = !!res.data.is_admin
+  } catch (e) {
+    if (e.response?.status !== 401) {
+      console.error('Could not restore Google session:', e)
+    }
   }
   // Re-verify stored admin secret on every load; clear it if it's no longer valid
   const storedSecret = sessionStorage.getItem('admin_secret')

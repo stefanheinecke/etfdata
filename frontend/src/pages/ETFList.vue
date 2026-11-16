@@ -141,7 +141,7 @@ import { ref, computed, watch, onMounted, inject } from 'vue'
 const showApiKeyModal = inject('showApiKeyModal')
 const navigateToPortfolio = inject('navigateToPortfolio')
 const navigateToDetail = inject('navigateToDetail')
-const hasApiKey = inject('hasApiKey', ref(!!localStorage.getItem('api_key')))
+const hasApiKey = inject('hasAuth', ref(!!localStorage.getItem('api_key')))
 import { etfService } from '../services/api.js'
 
 const allETFs = ref([])

@@ -110,7 +110,7 @@ import { scoreService } from '../services/api.js'
 import { BRAND } from '../brand.js'
 
 const showApiKeyModal = inject('showApiKeyModal')
-const hasApiKey = inject('hasApiKey', ref(!!localStorage.getItem('api_key')))
+const hasApiKey = inject('hasAuth', ref(!!localStorage.getItem('api_key')))
 const navigateTo = inject('navigateTo')
 const navigateToETF = inject('navigateToETF')
 

@@ -138,7 +138,7 @@ const BASE = import.meta.env.VITE_API_URL || 'https://etfdata-production.up.rail
 const DOC_BASE = `https://api.${BRAND.domain}`
 
 const showApiKeyModal = inject('showApiKeyModal')
-const hasApiKey = inject('hasApiKey', ref(!!localStorage.getItem('api_key')))
+const hasApiKey = inject('hasAuth', ref(!!localStorage.getItem('api_key')))
 const activeId = ref('list-etfs')
 
 const groups = [

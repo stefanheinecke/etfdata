@@ -202,7 +202,7 @@ const showApiKeyModal = inject('showApiKeyModal')
 const analyticsInitTab = inject('analyticsInitTab', ref(null))
 const portfolioInit = inject('portfolioInit', ref(null))
 const navigateTo = inject('navigateTo')
-const hasApiKey = inject('hasApiKey', ref(!!localStorage.getItem('api_key')))
+const hasApiKey = inject('hasAuth', ref(!!localStorage.getItem('api_key')))
 
 const allEtfs = ref([])
 const etfsLoading = ref(false)
