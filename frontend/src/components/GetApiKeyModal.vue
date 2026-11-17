@@ -21,7 +21,33 @@
         <!-- ── Tab: Request Key ── -->
         <template v-if="activeTab === 'request'">
           <!-- Success state -->
-          <template v-if="sent">
+          <template v-if="googleSignedIn">
+            <div class="sent-icon">✅</div>
+            <p class="modal-sub success-sub">Signed in with Google as <strong>{{ googleEmail }}</strong>.</p>
+            <p v-if="googleKeyEmailed" class="modal-note">
+              We emailed your API key to this address. Keep that email safe; the key is not shown in the browser.
+            </p>
+            <template v-else-if="googleHasApiKey">
+              <p class="modal-note">
+                An API key already exists for this address. We kept it unchanged and did not resend it.
+                If you no longer have it, you can request a replacement by email.
+              </p>
+              <button class="btn btn-outline" style="width:100%;margin-top:.75rem" @click="requestEmailKey">
+                Request replacement by email
+              </button>
+            </template>
+            <template v-else>
+              <p class="error-box" style="margin-bottom:.75rem">{{ googleKeyEmailError }}</p>
+              <button class="btn btn-outline" style="width:100%;margin-top:.75rem" @click="requestEmailKey">
+                Request API key by email instead
+              </button>
+            </template>
+            <button class="btn btn-primary" style="width:100%;margin-top:1rem" @click="close">
+              Done
+            </button>
+          </template>
+
+          <template v-else-if="sent">
             <div class="sent-icon">✉️</div>
             <p class="modal-sub success-sub">Check your inbox at <strong>{{ email }}</strong>.</p>
             <p style="font-size:.875rem;color:var(--text-muted);line-height:1.6">
@@ -36,7 +62,7 @@
 
           <!-- Form state -->
           <template v-else>
-            <p class="modal-sub">Sign in with Google for the web app, or request a free API key by email (60 req/min).</p>
+            <p class="modal-sub">Sign in with Google for the web app. If this account has no API key, we’ll email one to you.</p>
 
             <div v-if="googleClientId" class="google-signin">
               <div ref="googleButton"></div>
@@ -145,6 +171,11 @@ const errorMsg   = ref('')
 const sent       = ref(false)
 const emailInput = ref(null)
 const googleButton = ref(null)
+const googleSignedIn = ref(false)
+const googleEmail = ref('')
+const googleHasApiKey = ref(false)
+const googleKeyEmailed = ref(false)
+const googleKeyEmailError = ref('')
 
 const apiKey   = ref('')
 const showKey  = ref(false)
@@ -182,13 +213,25 @@ async function handleGoogleCredential(response) {
   errorMsg.value = ''
   try {
     const result = await authService.googleSignIn(response.credential)
+    googleEmail.value = result.data.email || ''
+    googleHasApiKey.value = !!result.data.has_api_key
+    googleKeyEmailed.value = !!result.data.api_key_emailed
+    googleKeyEmailError.value = result.data.api_key_email_error || ''
+    googleSignedIn.value = true
     emit('google-authenticated', result.data)
-    close()
   } catch (e) {
     errorMsg.value = e.response?.data?.detail || e.message
   } finally {
     loading.value = false
   }
+}
+
+function requestEmailKey() {
+  googleSignedIn.value = false
+  email.value = googleEmail.value
+  sent.value = false
+  errorMsg.value = ''
+  nextTick(() => emailInput.value?.focus())
 }
 
 async function initializeGoogleButton() {
@@ -218,6 +261,11 @@ watch(() => props.show, async (val) => {
   if (val) {
     activeTab.value = props.initialTab
     email.value = ''; errorMsg.value = ''; sent.value = false
+    googleSignedIn.value = false
+    googleEmail.value = ''
+    googleHasApiKey.value = false
+    googleKeyEmailed.value = false
+    googleKeyEmailError.value = ''
     apiKey.value = localStorage.getItem('api_key') || ''
     showKey.value = false; keyError.value = ''; keySaved.value = false
     await nextTick()

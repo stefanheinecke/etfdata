@@ -13,6 +13,7 @@ from datetime import datetime, timedelta
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Response
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, EmailStr, Field
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 from google.auth import exceptions as google_auth_exceptions
 from google.auth.transport.requests import Request as GoogleRequest
@@ -260,6 +261,15 @@ def _session_cookie_samesite() -> str:
     return "none" if _session_cookie_secure() else "lax"
 
 
+def _find_usable_api_key(db: Session, email: str):
+    now = datetime.utcnow()
+    return db.query(APIKey).filter(
+        APIKey.email == email,
+        APIKey.is_active.is_(True),
+        or_(APIKey.expires_at.is_(None), APIKey.expires_at > now),
+    ).order_by(APIKey.created_at.desc()).first()
+
+
 @router.post("/google/session")
 def google_session(
     payload: GoogleLoginRequest,
@@ -289,6 +299,31 @@ def google_session(
     ))
     db.commit()
 
+    api_key_emailed = False
+    api_key_email_error = None
+    if not _find_usable_api_key(db, account.email):
+        raw_key = generate_api_key()
+        db.add(APIKey(
+            key=hash_api_key(raw_key),
+            name=account.email.split("@")[0][:100],
+            email=account.email,
+            rate_limit_per_minute=60,
+        ))
+        try:
+            send_api_key_email(to_email=account.email, api_key=raw_key)
+            db.commit()
+            api_key_emailed = True
+        except (RuntimeError, _requests.RequestException):
+            db.rollback()
+            import logging
+            logging.getLogger(__name__).exception(
+                "Could not email an API key to the Google-authenticated user."
+            )
+            api_key_email_error = (
+                "You are signed in, but we could not email your API key. "
+                "Please try Google sign-in again or request a key by email."
+            )
+
     response.set_cookie(
         key=_GOOGLE_SESSION_COOKIE,
         value=session_token,
@@ -303,6 +338,9 @@ def google_session(
         "name": account.name,
         "email": account.email,
         "is_admin": bool(admin_email and account.email == admin_email),
+        "has_api_key": _find_usable_api_key(db, account.email) is not None,
+        "api_key_emailed": api_key_emailed,
+        "api_key_email_error": api_key_email_error,
     }
 
 
@@ -320,6 +358,7 @@ def get_web_session(
         "name": account.name,
         "email": account.email,
         "is_admin": bool(admin_email and account.email == admin_email),
+        "has_api_key": _find_usable_api_key(db, account.email) is not None,
     }
 
 

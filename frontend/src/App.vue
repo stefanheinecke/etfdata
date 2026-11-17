@@ -256,6 +256,7 @@ function onApiKeySaved() {
 
 function onGoogleAuthenticated(user) {
   hasGoogleSession.value = true
+  hasApiKey.value = !!user.has_api_key || !!localStorage.getItem('api_key')
   currentUserEmail.value = user.email || ''
   isAdminApiUser.value = !!user.is_admin
   homeRenderKey.value += 1
@@ -357,6 +358,7 @@ onMounted(async () => {
   try {
     const res = await authService.session()
     hasGoogleSession.value = true
+    hasApiKey.value = !!res.data.has_api_key || !!localStorage.getItem('api_key')
     currentUserEmail.value = res.data.email || ''
     isAdminApiUser.value = !!res.data.is_admin
   } catch (e) {

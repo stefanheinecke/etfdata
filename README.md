@@ -174,8 +174,11 @@ Falls kein Endpoint vorhanden ist, nutze den Test-Key: `test-key`
 
 ### Google-Anmeldung für die Web-App
 
-Google-Anmeldung verwendet eine separate Web-Sitzung; sie ersetzt oder rotiert
-keine API-Keys für externe Integrationen. Zur Einrichtung:
+Google-Anmeldung erstellt eine separate Web-Sitzung. Wenn für die bestätigte
+E-Mail-Adresse noch kein aktiver API-Key existiert, wird einmalig ein Key
+erstellt und per E-Mail zugestellt. Vorhandene Keys werden weder rotiert noch
+erneut versendet. Dafür werden `RESEND_API_KEY` und `RESEND_FROM_EMAIL` im
+Backend benötigt. Zur Einrichtung:
 
 1. In der Google Cloud Console einen OAuth-Client vom Typ **Web application**
    anlegen und die Frontend-Domains als autorisierte JavaScript-Ursprünge eintragen.
