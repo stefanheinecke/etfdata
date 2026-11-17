@@ -6,6 +6,8 @@ COPY package.json ./
 RUN npm install
 
 COPY . .
+ARG VITE_GOOGLE_CLIENT_ID
+ARG VITE_API_URL
 RUN NODE_OPTIONS=--max-old-space-size=1024 npm run build
 
 FROM node:18-alpine
