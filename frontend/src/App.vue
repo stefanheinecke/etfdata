@@ -38,13 +38,13 @@
 
     <!-- Main -->
     <main class="main" :class="{ 'main-home': currentPage === 'home' }">
-      <Home v-if="currentPage === 'home'" :key="homeRenderKey" @navigate="currentPage = $event" />
-      <ETFList v-else-if="currentPage === 'etfs'" />
-      <ETFDetail v-else-if="currentPage === 'etf-detail'" />
-      <Scores v-else-if="currentPage === 'scores'" />
-      <Analytics v-else-if="currentPage === 'analytics'" />
+      <Home v-if="currentPage === 'home'" :key="pageRefreshKey" @navigate="currentPage = $event" />
+      <ETFList v-else-if="currentPage === 'etfs'" :key="pageRefreshKey" />
+      <ETFDetail v-else-if="currentPage === 'etf-detail'" :key="pageRefreshKey" />
+      <Scores v-else-if="currentPage === 'scores'" :key="pageRefreshKey" />
+      <Analytics v-else-if="currentPage === 'analytics'" :key="pageRefreshKey" />
       <Methodology v-else-if="currentPage === 'methodology'" />
-      <ApiDocs v-else-if="currentPage === 'docs'" />
+      <ApiDocs v-else-if="currentPage === 'docs'" :key="pageRefreshKey" />
       <Admin v-else-if="currentPage === 'admin'" />
 
       <Home v-else />
@@ -195,7 +195,7 @@ const hasGoogleSession = ref(false)
 const hasAuth = computed(() => hasApiKey.value || hasGoogleSession.value)
 const currentUserEmail = ref('')
 const isAdminApiUser = ref(false)
-const homeRenderKey = ref(0)
+const pageRefreshKey = ref(0)
 
 function openApiKeyModal(tab = 'request') {
   apiKeyModalTab.value = tab
@@ -247,7 +247,7 @@ function goToPage(page, tab = null) {
 
 function onApiKeySaved() {
   hasApiKey.value = true
-  homeRenderKey.value += 1
+  pageRefreshKey.value += 1
   authService.me().then(r => {
     currentUserEmail.value = r.data.email || ''
     isAdminApiUser.value = !!r.data.is_admin
@@ -259,7 +259,7 @@ function onGoogleAuthenticated(user) {
   hasApiKey.value = !!user.has_api_key || !!localStorage.getItem('api_key')
   currentUserEmail.value = user.email || ''
   isAdminApiUser.value = !!user.is_admin
-  homeRenderKey.value += 1
+  pageRefreshKey.value += 1
 }
 
 async function logout() {
