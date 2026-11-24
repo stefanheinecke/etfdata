@@ -15,6 +15,7 @@ from app.core.auth import (
 )
 from app.api.routes import admin
 from app.api.routes import auth
+from app.core import email as email_service
 from app.schemas import (
     APIKey,
     Base,
@@ -93,6 +94,37 @@ def test_admin_routes_keep_service_secret_authentication(auth_db, monkeypatch):
     monkeypatch.setenv("ADMIN_SECRET", "worker-secret")
 
     asyncio.run(admin.verify_admin_access("worker-secret", None, None, auth_db))
+
+
+def test_new_user_notification_uses_resend_and_configured_recipient(monkeypatch):
+    monkeypatch.setenv("RESEND_API_KEY", "test-resend-key")
+    monkeypatch.setenv("RESEND_FROM_EMAIL", "noreply@example.com")
+    requests = []
+
+    class SuccessfulResponse:
+        def raise_for_status(self):
+            return None
+
+    def fake_post(url, **kwargs):
+        requests.append((url, kwargs))
+        return SuccessfulResponse()
+
+    monkeypatch.setattr(email_service._requests, "post", fake_post)
+
+    email_service.send_new_user_notification_email(
+        to_email="contact@example.com",
+        user_email="new-user@example.com",
+        registration_method="Google",
+    )
+
+    assert len(requests) == 1
+    url, request = requests[0]
+    assert url == "https://api.resend.com/emails"
+    assert request["json"]["to"] == ["contact@example.com"]
+    assert request["json"]["from"] == "noreply@example.com"
+    assert request["json"]["subject"] == "New TrueETF user registration"
+    assert "new-user@example.com" in request["json"]["text"]
+    assert request["timeout"] == 10
 
 
 def test_verified_google_claims_are_normalized(monkeypatch):
