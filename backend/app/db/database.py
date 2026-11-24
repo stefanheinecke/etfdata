@@ -118,6 +118,29 @@ def init_db():
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """))
+
+        conn.execute(text("""
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM settings
+                    WHERE key = 'migration_remove_legacy_admin_api_key_v1'
+                ) THEN
+                    DELETE FROM api_keys
+                    WHERE LOWER(TRIM(name)) = 'admin'
+                      AND (
+                          email IS NULL
+                          OR LOWER(TRIM(email)) <> 'stefan.heinecke1@gmail.com'
+                      );
+                    INSERT INTO settings (id, key, value)
+                    VALUES (
+                        gen_random_uuid(),
+                        'migration_remove_legacy_admin_api_key_v1',
+                        'done'
+                    );
+                END IF;
+            END $$;
+        """))
         
         # Insert default contact email if not already set
         conn.execute(text("""

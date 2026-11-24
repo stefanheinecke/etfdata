@@ -21,6 +21,7 @@ from app.schemas import (
     EmailWebSession,
     GoogleAccount,
     PendingKeyRequest,
+    Settings,
     WebSession,
 )
 
@@ -37,6 +38,7 @@ def auth_db():
         EmailWebSession.__table__,
         GoogleAccount.__table__,
         PendingKeyRequest.__table__,
+        Settings.__table__,
         WebSession.__table__,
     ])
     db = sessionmaker(bind=engine)()
@@ -150,6 +152,8 @@ def test_google_session_authenticates_and_can_be_revoked(
     monkeypatch,
 ):
     db = auth_db
+    db.add(Settings(key="contact_email", value="owner@example.com"))
+    db.commit()
     monkeypatch.setattr(
         auth,
         "_verified_google_claims",
@@ -161,10 +165,16 @@ def test_google_session_authenticates_and_can_be_revoked(
     )
     monkeypatch.setenv("SESSION_COOKIE_SECURE", "true")
     sent_emails = []
+    registration_notifications = []
     monkeypatch.setattr(
         auth,
         "send_api_key_email",
         lambda **kwargs: sent_emails.append(kwargs),
+    )
+    monkeypatch.setattr(
+        auth,
+        "send_new_user_notification_email",
+        lambda **kwargs: registration_notifications.append(kwargs),
     )
     response = Response()
 
@@ -184,6 +194,11 @@ def test_google_session_authenticates_and_can_be_revoked(
     assert result["is_admin"] is False
     assert result["api_key_emailed"] is True
     assert len(sent_emails) == 1
+    assert registration_notifications == [{
+        "to_email": "owner@example.com",
+        "user_email": "user@example.com",
+        "registration_method": "Google",
+    }]
     stored_key = db.query(APIKey).one()
     assert stored_key.key == hash_api_key(sent_emails[0]["api_key"])
     assert stored_key.is_admin is False
@@ -203,6 +218,7 @@ def test_google_session_authenticates_and_can_be_revoked(
     assert second_result["has_api_key"] is True
     assert second_result["api_key_emailed"] is False
     assert len(sent_emails) == 1
+    assert len(registration_notifications) == 1
     assert db.query(APIKey).one().key == stored_key.key
 
     stored_session = db.query(WebSession).filter(
@@ -328,11 +344,19 @@ def test_email_request_keeps_new_key_inactive_until_confirmation(
     monkeypatch,
 ):
     db = auth_db
+    db.add(Settings(key="contact_email", value="owner@example.com"))
+    db.commit()
     sent_confirmations = []
+    registration_notifications = []
     monkeypatch.setattr(
         auth,
         "send_confirmation_email",
         lambda **kwargs: sent_confirmations.append(kwargs),
+    )
+    monkeypatch.setattr(
+        auth,
+        "send_new_user_notification_email",
+        lambda **kwargs: registration_notifications.append(kwargs),
     )
     monkeypatch.setenv("FRONTEND_URL", "https://app.example.com")
     monkeypatch.setenv("SESSION_COOKIE_SECURE", "true")
@@ -356,9 +380,15 @@ def test_email_request_keeps_new_key_inactive_until_confirmation(
     assert auth.email_confirmation_status(
         Response(), browser_token, None, db
     ) == {"pending": True, "authenticated": False}
+    assert registration_notifications == []
 
     phone_response = auth.confirm_key(token, None, db)
 
+    assert registration_notifications == [{
+        "to_email": "owner@example.com",
+        "user_email": "user@example.com",
+        "registration_method": "Email",
+    }]
     cookie_header = phone_response.headers["set-cookie"].lower()
     phone_session_token = phone_response.headers["set-cookie"].split(";", 1)[0].split("=", 1)[1]
     assert phone_response.status_code == 200

@@ -6,6 +6,7 @@ Two-step API key flow:
   2. GET  /auth/confirm-key   — activate the key and sign in the confirming browser
 """
 import html
+import logging
 import os
 import secrets
 from datetime import datetime, timedelta
@@ -31,6 +32,7 @@ from app.core.auth import (
 )
 from app.core.email import (
     is_email_configured,
+    send_new_user_notification_email,
     send_api_key_email,
     send_confirmation_email,
 )
@@ -220,6 +222,7 @@ def confirm_key(
 
     email = pending.email
     active_key = _find_usable_api_key(db, email)
+    is_new_user = active_key is None and not pending.is_replacement
     raw_key = None
     if not active_key:
         if pending.is_replacement:
@@ -272,6 +275,9 @@ def confirm_key(
         return HTMLResponse(_error_page(
             f"Your confirmation could not be completed: {exc}. Please try again."
         ), status_code=500)
+
+    if is_new_user:
+        _notify_contact_of_new_registration(db, email, "Email")
 
     success_response = HTMLResponse(_success_page(email))
     _set_web_session_cookie(success_response, session_token)
@@ -466,6 +472,24 @@ def _find_usable_api_key(db: Session, email: str):
     ).order_by(APIKey.created_at.desc()).first()
 
 
+def _notify_contact_of_new_registration(db: Session, user_email: str, method: str) -> None:
+    logger = logging.getLogger(__name__)
+    setting = db.query(Settings).filter(Settings.key == "contact_email").first()
+    contact_email = setting.value.strip() if setting and setting.value else ""
+    if not contact_email:
+        logger.error("New-user notification not sent: contact_email setting is missing.")
+        return
+
+    try:
+        send_new_user_notification_email(
+            to_email=contact_email,
+            user_email=user_email,
+            registration_method=method,
+        )
+    except (RuntimeError, _requests.RequestException):
+        logger.exception("Could not send new-user registration notification.")
+
+
 @router.post("/google/session")
 def google_session(
     payload: GoogleLoginRequest,
@@ -474,6 +498,7 @@ def google_session(
 ):
     """Verify a Google ID token and start a server-side web session."""
     claims = _verified_google_claims(payload.credential)
+    is_new_user = db.query(APIKey.id).filter(APIKey.email == claims["email"]).first() is None
     account = db.query(GoogleAccount).filter(
         GoogleAccount.google_sub == claims["google_sub"]
     ).first()
@@ -523,6 +548,8 @@ def google_session(
 
     _set_web_session_cookie(response, session_token)
     api_key = _find_usable_api_key(db, account.email)
+    if is_new_user and api_key:
+        _notify_contact_of_new_registration(db, account.email, "Google")
     return {
         "name": account.name,
         "email": account.email,

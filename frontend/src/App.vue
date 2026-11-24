@@ -14,8 +14,8 @@
         <a v-if="!hasAuth" href="#" class="btn btn-outline nav-cta" @click.prevent="openApiKeyModal()">Get API Key</a>
         <template v-else>
           <a v-if="!hasApiKey" href="#" class="btn btn-outline nav-cta" @click.prevent="openApiKeyModal()">Get API Key</a>
-          <span class="api-online-pill"><span class="status-dot"></span><span v-if="currentUserEmail" class="user-email">{{ currentUserEmail }}</span><span v-else>API Online</span></span>
-          <button class="switch-key-btn" @click="logout" title="Log out">Log out</button>
+          <span class="api-online-pill"><span class="status-dot"></span><span v-if="currentUserEmail" class="user-email" :title="currentUserEmail">{{ currentUserEmail }}</span><span v-else>API Online</span></span>
+          <button class="switch-key-btn" @click="logout" title="Log off">Log off</button>
         </template>
         <button class="hamburger" @click="mobileMenuOpen = true" aria-label="Open menu">
           <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
@@ -404,23 +404,24 @@ onUnmounted(() => {
   border: 1px solid rgba(0, 201, 167, .3);
 }
 .user-email {
-  max-width: 180px;
+  max-width: min(320px, 30vw);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .switch-key-btn {
   margin-left: 6px;
-  background: none;
-  border: none;
-  font-size: .75rem;
-  color: var(--text-muted);
+  background: #dc2626;
+  border: 1px solid #dc2626;
+  border-radius: 7px;
+  font-size: .8rem;
+  font-weight: 600;
+  color: #fff;
   cursor: pointer;
-  padding: 4px 0;
-  text-decoration: underline;
+  padding: 7px 11px;
   white-space: nowrap;
 }
-.switch-key-btn:hover { color: var(--text); }
+.switch-key-btn:hover { background: #b91c1c; border-color: #b91c1c; }
 .status-dot {
   width: 7px;
   height: 7px;

@@ -198,10 +198,15 @@ werden. Bestehende aktive API-Keys bleiben unverändert. Wird der Link auf einem
 anderen Gerät geöffnet, wird auch der ursprüngliche Browser angemeldet, sobald
 er die Bestätigung abfragt oder die Website erneut im selben Browser geöffnet
 wird. `FRONTEND_URL` bestimmt den Link zurück zur Website.
+Nach erfolgreicher Erstregistrierung per E-Mail-Bestätigung oder Google-Login
+wird die Adresse aus `settings.contact_email` einmalig benachrichtigt; erneute
+Logins lösen keine neue Registrierungsbenachrichtigung aus.
 
 Der Admin-Status wird pro API-Key in `api_keys.is_admin` gespeichert. Bei der
 Migration bestehender Daten wird `stefan.heinecke1@gmail.com` als Admin markiert;
 neu erstellte API-Keys für diese Adresse erhalten den Admin-Status ebenfalls.
+Eine einmalige Migration löscht außerdem alte API-Key-Zeilen mit `name='admin'`,
+behält aber Stefans API-Key bei.
 
 ### 2. GET /etfs - Alle ETFs abrufen
 

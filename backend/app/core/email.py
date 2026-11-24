@@ -6,6 +6,7 @@ Required environment variables (same ones used in vivasuiza):
   RESEND_FROM_EMAIL   Verified sender address
 """
 import os
+import html
 import requests as _requests
 
 _RESEND_URL = "https://api.resend.com/emails"
@@ -65,6 +66,53 @@ def send_api_key_email(to_email: str, api_key: str, app_name: str = "GoETF.ch AP
             "subject": f"Your {app_name} API Key",
             "text": body_text,
             "html": body_html,
+        },
+        timeout=10,
+    )
+    resp.raise_for_status()
+
+
+def send_new_user_notification_email(
+    to_email: str,
+    user_email: str,
+    registration_method: str,
+    app_name: str = "TrueETF",
+) -> None:
+    """Notify the configured contact address after a new user is registered."""
+    resend_key = os.getenv("RESEND_API_KEY", "")
+    from_addr = os.getenv("RESEND_FROM_EMAIL", "")
+
+    if not resend_key or not from_addr:
+        raise RuntimeError(
+            "Email delivery is not configured. "
+            "Set RESEND_API_KEY and RESEND_FROM_EMAIL on the backend service."
+        )
+
+    safe_email = html.escape(user_email)
+    safe_method = html.escape(registration_method)
+    resp = _requests.post(
+        _RESEND_URL,
+        headers={
+            "Authorization": f"******",
+            "Content-Type": "application/json",
+        },
+        json={
+            "from": from_addr,
+            "to": [to_email],
+            "subject": f"New {app_name} user registration",
+            "text": (
+                f"A new user registered for {app_name}.\n\n"
+                f"Email: {user_email}\n"
+                f"Registration method: {registration_method}\n"
+            ),
+            "html": f"""<!DOCTYPE html>
+<html>
+<body style="font-family:sans-serif;color:#111;max-width:520px;margin:2rem auto;padding:0 1rem">
+  <h2>New {app_name} user registration</h2>
+  <p><strong>Email:</strong> {safe_email}</p>
+  <p><strong>Registration method:</strong> {safe_method}</p>
+</body>
+</html>""",
         },
         timeout=10,
     )
