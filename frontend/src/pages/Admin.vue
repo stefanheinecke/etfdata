@@ -30,26 +30,15 @@
       <div v-if="keySaved" class="success-msg">✓ API key saved. Reload the ETF pages to apply.</div>
     </div>
 
-    <!-- Admin credentials -->
+    <!-- Admin access -->
     <div class="card" style="margin-bottom:1.5rem">
-      <h2 class="card-title">Admin Credentials</h2>
+      <h2 class="card-title">Admin Access</h2>
       <p style="font-size:.875rem;color:var(--text-muted);margin-bottom:1rem">
-        Enter your <code>ADMIN_SECRET</code> from Railway to unlock admin operations.
-        Stored in <strong>sessionStorage</strong>, cleared automatically when you close the browser tab.
+        Admin operations are available to signed-in users whose API key is marked as an administrator.
       </p>
-      <label class="label">Admin Secret</label>
-      <div class="key-row">
-        <input :type="showAdmin ? 'text' : 'password'" class="input" v-model="adminSecret" @input="adminVerified = false; verifyError = ''" placeholder="Your ADMIN_SECRET..." />
-        <button class="btn btn-outline" @click="showAdmin=!showAdmin">{{ showAdmin ? 'Hide' : 'Show' }}</button>
-        <button class="btn btn-primary" @click="verifySecret" :disabled="!adminSecret || verifyLoading">
-          {{ verifyLoading ? 'Verifying...' : adminVerified ? '✓ Verified' : 'Verify' }}
-        </button>
-      </div>
+      <div v-if="verifyLoading" class="success-msg">Checking admin access…</div>
       <div v-if="verifyError" class="error-box" style="margin-top:.5rem">{{ verifyError }}</div>
-      <div v-if="adminVerified" class="success-msg" style="margin-top:.5rem;display:flex;align-items:center;justify-content:space-between;gap:1rem">
-        <span>✓ Admin secret verified, operations unlocked.</span>
-        <button class="btn btn-outline" style="font-size:.8rem;padding:.35rem .75rem" @click="logout">Log out</button>
-      </div>
+      <div v-else-if="adminVerified" class="success-msg" style="margin-top:.5rem">✓ Signed in with admin permissions.</div>
     </div>
 
     <!-- Admin operations -->
@@ -872,11 +861,9 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, inject } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { healthService, adminService, etfService } from '../services/api.js'
 import { BRAND } from '../brand.js'
-
-const setAdminActive = inject('setAdminActive')
 
 // ─── Tab state ────────────────────────────────────────────────
 const activeTab = ref('management')
@@ -905,18 +892,12 @@ function switchToEditor() {
 const apiKey = ref(localStorage.getItem('api_key') || '')
 const showKey = ref(false)
 const keySaved = ref(false)
-const adminSecret = ref('')
-const showAdmin = ref(false)
 const adminVerified = ref(false)
 const verifyLoading = ref(false)
 const verifyError = ref('')
 
 onMounted(() => {
-  const saved = sessionStorage.getItem('admin_secret')
-  if (saved) {
-    adminSecret.value = saved
-    verifySecret()
-  }
+  verifyAdminAccess()
 })
 
 const newKeyName = ref('my-key')
@@ -966,7 +947,6 @@ async function importHoldings() {
   holdingsLoading.value = true; holdingsImportError.value = ''; holdingsResult.value = null
   try {
     const r = await adminService.importHoldings(
-      adminSecret.value,
       holdingsIsin.value.trim().toUpperCase(),
       holdingsProvider.value,
       holdingsProvider.value === 'ubs' ? holdingsUbsFile.value : null,
@@ -1014,33 +994,23 @@ function useAsApiKey() {
   saveKey()
 }
 
-async function verifySecret() {
+async function verifyAdminAccess() {
   verifyLoading.value = true; verifyError.value = ''
   try {
-    await adminService.verify(adminSecret.value)
-    sessionStorage.setItem('admin_secret', adminSecret.value)
-    setAdminActive(true)
+    await adminService.verify()
     adminVerified.value = true
     loadLogs(0)
   } catch(e) {
     adminVerified.value = false
-    verifyError.value = e.response?.status === 403 ? 'Invalid admin secret.' : (e.response?.data?.detail || e.message)
+    verifyError.value = e.response?.data?.detail || e.message
   }
   finally { verifyLoading.value = false }
-}
-
-function logout() {
-  sessionStorage.removeItem('admin_secret')
-  setAdminActive(false)
-  adminVerified.value = false
-  adminSecret.value = ''
-  logsData.value = null
 }
 
 async function createKey() {
   createLoading.value = true; createError.value = ''; createdKey.value = ''
   try {
-    const r = await adminService.createApiKey(adminSecret.value, newKeyName.value, newKeyRateLimit.value, newKeyEmail.value || null)
+    const r = await adminService.createApiKey(newKeyName.value, newKeyRateLimit.value, newKeyEmail.value || null)
     createdKey.value = r.data.api_key
   } catch(e) { createError.value = e.response?.data?.detail || e.message }
   finally { createLoading.value = false }
@@ -1050,7 +1020,6 @@ async function previewETF() {
   previewLoading.value = true; previewError.value = ''; previewData.value = null
   try {
     const r = await adminService.previewImport(
-      adminSecret.value,
       importSymbol.value.trim().toUpperCase(),
       importCsvFile.value || null,
       importName.value.trim() || null,
@@ -1069,7 +1038,6 @@ async function approveAndImport() {
   approveLoading.value = true
   try {
     const r = await adminService.importETF(
-      adminSecret.value,
       importSymbol.value.trim().toUpperCase(),
       importCsvFile.value || null,
       importName.value.trim() || null,
@@ -1096,7 +1064,6 @@ async function importETF() {
   previewLoading.value = true; previewError.value = ''; previewData.value = null
   try {
     const r = await adminService.previewImport(
-      adminSecret.value,
       importSymbol.value.trim().toUpperCase(),
       importCsvFile.value || null,
       importName.value.trim() || null,
@@ -1113,14 +1080,14 @@ async function importETF() {
 
 async function initDb() {
   initLoading.value = true; dbResult.value = ''; dbError.value = ''
-  try { const r = await adminService.initDb(adminSecret.value); dbResult.value = r.data.message }
+  try { const r = await adminService.initDb(); dbResult.value = r.data.message }
   catch(e) { dbError.value = e.response?.data?.detail || e.message }
   finally { initLoading.value = false }
 }
 
 async function seedDb() {
   seedLoading.value = true; dbResult.value = ''; dbError.value = ''
-  try { const r = await adminService.seed(adminSecret.value); dbResult.value = `Seeded: ${JSON.stringify(r.data.seeded)}` }
+  try { const r = await adminService.seed(); dbResult.value = `Seeded: ${JSON.stringify(r.data.seeded)}` }
   catch(e) { dbError.value = e.response?.data?.detail || e.message }
   finally { seedLoading.value = false }
 }
@@ -1128,7 +1095,7 @@ async function seedDb() {
 async function confirmReset() {
   if (!confirm('This will DELETE all ETF data and reseed. Continue?')) return
   resetLoading.value = true; dbResult.value = ''; dbError.value = ''
-  try { const r = await adminService.reset(adminSecret.value); dbResult.value = `Reset complete. Seeded: ${JSON.stringify(r.data.seeded)}` }
+  try { const r = await adminService.reset(); dbResult.value = `Reset complete. Seeded: ${JSON.stringify(r.data.seeded)}` }
   catch(e) { dbError.value = e.response?.data?.detail || e.message }
   finally { resetLoading.value = false }
 }
@@ -1139,14 +1106,14 @@ async function triggerRefreshPrices() {
   refreshPricesResult.value = ''
   refreshPricesError.value = ''
   try {
-    const { data } = await adminService.refreshPrices(adminSecret.value)
+    const { data } = await adminService.refreshPrices()
     const jobId = data.job_id
 
     // Poll for progress every 900 ms
     await new Promise((resolve, reject) => {
       const interval = setInterval(async () => {
         try {
-          const { data: job } = await adminService.refreshPricesStatus(adminSecret.value, jobId)
+          const { data: job } = await adminService.refreshPricesStatus(jobId)
           if (job.total > 0) {
             const ticker = job.current_ticker ? ` — ${job.current_ticker}` : ''
             refreshPricesProgress.value = `${job.done} of ${job.total}${ticker}`
@@ -1178,7 +1145,7 @@ async function triggerRefreshPrices() {
 async function triggerBackfillSymbols() {
   backfillLoading.value = true; backfillResult.value = ''; backfillError.value = ''
   try {
-    const r = await adminService.backfillEodhdSymbols(adminSecret.value)
+    const r = await adminService.backfillEodhdSymbols()
     const d = r.data
     backfillResult.value = `✓ ${d.updated?.length ?? 0} ETF(s) linked to EODHD symbols, ${d.skipped?.length ?? 0} skipped.`
   } catch(e) {
@@ -1191,7 +1158,7 @@ async function triggerBackfillSymbols() {
 async function triggerRefreshFxRates() {
   fxRatesLoading.value = true; fxRatesResult.value = ''; fxRatesError.value = ''
   try {
-    const r = await adminService.refreshFxRates(adminSecret.value)
+    const r = await adminService.refreshFxRates()
     const d = r.data
     if (d.error) { fxRatesError.value = d.error; return }
     const results = d.results || []
@@ -1211,7 +1178,7 @@ async function triggerRefreshFxRates() {
 async function triggerRecalculateScores() {
   scoresLoading.value = true; scoresResult.value = ''; scoresError.value = ''
   try {
-    const { data } = await adminService.recalculateScores(adminSecret.value)
+    const { data } = await adminService.recalculateScores()
     scoresResult.value = `✓ Recalculated ${data.total} ETF(s): ${data.available} scored, ${data.unavailable} unavailable.`
   } catch (e) {
     scoresError.value = e.response?.data?.detail || e.message
@@ -1223,7 +1190,7 @@ async function triggerRecalculateScores() {
 async function importProviderMetadata() {
   providerImportLoading.value = true; providerImportResult.value = null; providerImportError.value = ''
   try {
-    const r = await adminService.importProviderMetadata(adminSecret.value, providerUbsFile.value, providerIsharesFile.value)
+    const r = await adminService.importProviderMetadata(providerUbsFile.value, providerIsharesFile.value)
     providerImportResult.value = r.data
   } catch(e) {
     providerImportError.value = e.response?.data?.detail || e.message
@@ -1234,7 +1201,7 @@ async function importProviderMetadata() {
 
 async function downloadProviderFile(provider) {
   try {
-    const r = await adminService.downloadProviderFile(adminSecret.value, provider)
+    const r = await adminService.downloadProviderFile(provider)
     const url = window.URL.createObjectURL(new Blob([r.data]))
     const a = document.createElement('a')
     a.href = url
@@ -1296,12 +1263,12 @@ async function deleteSelectedEtfs() {
   if (!confirm(`Delete ${selectedEtfIds.value.length} ETF(s): ${names}?\n\nThis removes all holdings and allocations.`)) return
   deleteEtfLoading.value = true; deleteEtfResult.value = ''; deleteEtfError.value = ''
   try {
-    const r = await adminService.deleteETFs(adminSecret.value, selectedEtfIds.value)
+    const r = await adminService.deleteETFs(selectedEtfIds.value)
     deleteEtfResult.value = `Deleted ${r.data.deleted} ETF(s).`
     selectedEtfIds.value = []
     await loadETFs()
   } catch(e) {
-    deleteEtfError.value = e.response?.status === 403 ? 'Invalid admin secret.' : (e.response?.data?.detail || e.message)
+    deleteEtfError.value = e.response?.data?.detail || e.message
   } finally {
     deleteEtfLoading.value = false
   }
@@ -1314,12 +1281,12 @@ async function quickDeleteETF() {
   
   quickDeleteLoading.value = true; quickDeleteResult.value = ''; quickDeleteError.value = ''
   try {
-    const r = await adminService.deleteETFByISIN(adminSecret.value, isin)
+    const r = await adminService.deleteETFByISIN(isin)
     quickDeleteResult.value = `✓ ETF ${isin} deleted successfully.`
     quickDeleteIsin.value = ''
     await loadETFs()
   } catch(e) {
-    quickDeleteError.value = e.response?.status === 403 ? 'Invalid admin secret.' : (e.response?.data?.detail || e.message)
+    quickDeleteError.value = e.response?.data?.detail || e.message
   } finally {
     quickDeleteLoading.value = false
   }
@@ -1458,7 +1425,7 @@ async function saveMetadata() {
     if (!payload.benchmark) payload.benchmark = null
     if (!payload.dividend_policy) payload.dividend_policy = null
     if (payload.ter === '') payload.ter = null
-    await adminService.updateETF(adminSecret.value, editorEtfId.value, payload)
+    await adminService.updateETF(editorEtfId.value, payload)
     metaSaveOk.value = true
     // Refresh the ETF list so the name change shows in the selector
     await loadEditorEtfList()
@@ -1484,7 +1451,7 @@ function startEditHolding(h) {
 async function saveHolding(holdingId) {
   holdingsError.value = ''
   try {
-    const r = await adminService.updateHolding(adminSecret.value, editorEtfId.value, holdingId, editHolding.value)
+    const r = await adminService.updateHolding(editorEtfId.value, holdingId, editHolding.value)
     const idx = editorHoldings.value.findIndex(h => h.id === holdingId)
     if (idx !== -1) editorHoldings.value[idx] = r.data
     editingHoldingId.value = null
@@ -1497,7 +1464,7 @@ async function deleteHolding(holdingId) {
   if (!confirm('Delete this holding? This cannot be undone.')) return
   holdingsError.value = ''
   try {
-    await adminService.deleteHolding(adminSecret.value, editorEtfId.value, holdingId)
+    await adminService.deleteHolding(editorEtfId.value, holdingId)
     editorHoldings.value = editorHoldings.value.filter(h => h.id !== holdingId)
   } catch (e) {
     holdingsError.value = e.response?.data?.detail || e.message
@@ -1513,7 +1480,7 @@ async function addHolding() {
   addHoldingLoading.value = true
   addHoldingError.value = ''
   try {
-    const r = await adminService.addHolding(adminSecret.value, editorEtfId.value, newHolding.value)
+    const r = await adminService.addHolding(editorEtfId.value, newHolding.value)
     editorHoldings.value.push(r.data)
     showAddHolding.value = false
     resetNewHolding()
@@ -1535,7 +1502,7 @@ const logsData = ref(null)
 async function loadLogs(offset = 0) {
   logsLoading.value = true; logsError.value = ''
   try {
-    const r = await adminService.requestLogs(adminSecret.value, {
+    const r = await adminService.requestLogs({
       limit: 50,
       offset,
       api_key_name: logFilterName.value,
@@ -1635,7 +1602,7 @@ async function savePdfImport() {
       fund_size: pdfFormData.value.fund_size,
       dividend_policy: pdfFormData.value.dividend_policy
     }
-    const r = await adminService.importPdfData(adminSecret.value, metadata, pdfFormData.value.holdings)
+    const r = await adminService.importPdfData(metadata, pdfFormData.value.holdings)
     pdfSuccess.value = r.data
     resetPdfImport()
     setTimeout(() => { pdfSuccess.value = null }, 4000)

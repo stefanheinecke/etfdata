@@ -9,7 +9,7 @@
           <li><a href="#" :class="{ active: currentPage === 'scores' }" @click.prevent="goToPage('scores')">Scores</a></li>
           <li><a href="#" :class="{ active: currentPage === 'docs' }" @click.prevent="goToPage('docs')">API</a></li>
           <li><a href="#" :class="{ active: currentPage === 'methodology' }" @click.prevent="goToPage('methodology')">Methodology</a></li>
-          <li v-if="adminActive || isAdminApiUser"><a href="#" :class="{ active: currentPage === 'admin' }" @click.prevent="goToPage('admin')" style="color:#dc2626;font-weight:600">Admin</a></li>
+          <li v-if="isAdminApiUser"><a href="#" :class="{ active: currentPage === 'admin' }" @click.prevent="goToPage('admin')" style="color:#dc2626;font-weight:600">Admin</a></li>
         </ul>
         <a v-if="!hasAuth" href="#" class="btn btn-outline nav-cta" @click.prevent="openApiKeyModal()">Get API Key</a>
         <template v-else>
@@ -31,7 +31,7 @@
         <a href="#" @click.prevent="goToPage('scores')">Scores</a>
         <a href="#" @click.prevent="goToPage('docs')">API</a>
         <a href="#" @click.prevent="goToPage('methodology')">Methodology</a>
-        <a v-if="adminActive || isAdminApiUser" href="#" @click.prevent="goToPage('admin'); mobileMenuOpen = false" style="color:#dc2626;font-weight:600">Admin</a>
+        <a v-if="isAdminApiUser" href="#" @click.prevent="goToPage('admin'); mobileMenuOpen = false" style="color:#dc2626;font-weight:600">Admin</a>
         <a v-if="!hasApiKey" href="#" class="btn btn-primary" @click.prevent="openApiKeyModal(); mobileMenuOpen = false">Get API Key</a>
       </div>
     </div>
@@ -105,69 +105,14 @@
     <!-- Contact Modal -->
     <ContactModal :show="showContactModal" @close="showContactModal = false" />
 
-    <!-- Admin Login Modal -->
-    <Teleport to="body">
-      <div v-if="showAdminLogin" class="modal-backdrop" @click.self="showAdminLogin = false">
-        <div class="admin-login-modal">
-          <h3 class="admin-login-title">🔐 Admin Login</h3>
-          <p class="admin-login-sub">Enter your <code>ADMIN_SECRET</code> to continue.</p>
-          <input
-            :type="adminLoginShow ? 'text' : 'password'"
-            v-model="adminLoginSecret"
-            class="admin-login-input"
-            placeholder="Admin secret…"
-            @keydown.enter="doAdminLogin"
-            autofocus
-          />
-          <div v-if="adminLoginError" class="admin-login-error">{{ adminLoginError }}</div>
-          <div class="admin-login-actions">
-            <button class="admin-login-toggle" @click="adminLoginShow = !adminLoginShow">{{ adminLoginShow ? 'Hide' : 'Show' }}</button>
-            <button class="admin-login-cancel" @click="showAdminLogin = false">Cancel</button>
-            <button class="admin-login-submit" @click="doAdminLogin" :disabled="!adminLoginSecret || adminLoginLoading">
-              {{ adminLoginLoading ? 'Verifying…' : 'Log In' }}
-            </button>
-          </div>
-        </div>
-      </div>
-    </Teleport>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, provide } from 'vue'
-import { healthService, adminService, authService } from './services/api.js'
+import { healthService, authService } from './services/api.js'
 import { BRAND, BRAND_PREFIX } from './brand.js'
 
-const adminActive = ref(!!sessionStorage.getItem('admin_secret'))
-function setAdminActive(val) {
-  adminActive.value = val
-  if (!val) sessionStorage.removeItem('admin_secret')
-}
-provide('setAdminActive', setAdminActive)
-
-// Admin login modal state (in App.vue so non-admins never see the Admin page)
-const showAdminLogin = ref(false)
-const adminLoginSecret = ref('')
-const adminLoginShow = ref(false)
-const adminLoginLoading = ref(false)
-const adminLoginError = ref('')
-
-async function doAdminLogin() {
-  if (!adminLoginSecret.value || adminLoginLoading.value) return
-  adminLoginLoading.value = true; adminLoginError.value = ''
-  try {
-    await adminService.verify(adminLoginSecret.value)
-    sessionStorage.setItem('admin_secret', adminLoginSecret.value)
-    setAdminActive(true)
-    showAdminLogin.value = false
-    adminLoginSecret.value = ''
-    currentPage.value = 'admin'
-  } catch (e) {
-    adminLoginError.value = e.response?.status === 403 ? 'Invalid admin secret.' : (e.response?.data?.detail || e.message)
-  } finally {
-    adminLoginLoading.value = false
-  }
-}
 import Home from './pages/Home.vue'
 import ETFList from './pages/ETFList.vue'
 import ETFDetail from './pages/ETFDetail.vue'
@@ -234,10 +179,7 @@ provide('navigateToPortfolio', (etfs) => {
 provide('navigateTo', (page, tab) => { goToPage(page, tab) })
 
 function goToPage(page, tab = null) {
-  if (page === 'admin' && !adminActive.value) {
-    showAdminLogin.value = true
-    return
-  }
+  if (page === 'admin' && !isAdminApiUser.value) return
   currentPage.value = page
   if (tab) analyticsInitTab.value = tab
   mobileMenuOpen.value = false
@@ -299,7 +241,6 @@ async function logout() {
   hasWebSession.value = false
   currentUserEmail.value = ''
   isAdminApiUser.value = false
-  setAdminActive(false)
   goToPage('home')
   openApiKeyModal()
 }
@@ -358,6 +299,7 @@ function onPopState() {
 }
 
 onMounted(async () => {
+  sessionStorage.removeItem('admin_secret')
   applyPathRoute(window.location.pathname)
   window.addEventListener('popstate', onPopState)
   window.addEventListener('scroll', onScroll, { passive: true })
@@ -387,16 +329,6 @@ onMounted(async () => {
   } catch (e) {
     if (e.response?.status !== 401) {
       console.error('Could not restore browser session:', e)
-    }
-  }
-  // Re-verify stored admin secret on every load; clear it if it's no longer valid
-  const storedSecret = sessionStorage.getItem('admin_secret')
-  if (storedSecret) {
-    try {
-      await adminService.verify(storedSecret)
-    } catch {
-      sessionStorage.removeItem('admin_secret')
-      setAdminActive(false)
     }
   }
   startEmailConfirmationPolling()

@@ -98,15 +98,15 @@ export const authService = {
 }
 
 export const adminService = {
-  verify(adminSecret) {
-    return api.get('/admin/verify', { headers: { 'x-admin-secret': adminSecret } })
+  verify() {
+    return api.get('/admin/verify')
   },
-  importETF(adminSecret, symbol, csvFile = null, name = null, ter = null, isin = null) {
+  importETF(symbol, csvFile = null, name = null, ter = null, isin = null) {
     const params = { symbol }
     if (isin) params.isin = isin
     if (name) params.name = name
     if (ter != null) params.ter = ter
-    const config = { params, headers: { 'x-admin-secret': adminSecret } }
+    const config = { params }
     if (csvFile) {
       const form = new FormData()
       form.append('csv_file', csvFile)
@@ -114,74 +114,68 @@ export const adminService = {
     }
     return api.post('/admin/import-etf', null, config)
   },
-  createApiKey(adminSecret, name, rateLimit = 60, email = null) {
+  createApiKey(name, rateLimit = 60, email = null) {
     const params = { name, rate_limit_per_minute: rateLimit }
     if (email) params.email = email
     return api.post(`/admin/api-keys`, null, {
       params,
-      headers: { 'x-admin-secret': adminSecret }
     })
   },
-  initDb(adminSecret) {
-    return api.post('/admin/init-db', null, { headers: { 'x-admin-secret': adminSecret } })
+  initDb() {
+    return api.post('/admin/init-db')
   },
-  seed(adminSecret) {
-    return api.post('/admin/seed', null, { headers: { 'x-admin-secret': adminSecret } })
+  seed() {
+    return api.post('/admin/seed')
   },
-  reset(adminSecret) {
-    return api.post('/admin/reset', null, { headers: { 'x-admin-secret': adminSecret } })
+  reset() {
+    return api.post('/admin/reset')
   },
-  refreshPrices(adminSecret) {
-    return api.post('/admin/refresh-prices', null, { headers: { 'x-admin-secret': adminSecret } })
+  refreshPrices() {
+    return api.post('/admin/refresh-prices')
   },
-  refreshPricesStatus(adminSecret, jobId) {
-    return api.get(`/admin/refresh-prices/status/${jobId}`, { headers: { 'x-admin-secret': adminSecret } })
+  refreshPricesStatus(jobId) {
+    return api.get(`/admin/refresh-prices/status/${jobId}`)
   },
-  backfillEodhdSymbols(adminSecret) {
-    return api.post('/admin/backfill-eodhd-symbols', null, { headers: { 'x-admin-secret': adminSecret } })
+  backfillEodhdSymbols() {
+    return api.post('/admin/backfill-eodhd-symbols')
   },
-  refreshFxRates(adminSecret) {
-    return api.post('/admin/refresh-fx-rates', null, { headers: { 'x-admin-secret': adminSecret } })
+  refreshFxRates() {
+    return api.post('/admin/refresh-fx-rates')
   },
-  recalculateScores(adminSecret) {
-    return api.post('/admin/recalculate-scores', null, { headers: { 'x-admin-secret': adminSecret } })
+  recalculateScores() {
+    return api.post('/admin/recalculate-scores')
   },
-  deleteETFs(adminSecret, etfIds) {
-    return api.delete('/admin/etfs', {
-      data: etfIds,
-      headers: { 'x-admin-secret': adminSecret }
-    })
+  deleteETFs(etfIds) {
+    return api.delete('/admin/etfs', { data: etfIds })
   },
-  deleteETFByISIN(adminSecret, isin) {
-    return api.delete(`/admin/etfs/by-isin/${isin}`, {
-      headers: { 'x-admin-secret': adminSecret }
-    })
+  deleteETFByISIN(isin) {
+    return api.delete(`/admin/etfs/by-isin/${isin}`)
   },
-  requestLogs(adminSecret, { limit = 100, offset = 0, api_key_name = '', email = '', path = '' } = {}) {
+  requestLogs({ limit = 100, offset = 0, api_key_name = '', email = '', path = '' } = {}) {
     const params = { limit, offset }
     if (api_key_name) params.api_key_name = api_key_name
     if (email) params.email = email
     if (path) params.path = path
-    return api.get('/admin/request-logs', { params, headers: { 'x-admin-secret': adminSecret } })
+    return api.get('/admin/request-logs', { params })
   },
-  updateETF(adminSecret, etfId, data) {
-    return api.patch(`/admin/etfs/${etfId}`, data, { headers: { 'x-admin-secret': adminSecret } })
+  updateETF(etfId, data) {
+    return api.patch(`/admin/etfs/${etfId}`, data)
   },
-  updateHolding(adminSecret, etfId, holdingId, data) {
-    return api.patch(`/admin/etfs/${etfId}/holdings/${holdingId}`, data, { headers: { 'x-admin-secret': adminSecret } })
+  updateHolding(etfId, holdingId, data) {
+    return api.patch(`/admin/etfs/${etfId}/holdings/${holdingId}`, data)
   },
-  deleteHolding(adminSecret, etfId, holdingId) {
-    return api.delete(`/admin/etfs/${etfId}/holdings/${holdingId}`, { headers: { 'x-admin-secret': adminSecret } })
+  deleteHolding(etfId, holdingId) {
+    return api.delete(`/admin/etfs/${etfId}/holdings/${holdingId}`)
   },
-  addHolding(adminSecret, etfId, holdingData) {
-    return api.post(`/admin/etfs/${etfId}/holdings`, holdingData, { headers: { 'x-admin-secret': adminSecret } })
+  addHolding(etfId, holdingData) {
+    return api.post(`/admin/etfs/${etfId}/holdings`, holdingData)
   },
-  previewImport(adminSecret, symbol, csvFile = null, name = null, ter = null, isin = null) {
+  previewImport(symbol, csvFile = null, name = null, ter = null, isin = null) {
     const params = { symbol }
     if (isin) params.isin = isin
     if (name) params.name = name
     if (ter != null) params.ter = ter
-    const config = { params, headers: { 'x-admin-secret': adminSecret } }
+    const config = { params }
     if (csvFile) {
       const form = new FormData()
       form.append('csv_file', csvFile)
@@ -194,13 +188,13 @@ export const adminService = {
     form.append('file', pdfFile)
     return api.post('/admin/etf/upload-factsheet', form)
   },
-  importPdfData(adminSecret, metadata, holdings) {
-    return api.post('/admin/etf/import-data', { metadata, holdings }, { headers: { 'x-admin-secret': adminSecret } })
+  importPdfData(metadata, holdings) {
+    return api.post('/admin/etf/import-data', { metadata, holdings })
   },
-  importHoldings(adminSecret, isin, provider, holdingsFile = null, asOf = null) {
+  importHoldings(isin, provider, holdingsFile = null, asOf = null) {
     const params = { isin, provider }
     if (asOf) params.as_of = asOf
-    const config = { params, headers: { 'x-admin-secret': adminSecret } }
+    const config = { params }
     if (holdingsFile) {
       const form = new FormData()
       form.append('holdings_file', holdingsFile)
@@ -208,15 +202,14 @@ export const adminService = {
     }
     return api.post('/admin/import-holdings', null, config)
   },
-  importProviderMetadata(adminSecret, ubsFile, isharesFile) {
+  importProviderMetadata(ubsFile, isharesFile) {
     const form = new FormData()
     if (ubsFile) form.append('ubs_file', ubsFile)
     if (isharesFile) form.append('ishares_file', isharesFile)
-    return api.post('/admin/import-provider-metadata', form, { headers: { 'x-admin-secret': adminSecret } })
+    return api.post('/admin/import-provider-metadata', form)
   },
-  downloadProviderFile(adminSecret, provider) {
+  downloadProviderFile(provider) {
     return api.get(`/admin/provider-metadata/${provider}-file`, {
-      headers: { 'x-admin-secret': adminSecret },
       responseType: 'blob',
     })
   },

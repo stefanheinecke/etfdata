@@ -13,6 +13,7 @@ from app.core.auth import (
     hash_api_key,
     verify_api_key,
 )
+from app.api.routes import admin
 from app.api.routes import auth
 from app.schemas import (
     APIKey,
@@ -44,6 +45,52 @@ def auth_db():
     finally:
         db.close()
         engine.dispose()
+
+
+def test_admin_routes_accept_admin_api_key_and_reject_regular_key(auth_db):
+    db = auth_db
+    admin_account = GoogleAccount(
+        google_sub="google-admin-id",
+        email="stefan.heinecke1@gmail.com",
+        name="Admin User",
+    )
+    db.add(admin_account)
+    db.flush()
+    admin_session_token = "admin-web-session"
+    db.add_all([
+        APIKey(
+            key=hash_api_key("admin-key"),
+            name="admin",
+            email="stefan.heinecke1@gmail.com",
+            is_active=True,
+            is_admin=True,
+        ),
+        APIKey(
+            key=hash_api_key("regular-key"),
+            name="regular",
+            email="user@example.com",
+            is_active=True,
+            is_admin=False,
+        ),
+        WebSession(
+            google_account_id=admin_account.id,
+            token_hash=hash_api_key(admin_session_token),
+            expires_at=datetime.utcnow() + timedelta(days=1),
+        ),
+    ])
+    db.commit()
+
+    asyncio.run(admin.verify_admin_access(None, None, admin_session_token, db))
+
+    with pytest.raises(HTTPException) as exc_info:
+        asyncio.run(admin.verify_admin_access(None, "regular-key", None, db))
+    assert exc_info.value.status_code == 403
+
+
+def test_admin_routes_keep_service_secret_authentication(auth_db, monkeypatch):
+    monkeypatch.setenv("ADMIN_SECRET", "worker-secret")
+
+    asyncio.run(admin.verify_admin_access("worker-secret", None, None, auth_db))
 
 
 def test_verified_google_claims_are_normalized(monkeypatch):

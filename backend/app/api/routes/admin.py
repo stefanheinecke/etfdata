@@ -1,16 +1,17 @@
 import os
+import hmac
 import threading
 from datetime import date as date_type
 from pathlib import Path
 from uuid import UUID, uuid4
-from fastapi import APIRouter, Depends, HTTPException, Header, UploadFile, File
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Header, UploadFile, File
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from typing import List, Optional
 from app.db.database import get_db, SessionLocal
-from app.core.auth import create_api_key
+from app.core.auth import create_api_key, verify_api_key
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -54,16 +55,27 @@ class HoldingCreateBody(BaseModel):
     date: Optional[date_type] = None
 
 
-def verify_admin_secret(x_admin_secret: str = Header(None)):
+async def verify_admin_access(
+    x_admin_secret: str = Header(None),
+    x_api_key: str = Header(None),
+    web_session: str = Cookie(None),
+    db: Session = Depends(get_db),
+):
     admin_secret = os.getenv("ADMIN_SECRET")
-    if not admin_secret:
-        raise HTTPException(status_code=503, detail="Admin endpoint not configured")
-    if x_admin_secret != admin_secret:
-        raise HTTPException(status_code=403, detail="Invalid admin secret")
+    if admin_secret and x_admin_secret and hmac.compare_digest(x_admin_secret, admin_secret):
+        return
+
+    api_key = await verify_api_key(x_api_key=x_api_key, web_session=web_session, db=db)
+    if not getattr(api_key, "is_admin", False):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    return api_key
+
+
+verify_admin_secret = verify_admin_access
 
 
 @router.get("/verify")
-def verify_endpoint(_: None = Depends(verify_admin_secret)):
+async def verify_endpoint(_: None = Depends(verify_admin_access)):
     return {"status": "ok"}
 
 
