@@ -191,7 +191,7 @@ function goToPage(page, tab = null) {
   window.scrollTo({ top: 0, behavior: 'auto' })
 }
 
-function onGoogleAuthenticated(user) {
+function onGoogleAuthenticated(user, forceRefresh = true) {
   const nextHasApiKey = !!user.has_api_key || !!localStorage.getItem('api_key')
   const nextEmail = user.email || ''
   const nextIsAdmin = !!user.is_admin
@@ -206,14 +206,14 @@ function onGoogleAuthenticated(user) {
   hasApiKey.value = nextHasApiKey
   currentUserEmail.value = nextEmail
   isAdminApiUser.value = nextIsAdmin
-  if (changed) pageRefreshKey.value += 1
+  if (changed || forceRefresh) pageRefreshKey.value += 1
 }
 
 async function onApiKeyModalClose() {
   showApiKeyModal.value = false
   try {
     const { data } = await authService.session()
-    onGoogleAuthenticated(data)
+    onGoogleAuthenticated(data, false)
   } catch (e) {
     if (e.response?.status !== 401) {
       console.error('Could not refresh browser session after closing the sign-in dialog:', e)
