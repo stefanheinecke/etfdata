@@ -199,6 +199,10 @@ anderen Gerät geöffnet, wird auch der ursprüngliche Browser angemeldet, sobal
 er die Bestätigung abfragt oder die Website erneut im selben Browser geöffnet
 wird. `FRONTEND_URL` bestimmt den Link zurück zur Website.
 
+Der Admin-Status wird pro API-Key in `api_keys.is_admin` gespeichert. Bei der
+Migration bestehender Daten wird `stefan.heinecke1@gmail.com` als Admin markiert;
+neu erstellte API-Keys für diese Adresse erhalten den Admin-Status ebenfalls.
+
 ### 2. GET /etfs - Alle ETFs abrufen
 
 ```bash

@@ -576,6 +576,7 @@ def create_key(
         "email": db_key.email,
         "id": str(db_key.id),
         "rate_limit_per_minute": db_key.rate_limit_per_minute,
+        "is_admin": db_key.is_admin,
     }
 
 
@@ -1180,4 +1181,3 @@ def get_contact_messages(
             for m in messages
         ]
     }
-

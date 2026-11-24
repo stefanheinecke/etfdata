@@ -134,10 +134,12 @@ def test_google_session_authenticates_and_can_be_revoked(
     assert "secure" in cookie_header
     assert "samesite=none" in cookie_header
     assert result["has_api_key"] is True
+    assert result["is_admin"] is False
     assert result["api_key_emailed"] is True
     assert len(sent_emails) == 1
     stored_key = db.query(APIKey).one()
     assert stored_key.key == hash_api_key(sent_emails[0]["api_key"])
+    assert stored_key.is_admin is False
     authenticated_user = asyncio.run(
         verify_api_key(x_api_key=None, web_session=session_token, db=db)
     )
@@ -203,6 +205,40 @@ def test_google_sign_in_preserves_an_existing_api_key(auth_db, monkeypatch):
     assert result["api_key_emailed"] is False
     assert sent_emails == []
     assert db.query(APIKey).one().key == existing_key_hash
+
+
+def test_default_admin_email_is_stored_as_admin_on_google_key(
+    auth_db,
+    monkeypatch,
+):
+    db = auth_db
+    monkeypatch.setattr(
+        auth,
+        "_verified_google_claims",
+        lambda _credential: {
+            "google_sub": "google-admin-id",
+            "email": "Stefan.Heinecke1@gmail.com",
+            "name": "Stefan Heinecke",
+        },
+    )
+    monkeypatch.setattr(auth, "send_api_key_email", lambda **_kwargs: None)
+    response = Response()
+
+    result = auth.google_session(
+        auth.GoogleLoginRequest(credential="google-id-token"),
+        response,
+        db,
+    )
+
+    stored_key = db.query(APIKey).one()
+    session_token = response.headers["set-cookie"].split(";", 1)[0].split("=", 1)[1]
+    authenticated_user = asyncio.run(
+        verify_api_key(x_api_key=None, web_session=session_token, db=db)
+    )
+
+    assert result["is_admin"] is True
+    assert stored_key.is_admin is True
+    assert auth.get_web_session(api_key=authenticated_user, db=db)["is_admin"] is True
 
 
 def test_google_session_remains_active_when_key_email_fails(auth_db, monkeypatch):

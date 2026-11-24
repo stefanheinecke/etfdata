@@ -26,6 +26,7 @@ from app.core.auth import (
     generate_api_key,
     get_email_session,
     hash_api_key,
+    is_default_admin_email,
     verify_api_key,
 )
 from app.core.email import (
@@ -130,6 +131,7 @@ def request_key(
                 inactive_key.name = email.split("@")[0][:100]
                 inactive_key.created_at = datetime.utcnow()
                 inactive_key.expires_at = None
+                inactive_key.is_admin = is_default_admin_email(email)
             else:
                 db.add(APIKey(
                     key=hash_api_key(raw_key),
@@ -137,6 +139,7 @@ def request_key(
                     email=email,
                     rate_limit_per_minute=60,
                     is_active=False,
+                    is_admin=is_default_admin_email(email),
                 ))
 
         token = secrets.token_urlsafe(32)
@@ -241,6 +244,7 @@ def confirm_key(
                 email=email,
                 rate_limit_per_minute=60,
                 is_active=True,
+                is_admin=is_default_admin_email(email),
             ))
 
     session_token = secrets.token_urlsafe(32)
@@ -315,13 +319,12 @@ def email_confirmation_status(
 
                     _set_web_session_cookie(response, session_token)
                     _delete_pending_email_cookie(response)
-                    admin_email = os.getenv("ADMIN_EMAIL", "").strip().lower()
                     return {
                         "pending": False,
                         "authenticated": True,
                         "name": api_key.name,
                         "email": email,
-                        "is_admin": bool(admin_email and email == admin_email),
+                        "is_admin": api_key.is_admin,
                         "has_api_key": True,
                     }
         else:
@@ -332,13 +335,12 @@ def email_confirmation_status(
         api_key = _find_usable_api_key(db, email_session.email)
         if api_key:
             _delete_pending_email_cookie(response)
-            admin_email = os.getenv("ADMIN_EMAIL", "").strip().lower()
             return {
                 "pending": False,
                 "authenticated": True,
                 "name": api_key.name,
                 "email": email_session.email,
-                "is_admin": bool(admin_email and email_session.email == admin_email),
+                "is_admin": api_key.is_admin,
                 "has_api_key": True,
             }
 
@@ -351,9 +353,11 @@ def get_current_user(
     api_key: APIKey = Depends(verify_api_key),
 ):
     """Return the name and email associated with the current API key."""
-    admin_email = os.getenv("ADMIN_EMAIL", "").strip().lower()
-    is_admin = bool(admin_email and api_key.email and api_key.email.strip().lower() == admin_email)
-    return {"name": api_key.name, "email": api_key.email, "is_admin": is_admin}
+    return {
+        "name": api_key.name,
+        "email": api_key.email,
+        "is_admin": getattr(api_key, "is_admin", False),
+    }
 
 
 # ── Contact Form ──────────────────────────────────────────────────────────────
@@ -500,6 +504,7 @@ def google_session(
             name=account.email.split("@")[0][:100],
             email=account.email,
             rate_limit_per_minute=60,
+            is_admin=is_default_admin_email(account.email),
         ))
         try:
             send_api_key_email(to_email=account.email, api_key=raw_key)
@@ -517,12 +522,12 @@ def google_session(
             )
 
     _set_web_session_cookie(response, session_token)
-    admin_email = os.getenv("ADMIN_EMAIL", "").strip().lower()
+    api_key = _find_usable_api_key(db, account.email)
     return {
         "name": account.name,
         "email": account.email,
-        "is_admin": bool(admin_email and account.email == admin_email),
-        "has_api_key": _find_usable_api_key(db, account.email) is not None,
+        "is_admin": bool(api_key and api_key.is_admin),
+        "has_api_key": api_key is not None,
         "api_key_emailed": api_key_emailed,
         "api_key_email_error": api_key_email_error,
     }
@@ -533,12 +538,11 @@ def get_web_session(
     api_key: APIKey = Depends(verify_api_key),
     db: Session = Depends(get_db),
 ):
-    admin_email = os.getenv("ADMIN_EMAIL", "").strip().lower()
     email = api_key.email
     return {
         "name": api_key.name,
         "email": email,
-        "is_admin": bool(admin_email and email and email.strip().lower() == admin_email),
+        "is_admin": getattr(api_key, "is_admin", False),
         "has_api_key": _find_usable_api_key(db, email) is not None if email else False,
     }
 

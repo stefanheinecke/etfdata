@@ -139,6 +139,7 @@ class APIKey(Base):
     email = Column(String(255), nullable=True)
     rate_limit_per_minute = Column(Integer, default=60)
     is_active = Column(Boolean, default=True, index=True)
+    is_admin = Column(Boolean, default=False, nullable=False, server_default=text("false"))
     created_at = Column(DateTime, default=datetime.utcnow)
     last_used_at = Column(DateTime)
     expires_at = Column(DateTime)

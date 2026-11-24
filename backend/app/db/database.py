@@ -42,6 +42,21 @@ def init_db():
     # Additive column migrations (idempotent via IF NOT EXISTS)
     with engine.connect() as conn:
         conn.execute(text("ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS email VARCHAR(255)"))
+        has_admin_column = conn.execute(text("""
+            SELECT EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'api_keys' AND column_name = 'is_admin'
+            )
+        """)).scalar()
+        conn.execute(text(
+            "ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS "
+            "is_admin BOOLEAN NOT NULL DEFAULT FALSE"
+        ))
+        if not has_admin_column:
+            conn.execute(text(
+                "UPDATE api_keys SET is_admin = TRUE "
+                "WHERE LOWER(TRIM(email)) = 'stefan.heinecke1@gmail.com'"
+            ))
         conn.execute(text("ALTER TABLE pending_key_requests ADD COLUMN IF NOT EXISTS browser_token_hash VARCHAR(64)"))
         conn.execute(text("ALTER TABLE pending_key_requests ADD COLUMN IF NOT EXISTS confirmed_at TIMESTAMP"))
         conn.execute(text(

@@ -2,6 +2,7 @@ import hashlib
 import secrets
 from types import SimpleNamespace
 from datetime import datetime
+from typing import Optional
 from fastapi import HTTPException, Header, Cookie, Depends
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
@@ -10,9 +11,13 @@ from app.schemas import APIKey, EmailWebSession, GoogleAccount, WebSession
 
 # Public demo key — read-only, full catalog access, low rate limit
 DEMO_API_KEY = "demo"
+DEFAULT_ADMIN_EMAIL = "stefan.heinecke1@gmail.com"
 
 def generate_api_key():
     return secrets.token_urlsafe(48)
+
+def is_default_admin_email(email: Optional[str]) -> bool:
+    return bool(email and email.strip().lower() == DEFAULT_ADMIN_EMAIL)
 
 def hash_api_key(key: str) -> str:
     return hashlib.sha256(key.encode()).hexdigest()
@@ -50,6 +55,12 @@ async def verify_api_key(
 ) -> APIKey:
     account = get_google_account_for_session(web_session, db)
     if account:
+        now = datetime.utcnow()
+        api_key = db.query(APIKey).filter(
+            APIKey.email == account.email,
+            APIKey.is_active.is_(True),
+            or_(APIKey.expires_at.is_(None), APIKey.expires_at >= now),
+        ).order_by(APIKey.created_at.desc()).first()
         return SimpleNamespace(
             name=account.name or account.email.split("@")[0],
             id=None,
@@ -57,6 +68,7 @@ async def verify_api_key(
             rate_limit_per_minute=60,
             email=account.email,
             key=None,
+            is_admin=bool(api_key and api_key.is_admin),
         )
 
     email_session = get_email_session(web_session, db)
@@ -119,7 +131,8 @@ def create_api_key(db: Session, name: str, rate_limit_per_minute: int = 60, emai
         key=hashed_key,
         name=name,
         email=email,
-        rate_limit_per_minute=rate_limit_per_minute
+        rate_limit_per_minute=rate_limit_per_minute,
+        is_admin=is_default_admin_email(email),
     )
     db.add(db_key)
     db.commit()
