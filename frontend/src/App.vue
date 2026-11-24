@@ -97,7 +97,7 @@
     <!-- Get API Key Modal -->
     <GetApiKeyModal
       :show="showApiKeyModal"
-      @close="showApiKeyModal = false"
+      @close="onApiKeyModalClose"
       @google-authenticated="onGoogleAuthenticated"
       @email-confirmation-pending="startEmailConfirmationPolling"
     />
@@ -187,11 +187,33 @@ function goToPage(page, tab = null) {
 }
 
 function onGoogleAuthenticated(user) {
+  const nextHasApiKey = !!user.has_api_key || !!localStorage.getItem('api_key')
+  const nextEmail = user.email || ''
+  const nextIsAdmin = !!user.is_admin
+  const changed = (
+    !hasWebSession.value
+    || hasApiKey.value !== nextHasApiKey
+    || currentUserEmail.value !== nextEmail
+    || isAdminApiUser.value !== nextIsAdmin
+  )
+
   hasWebSession.value = true
-  hasApiKey.value = !!user.has_api_key || !!localStorage.getItem('api_key')
-  currentUserEmail.value = user.email || ''
-  isAdminApiUser.value = !!user.is_admin
-  pageRefreshKey.value += 1
+  hasApiKey.value = nextHasApiKey
+  currentUserEmail.value = nextEmail
+  isAdminApiUser.value = nextIsAdmin
+  if (changed) pageRefreshKey.value += 1
+}
+
+async function onApiKeyModalClose() {
+  showApiKeyModal.value = false
+  try {
+    const { data } = await authService.session()
+    onGoogleAuthenticated(data)
+  } catch (e) {
+    if (e.response?.status !== 401) {
+      console.error('Could not refresh browser session after closing the sign-in dialog:', e)
+    }
+  }
 }
 
 function stopEmailConfirmationPolling() {
