@@ -194,8 +194,10 @@ Wenn ein Nutzer **Get Free API Key** auswählt, wird eine Bestätigungs-E-Mail
 versendet. Bei neuen Nutzern enthält sie einen zunächst inaktiven API-Key.
 Erst nach Klick auf den Bestätigungsbutton wird dieser aktiviert und der
 Browser angemeldet; der Key muss in der Web-App nicht manuell eingegeben
-werden. Bestehende aktive API-Keys bleiben unverändert. `FRONTEND_URL` bestimmt
-den Link zurück zur Website.
+werden. Bestehende aktive API-Keys bleiben unverändert. Wird der Link auf einem
+anderen Gerät geöffnet, wird auch der ursprüngliche Browser angemeldet, sobald
+er die Bestätigung abfragt oder die Website erneut im selben Browser geöffnet
+wird. `FRONTEND_URL` bestimmt den Link zurück zur Website.
 
 ### 2. GET /etfs - Alle ETFs abrufen
 

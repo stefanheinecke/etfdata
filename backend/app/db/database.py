@@ -42,6 +42,12 @@ def init_db():
     # Additive column migrations (idempotent via IF NOT EXISTS)
     with engine.connect() as conn:
         conn.execute(text("ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS email VARCHAR(255)"))
+        conn.execute(text("ALTER TABLE pending_key_requests ADD COLUMN IF NOT EXISTS browser_token_hash VARCHAR(64)"))
+        conn.execute(text("ALTER TABLE pending_key_requests ADD COLUMN IF NOT EXISTS confirmed_at TIMESTAMP"))
+        conn.execute(text(
+            "CREATE UNIQUE INDEX IF NOT EXISTS ix_pending_key_requests_browser_token_hash "
+            "ON pending_key_requests (browser_token_hash)"
+        ))
         conn.execute(text("ALTER TABLE etfs ADD COLUMN IF NOT EXISTS dividend_policy VARCHAR(20)"))
         conn.execute(text("ALTER TABLE etfs ADD COLUMN IF NOT EXISTS replication_method VARCHAR(50)"))
         conn.execute(text("ALTER TABLE etfs ADD COLUMN IF NOT EXISTS asset_class VARCHAR(50)"))

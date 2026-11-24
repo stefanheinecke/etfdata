@@ -83,6 +83,9 @@ export const authService = {
   session() {
     return api.get('/auth/session')
   },
+  emailStatus() {
+    return api.get('/auth/email-status')
+  },
   logout() {
     return api.post('/auth/logout')
   },

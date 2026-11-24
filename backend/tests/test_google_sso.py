@@ -254,33 +254,55 @@ def test_email_request_keeps_new_key_inactive_until_confirmation(
     monkeypatch.setenv("FRONTEND_URL", "https://app.example.com")
     monkeypatch.setenv("SESSION_COOKIE_SECURE", "true")
 
-    result = auth.request_key("User@Example.com", db)
+    request_response = Response()
+    result = auth.request_key("User@Example.com", request_response, db)
 
     raw_key = sent_confirmations[0]["api_key"]
     token = sent_confirmations[0]["confirm_url"].rsplit("token=", 1)[1]
+    browser_token = request_response.headers["set-cookie"].split(";", 1)[0].split("=", 1)[1]
     key_record = db.query(APIKey).one()
     assert result["email"] == "user@example.com"
     assert result["has_active_key"] is False
+    assert "pending_email_session" in request_response.headers["set-cookie"]
     assert key_record.key == hash_api_key(raw_key)
     assert key_record.is_active is False
     assert db.query(PendingKeyRequest).count() == 1
     with pytest.raises(HTTPException) as exc_info:
         asyncio.run(verify_api_key(x_api_key=raw_key, web_session=None, db=db))
     assert exc_info.value.status_code == 401
+    assert auth.email_confirmation_status(
+        Response(), browser_token, None, db
+    ) == {"pending": True, "authenticated": False}
 
-    response = auth.confirm_key(token, db)
+    phone_response = auth.confirm_key(token, None, db)
 
-    cookie_header = response.headers["set-cookie"].lower()
-    session_token = response.headers["set-cookie"].split(";", 1)[0].split("=", 1)[1]
-    assert response.status_code == 200
+    cookie_header = phone_response.headers["set-cookie"].lower()
+    phone_session_token = phone_response.headers["set-cookie"].split(";", 1)[0].split("=", 1)[1]
+    assert phone_response.status_code == 200
     assert "httponly" in cookie_header
     assert "secure" in cookie_header
     assert "samesite=none" in cookie_header
-    assert "https://app.example.com" in response.body.decode()
+    assert "https://app.example.com" in phone_response.body.decode()
     assert db.query(APIKey).one().key == hash_api_key(raw_key)
     assert db.query(APIKey).one().is_active is True
+    assert db.query(PendingKeyRequest).one().confirmed_at is not None
+    assert get_email_session(phone_session_token, db).email == "user@example.com"
+
+    first_device_response = Response()
+    status = auth.email_confirmation_status(
+        first_device_response,
+        browser_token,
+        None,
+        db,
+    )
+    assert status["authenticated"] is True
+    assert status["email"] == "user@example.com"
     assert db.query(PendingKeyRequest).count() == 0
-    assert get_email_session(session_token, db).email == "user@example.com"
+    session_cookie = next(
+        value for value in first_device_response.headers.getlist("set-cookie")
+        if value.startswith("web_session=")
+    )
+    session_token = session_cookie.split(";", 1)[0].split("=", 1)[1]
 
     authenticated_user = asyncio.run(
         verify_api_key(
@@ -319,6 +341,12 @@ def test_email_confirmation_preserves_an_existing_active_key(
         rate_limit_per_minute=60,
         is_active=True,
     ))
+    existing_session_token = "existing-email-session"
+    db.add(EmailWebSession(
+        email="user@example.com",
+        token_hash=hash_api_key(existing_session_token),
+        expires_at=datetime.utcnow() + timedelta(days=7),
+    ))
     db.commit()
     sent_confirmations = []
     monkeypatch.setattr(
@@ -327,15 +355,23 @@ def test_email_confirmation_preserves_an_existing_active_key(
         lambda **kwargs: sent_confirmations.append(kwargs),
     )
 
-    result = auth.request_key("user@example.com", db)
+    request_response = Response()
+    result = auth.request_key("user@example.com", request_response, db)
 
     assert result["has_active_key"] is True
     assert sent_confirmations[0]["has_active_key"] is True
     assert sent_confirmations[0]["api_key"] is None
     assert db.query(APIKey).one().key == key_hash
+    browser_token = request_response.headers["set-cookie"].split(";", 1)[0].split("=", 1)[1]
+    assert auth.email_confirmation_status(
+        Response(),
+        browser_token,
+        existing_session_token,
+        db,
+    ) == {"pending": True, "authenticated": False}
 
     token = sent_confirmations[0]["confirm_url"].rsplit("token=", 1)[1]
-    response = auth.confirm_key(token, db)
+    response = auth.confirm_key(token, None, db)
     session_token = response.headers["set-cookie"].split(";", 1)[0].split("=", 1)[1]
     authenticated_user = asyncio.run(
         verify_api_key(x_api_key=None, web_session=session_token, db=db)
@@ -355,7 +391,7 @@ def test_email_request_failure_does_not_create_inactive_key(
 
     monkeypatch.setattr(auth, "send_confirmation_email", fail_email_delivery)
     with pytest.raises(HTTPException) as exc_info:
-        auth.request_key("user@example.com", db)
+        auth.request_key("user@example.com", Response(), db)
 
     assert exc_info.value.status_code == 503
     assert db.query(APIKey).count() == 0

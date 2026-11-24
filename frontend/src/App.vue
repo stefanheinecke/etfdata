@@ -99,6 +99,7 @@
       :show="showApiKeyModal"
       @close="showApiKeyModal = false"
       @google-authenticated="onGoogleAuthenticated"
+      @email-confirmation-pending="startEmailConfirmationPolling"
     />
 
     <!-- Contact Modal -->
@@ -193,6 +194,8 @@ const hasAuth = computed(() => hasApiKey.value || hasWebSession.value)
 const currentUserEmail = ref('')
 const isAdminApiUser = ref(false)
 const pageRefreshKey = ref(0)
+let emailConfirmationPollTimer = null
+let checkingEmailConfirmation = false
 
 function openApiKeyModal() {
   showApiKeyModal.value = true
@@ -247,6 +250,39 @@ function onGoogleAuthenticated(user) {
   currentUserEmail.value = user.email || ''
   isAdminApiUser.value = !!user.is_admin
   pageRefreshKey.value += 1
+}
+
+function stopEmailConfirmationPolling() {
+  if (emailConfirmationPollTimer) {
+    window.clearInterval(emailConfirmationPollTimer)
+    emailConfirmationPollTimer = null
+  }
+}
+
+async function checkEmailConfirmation() {
+  if (checkingEmailConfirmation) return
+  checkingEmailConfirmation = true
+  try {
+    const { data } = await authService.emailStatus()
+    if (data.authenticated) {
+      stopEmailConfirmationPolling()
+      onGoogleAuthenticated(data)
+      showApiKeyModal.value = false
+    } else if (!data.pending) {
+      stopEmailConfirmationPolling()
+    }
+  } catch (e) {
+    console.error('Could not check email confirmation status:', e)
+    stopEmailConfirmationPolling()
+  } finally {
+    checkingEmailConfirmation = false
+  }
+}
+
+function startEmailConfirmationPolling() {
+  if (emailConfirmationPollTimer) return
+  emailConfirmationPollTimer = window.setInterval(checkEmailConfirmation, 3000)
+  checkEmailConfirmation()
 }
 
 async function logout() {
@@ -363,9 +399,11 @@ onMounted(async () => {
       setAdminActive(false)
     }
   }
+  startEmailConfirmationPolling()
 })
 
 onUnmounted(() => {
+  stopEmailConfirmationPolling()
   window.removeEventListener('popstate', onPopState)
   window.removeEventListener('scroll', onScroll)
   window.removeEventListener('keydown', onAdminShortcut)

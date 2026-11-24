@@ -205,9 +205,11 @@ class PendingKeyRequest(Base):
     id = Column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
     token = Column(String(64), unique=True, nullable=False, index=True)
     email = Column(String(255), nullable=False, index=True)
+    browser_token_hash = Column(String(64), unique=True, index=True)
     is_replacement = Column(Boolean, nullable=False, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     expires_at = Column(DateTime, nullable=False)
+    confirmed_at = Column(DateTime)
 
 
 class ETLJob(Base):

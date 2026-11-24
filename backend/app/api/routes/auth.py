@@ -9,6 +9,7 @@ import html
 import os
 import secrets
 from datetime import datetime, timedelta
+from typing import Optional
 
 import requests as _requests
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Response
@@ -23,6 +24,7 @@ from google.oauth2 import id_token
 from app.db.database import get_db
 from app.core.auth import (
     generate_api_key,
+    get_email_session,
     hash_api_key,
     verify_api_key,
 )
@@ -46,6 +48,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 _APP_NAME = "GoETF.ch API"
 _GOOGLE_SESSION_COOKIE = "web_session"
 _GOOGLE_SESSION_DAYS = 7
+_PENDING_EMAIL_COOKIE = "pending_email_session"
 
 
 # ── HTML templates ────────────────────────────────────────────────────────────
@@ -98,6 +101,7 @@ def _error_page(message: str) -> str:
 @router.post("/request-key")
 def request_key(
     email: str,
+    response: Response,
     db: Session = Depends(get_db),
 ):
     """
@@ -136,10 +140,12 @@ def request_key(
                 ))
 
         token = secrets.token_urlsafe(32)
+        browser_token = secrets.token_urlsafe(32)
         expires = datetime.utcnow() + timedelta(minutes=30)
         db.add(PendingKeyRequest(
             token=token,
             email=email,
+            browser_token_hash=hash_api_key(browser_token),
             is_replacement=has_active_key,
             expires_at=expires,
         ))
@@ -161,6 +167,7 @@ def request_key(
                      f"Email delivery failed: {exc.response.text if exc.response else exc}"
             raise HTTPException(status_code=503, detail=detail)
 
+        _set_pending_email_cookie(response, browser_token)
         return {
             "message": "A confirmation email was sent. Confirm your email to activate access.",
             "email": email,
@@ -177,7 +184,11 @@ def request_key(
 # ── Step 2: confirm ───────────────────────────────────────────────────────────
 
 @router.get("/confirm-key", response_class=HTMLResponse)
-def confirm_key(token: str, db: Session = Depends(get_db)):
+def confirm_key(
+    token: str,
+    pending_email_session: Optional[str] = Cookie(None),
+    db: Session = Depends(get_db),
+):
     """
     Validate the one-time token, activate a pending API key, and sign in this
     browser without replacing any existing active key.
@@ -197,6 +208,11 @@ def confirm_key(token: str, db: Session = Depends(get_db)):
         return HTMLResponse(_error_page(
             "This confirmation link has expired (links are valid for 30 minutes). "
             "Please request a new API key."
+        ), status_code=400)
+
+    if pending.confirmed_at:
+        return HTMLResponse(_error_page(
+            "This confirmation link has already been used."
         ), status_code=400)
 
     email = pending.email
@@ -233,7 +249,15 @@ def confirm_key(token: str, db: Session = Depends(get_db)):
         token_hash=hash_api_key(session_token),
         expires_at=datetime.utcnow() + timedelta(days=_GOOGLE_SESSION_DAYS),
     ))
-    db.delete(pending)
+    same_browser = bool(
+        pending_email_session
+        and pending.browser_token_hash == hash_api_key(pending_email_session)
+    )
+    if same_browser:
+        db.delete(pending)
+    else:
+        pending.confirmed_at = datetime.utcnow()
+        pending.expires_at = pending.confirmed_at + timedelta(days=_GOOGLE_SESSION_DAYS)
 
     try:
         if raw_key:
@@ -247,7 +271,78 @@ def confirm_key(token: str, db: Session = Depends(get_db)):
 
     success_response = HTMLResponse(_success_page(email))
     _set_web_session_cookie(success_response, session_token)
+    if same_browser:
+        _delete_pending_email_cookie(success_response)
     return success_response
+
+
+@router.get("/email-status")
+def email_confirmation_status(
+    response: Response,
+    pending_email_session: Optional[str] = Cookie(None),
+    web_session: Optional[str] = Cookie(None),
+    db: Session = Depends(get_db),
+):
+    if pending_email_session:
+        pending = db.query(PendingKeyRequest).filter(
+            PendingKeyRequest.browser_token_hash == hash_api_key(pending_email_session)
+        ).first()
+        if pending:
+            now = datetime.utcnow()
+            if pending.expires_at < now:
+                db.delete(pending)
+                db.commit()
+                _delete_pending_email_cookie(response)
+            elif not pending.confirmed_at:
+                return {"pending": True, "authenticated": False}
+            else:
+                api_key = _find_usable_api_key(db, pending.email)
+                if not api_key:
+                    db.delete(pending)
+                    db.commit()
+                    _delete_pending_email_cookie(response)
+                else:
+                    session_token = secrets.token_urlsafe(32)
+                    db.add(EmailWebSession(
+                        email=pending.email,
+                        token_hash=hash_api_key(session_token),
+                        expires_at=now + timedelta(days=_GOOGLE_SESSION_DAYS),
+                    ))
+                    email = pending.email
+                    pending.browser_token_hash = None
+                    db.delete(pending)
+                    db.commit()
+
+                    _set_web_session_cookie(response, session_token)
+                    _delete_pending_email_cookie(response)
+                    admin_email = os.getenv("ADMIN_EMAIL", "").strip().lower()
+                    return {
+                        "pending": False,
+                        "authenticated": True,
+                        "name": api_key.name,
+                        "email": email,
+                        "is_admin": bool(admin_email and email == admin_email),
+                        "has_api_key": True,
+                    }
+        else:
+            _delete_pending_email_cookie(response)
+
+    email_session = get_email_session(web_session, db)
+    if email_session:
+        api_key = _find_usable_api_key(db, email_session.email)
+        if api_key:
+            _delete_pending_email_cookie(response)
+            admin_email = os.getenv("ADMIN_EMAIL", "").strip().lower()
+            return {
+                "pending": False,
+                "authenticated": True,
+                "name": api_key.name,
+                "email": email_session.email,
+                "is_admin": bool(admin_email and email_session.email == admin_email),
+                "has_api_key": True,
+            }
+
+    return {"pending": False, "authenticated": False}
 
 
 @router.get("/me")
@@ -333,6 +428,28 @@ def _set_web_session_cookie(response: Response, token: str) -> None:
         secure=_session_cookie_secure(),
         samesite=_session_cookie_samesite(),
         path="/",
+    )
+
+
+def _set_pending_email_cookie(response: Response, token: str) -> None:
+    response.set_cookie(
+        key=_PENDING_EMAIL_COOKIE,
+        value=token,
+        max_age=_GOOGLE_SESSION_DAYS * 24 * 60 * 60,
+        httponly=True,
+        secure=_session_cookie_secure(),
+        samesite=_session_cookie_samesite(),
+        path="/",
+    )
+
+
+def _delete_pending_email_cookie(response: Response) -> None:
+    response.delete_cookie(
+        key=_PENDING_EMAIL_COOKIE,
+        path="/",
+        httponly=True,
+        secure=_session_cookie_secure(),
+        samesite=_session_cookie_samesite(),
     )
 
 

@@ -106,7 +106,7 @@ let googleScriptPromise
 const props = defineProps({
   show: Boolean
 })
-const emit  = defineEmits(['close', 'google-authenticated'])
+const emit  = defineEmits(['close', 'google-authenticated', 'email-confirmation-pending'])
 
 const email      = ref('')
 const loading    = ref(false)
@@ -212,6 +212,7 @@ async function submit() {
     const result = await authService.requestKey(email.value.trim())
     sent.value = true
     emailHasActiveKey.value = !!result.data.has_active_key
+    emit('email-confirmation-pending')
   } catch(e) {
     errorMsg.value = e.response?.data?.detail || e.message
   } finally {
