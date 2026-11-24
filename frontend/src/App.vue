@@ -11,9 +11,9 @@
           <li><a href="#" :class="{ active: currentPage === 'methodology' }" @click.prevent="goToPage('methodology')">Methodology</a></li>
           <li v-if="adminActive || isAdminApiUser"><a href="#" :class="{ active: currentPage === 'admin' }" @click.prevent="goToPage('admin')" style="color:#dc2626;font-weight:600">Admin</a></li>
         </ul>
-        <a v-if="!hasAuth" href="#" class="btn btn-outline nav-cta" @click.prevent="openApiKeyModal('request')">Get API Key</a>
+        <a v-if="!hasAuth" href="#" class="btn btn-outline nav-cta" @click.prevent="openApiKeyModal()">Get API Key</a>
         <template v-else>
-          <a v-if="!hasApiKey" href="#" class="btn btn-outline nav-cta" @click.prevent="openApiKeyModal('request')">Get API Key</a>
+          <a v-if="!hasApiKey" href="#" class="btn btn-outline nav-cta" @click.prevent="openApiKeyModal()">Get API Key</a>
           <span class="api-online-pill"><span class="status-dot"></span><span v-if="currentUserEmail" class="user-email">{{ currentUserEmail }}</span><span v-else>API Online</span></span>
           <button class="switch-key-btn" @click="logout" title="Log out">Log out</button>
         </template>
@@ -32,7 +32,7 @@
         <a href="#" @click.prevent="goToPage('docs')">API</a>
         <a href="#" @click.prevent="goToPage('methodology')">Methodology</a>
         <a v-if="adminActive || isAdminApiUser" href="#" @click.prevent="goToPage('admin'); mobileMenuOpen = false" style="color:#dc2626;font-weight:600">Admin</a>
-        <a v-if="!hasApiKey" href="#" class="btn btn-primary" @click.prevent="openApiKeyModal('request'); mobileMenuOpen = false">Get API Key</a>
+        <a v-if="!hasApiKey" href="#" class="btn btn-primary" @click.prevent="openApiKeyModal(); mobileMenuOpen = false">Get API Key</a>
       </div>
     </div>
 
@@ -73,7 +73,7 @@
                 <h4>Developers</h4>
                 <ul>
                   <li><a href="#" @click.prevent="goToPage('docs')">API Docs</a></li>
-                  <li v-if="!hasApiKey"><a href="#" @click.prevent="openApiKeyModal('request')">Get API Key</a></li>
+                  <li v-if="!hasApiKey"><a href="#" @click.prevent="openApiKeyModal()">Get API Key</a></li>
                   <li><a href="#" @click.prevent="goToPage('docs')">Live Explorer</a></li>
                 </ul>
               </div>
@@ -97,9 +97,7 @@
     <!-- Get API Key Modal -->
     <GetApiKeyModal
       :show="showApiKeyModal"
-      :initialTab="apiKeyModalTab"
       @close="showApiKeyModal = false"
-      @key-saved="onApiKeySaved"
       @google-authenticated="onGoogleAuthenticated"
     />
 
@@ -188,7 +186,6 @@ const navScrolled = ref(false)
 const apiStatus = ref('checking')
 const apiStatusText = ref('Checking...')
 const showApiKeyModal = ref(false)
-const apiKeyModalTab = ref('request')
 const mobileMenuOpen = ref(false)
 const hasApiKey = ref(!!localStorage.getItem('api_key'))
 const hasWebSession = ref(false)
@@ -197,8 +194,7 @@ const currentUserEmail = ref('')
 const isAdminApiUser = ref(false)
 const pageRefreshKey = ref(0)
 
-function openApiKeyModal(tab = 'request') {
-  apiKeyModalTab.value = tab
+function openApiKeyModal() {
   showApiKeyModal.value = true
 }
 
@@ -245,15 +241,6 @@ function goToPage(page, tab = null) {
   window.scrollTo({ top: 0, behavior: 'auto' })
 }
 
-function onApiKeySaved() {
-  hasApiKey.value = true
-  pageRefreshKey.value += 1
-  authService.me().then(r => {
-    currentUserEmail.value = r.data.email || ''
-    isAdminApiUser.value = !!r.data.is_admin
-  }).catch(() => {})
-}
-
 function onGoogleAuthenticated(user) {
   hasWebSession.value = true
   hasApiKey.value = !!user.has_api_key || !!localStorage.getItem('api_key')
@@ -278,7 +265,7 @@ async function logout() {
   isAdminApiUser.value = false
   setAdminActive(false)
   goToPage('home')
-  openApiKeyModal('enter')
+  openApiKeyModal()
 }
 
 // Reflect key changes from the modal's "Use this key" button

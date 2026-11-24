@@ -168,6 +168,16 @@ class WebSession(Base):
     expires_at = Column(DateTime, nullable=False, index=True)
     revoked_at = Column(DateTime)
 
+class EmailWebSession(Base):
+    __tablename__ = "email_web_sessions"
+
+    id = Column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    email = Column(String(255), nullable=False, index=True)
+    token_hash = Column(String(64), unique=True, nullable=False, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    expires_at = Column(DateTime, nullable=False, index=True)
+    revoked_at = Column(DateTime)
+
 class RequestLog(Base):
     __tablename__ = "request_logs"
 

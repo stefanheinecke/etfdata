@@ -12,139 +12,84 @@
           <button class="modal-close" @click="close" aria-label="Close">✕</button>
         </div>
 
-        <!-- Tabs -->
-        <div class="modal-tabs">
-          <button :class="['modal-tab', { active: activeTab === 'request' }]" @click="switchTab('request')">Request Key</button>
-          <button :class="['modal-tab', { active: activeTab === 'enter' }]" @click="switchTab('enter')">Enter Key</button>
-        </div>
-
-        <!-- ── Tab: Request Key ── -->
-        <template v-if="activeTab === 'request'">
-          <!-- Success state -->
-          <template v-if="googleSignedIn">
-            <div class="sent-icon">✅</div>
-            <p class="modal-sub success-sub">Signed in with Google as <strong>{{ googleEmail }}</strong>.</p>
-            <p v-if="googleKeyEmailed" class="modal-note">
-              We emailed your API key to this address. Keep that email safe; the key is not shown in the browser.
-            </p>
-            <template v-else-if="googleHasApiKey">
-              <p class="modal-note">
-                An API key already exists for this address. We kept it unchanged and did not resend it.
-                If you no longer have it, you can request a replacement by email.
-              </p>
-              <button class="btn btn-outline" style="width:100%;margin-top:.75rem" @click="requestEmailKey">
-                Request replacement by email
-              </button>
-            </template>
-            <template v-else>
-              <p class="error-box" style="margin-bottom:.75rem">{{ googleKeyEmailError }}</p>
-              <button class="btn btn-outline" style="width:100%;margin-top:.75rem" @click="requestEmailKey">
-                Request API key by email instead
-              </button>
-            </template>
-            <button class="btn btn-primary" style="width:100%;margin-top:1rem" @click="close">
-              Done
-            </button>
-          </template>
-
-          <template v-else-if="sent">
-            <div class="sent-icon">✉️</div>
-            <p class="modal-sub success-sub">Check your inbox at <strong>{{ email }}</strong>.</p>
-            <p style="font-size:.875rem;color:var(--text-muted);line-height:1.6">
-              We sent a confirmation email. Click the button in the email to receive your API key.
-              The link expires in <strong>30 minutes</strong>.
-            </p>
-            <p class="modal-note" style="margin-top:.75rem">Didn't receive it? Check your spam folder or try again.</p>
-            <button class="btn btn-primary" style="width:100%;margin-top:1rem" @click="close">
-              Close
-            </button>
-          </template>
-
-          <!-- Form state -->
-          <template v-else>
-            <p class="modal-sub">Sign in with Google for the web app. If this account has no API key, we’ll email one to you.</p>
-
-            <div v-if="googleClientId" class="google-signin">
-              <div ref="googleButton"></div>
-              <div class="auth-divider"><span>or</span></div>
-            </div>
-
-            <div class="form-field">
-              <label class="label">Email Address</label>
-              <input
-                ref="emailInput"
-                class="input"
-                type="email"
-                v-model="email"
-                placeholder="jane@example.com"
-                @keyup.enter="submit"
-              />
-            </div>
-
-            <div v-if="errorMsg" class="error-box" style="margin-bottom:.75rem">{{ errorMsg }}</div>
-
-            <button
-              class="btn btn-primary"
-              style="width:100%"
-              :disabled="!email || loading"
-              @click="submit"
-            >
-              {{ loading ? 'Sending…' : 'Get Free API Key' }}
-            </button>
-
+        <template v-if="googleSignedIn">
+          <div class="sent-icon">✅</div>
+          <p class="modal-sub success-sub">Signed in with Google as <strong>{{ googleEmail }}</strong>.</p>
+          <p v-if="googleKeyEmailed" class="modal-note">
+            We emailed your API key to this address. Keep that email safe; the key is not shown in the browser.
+          </p>
+          <template v-else-if="googleHasApiKey">
             <p class="modal-note">
-              Your key will be emailed to you. We don't send marketing emails.
+              An active API key already exists for this address. It was kept unchanged.
+              If you saved the original key email, the key is available there.
             </p>
           </template>
+          <template v-else>
+            <p class="error-box" style="margin-bottom:.75rem">{{ googleKeyEmailError }}</p>
+            <button class="btn btn-outline" style="width:100%;margin-top:.75rem" @click="requestEmailKey">
+              Request API key by email instead
+            </button>
+          </template>
+          <button class="btn btn-primary" style="width:100%;margin-top:1rem" @click="close">
+            Done
+          </button>
         </template>
 
-        <!-- ── Tab: Enter Key ── -->
+        <template v-else-if="sent">
+          <div class="sent-icon">✉️</div>
+          <p class="modal-sub success-sub">Check your inbox at <strong>{{ email }}</strong>.</p>
+          <p v-if="emailHasActiveKey" style="font-size:.875rem;color:var(--text-muted);line-height:1.6">
+            Click the confirmation button in the email to sign in. Your existing API key will remain unchanged.
+          </p>
+          <p v-else style="font-size:.875rem;color:var(--text-muted);line-height:1.6">
+            Your new API key is included in the email but stays inactive until you click the confirmation button.
+            After confirmation, this browser will be signed in.
+          </p>
+          <p class="modal-note" style="margin-top:.75rem">
+            The confirmation link expires in 30 minutes. Check your spam folder if needed.
+          </p>
+          <button class="btn btn-primary" style="width:100%;margin-top:1rem" @click="close">
+            Close
+          </button>
+        </template>
+
         <template v-else>
-          <template v-if="keySaved">
-            <div class="sent-icon">✅</div>
-            <p class="modal-sub success-sub">API key saved successfully!</p>
-            <p style="font-size:.875rem;color:var(--text-muted);line-height:1.6">
-              Your key is stored locally in this browser. All API requests will now use it automatically.
-            </p>
-            <button class="btn btn-primary" style="width:100%;margin-top:1rem" @click="close">
-              Done
-            </button>
-          </template>
-          <template v-else>
-            <p class="modal-sub">Already have a key? Paste it below to activate it in this browser.</p>
+          <p class="modal-sub">
+            We’ll email you a confirmation button. New API keys are activated only after you confirm your email.
+            Existing active keys are never changed by this request.
+          </p>
 
-            <div class="form-field">
-              <label class="label">Your API Key</label>
-              <div class="key-input-wrap">
-                <input
-                  ref="keyInput"
-                  class="input"
-                  :type="showKey ? 'text' : 'password'"
-                  v-model="apiKey"
-                  placeholder="Paste your API key here…"
-                  @keyup.enter="saveKey"
-                />
-                <button class="key-toggle" @click="showKey = !showKey" type="button" :aria-label="showKey ? 'Hide key' : 'Show key'">
-                  {{ showKey ? '🙈' : '👁' }}
-                </button>
-              </div>
-            </div>
+          <div v-if="googleClientId" class="google-signin">
+            <div ref="googleButton"></div>
+            <div class="auth-divider"><span>or</span></div>
+          </div>
 
-            <div v-if="keyError" class="error-box" style="margin-bottom:.75rem">{{ keyError }}</div>
+          <div class="form-field">
+            <label class="label">Email Address</label>
+            <input
+              ref="emailInput"
+              class="input"
+              type="email"
+              v-model="email"
+              placeholder="jane@example.com"
+              @keyup.enter="submit"
+            />
+          </div>
 
-            <button
-              class="btn btn-primary"
-              style="width:100%"
-              :disabled="!apiKey.trim()"
-              @click="saveKey"
-            >
-              Save API Key
-            </button>
+          <div v-if="errorMsg" class="error-box" style="margin-bottom:.75rem">{{ errorMsg }}</div>
 
-            <p class="modal-note">
-              Stored only in your browser's local storage. Never sent to our servers.
-            </p>
-          </template>
+          <button
+            class="btn btn-primary"
+            style="width:100%"
+            :disabled="!email || loading"
+            @click="submit"
+          >
+            {{ loading ? 'Sending…' : 'Get Free API Key' }}
+          </button>
+
+          <p class="modal-note">
+            You can also sign in with Google for immediate access to the website.
+          </p>
         </template>
       </div>
     </div>
@@ -159,16 +104,15 @@ const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
 let googleScriptPromise
 
 const props = defineProps({
-  show: Boolean,
-  initialTab: { type: String, default: 'request' }
+  show: Boolean
 })
-const emit  = defineEmits(['close', 'key-saved', 'google-authenticated'])
+const emit  = defineEmits(['close', 'google-authenticated'])
 
-const activeTab  = ref(props.initialTab)
 const email      = ref('')
 const loading    = ref(false)
 const errorMsg   = ref('')
 const sent       = ref(false)
+const emailHasActiveKey = ref(false)
 const emailInput = ref(null)
 const googleButton = ref(null)
 const googleSignedIn = ref(false)
@@ -176,18 +120,6 @@ const googleEmail = ref('')
 const googleHasApiKey = ref(false)
 const googleKeyEmailed = ref(false)
 const googleKeyEmailError = ref('')
-
-const apiKey   = ref('')
-const showKey  = ref(false)
-const keyError = ref('')
-const keySaved = ref(false)
-const keyInput = ref(null)
-
-function switchTab(tab) {
-  activeTab.value = tab
-  errorMsg.value = ''
-  keyError.value = ''
-}
 
 function loadGoogleIdentityServices() {
   if (window.google?.accounts?.id) return Promise.resolve()
@@ -230,6 +162,7 @@ function requestEmailKey() {
   googleSignedIn.value = false
   email.value = googleEmail.value
   sent.value = false
+  emailHasActiveKey.value = false
   errorMsg.value = ''
   nextTick(() => emailInput.value?.focus())
 }
@@ -259,28 +192,16 @@ async function initializeGoogleButton() {
 
 watch(() => props.show, async (val) => {
   if (val) {
-    activeTab.value = props.initialTab
     email.value = ''; errorMsg.value = ''; sent.value = false
+    emailHasActiveKey.value = false
     googleSignedIn.value = false
     googleEmail.value = ''
     googleHasApiKey.value = false
     googleKeyEmailed.value = false
     googleKeyEmailError.value = ''
-    apiKey.value = localStorage.getItem('api_key') || ''
-    showKey.value = false; keyError.value = ''; keySaved.value = false
     await nextTick()
-    if (activeTab.value === 'enter') keyInput.value?.focus()
-    else {
-      emailInput.value?.focus()
-      initializeGoogleButton()
-    }
-  }
-})
-
-watch(() => props.initialTab, (val) => {
-  if (props.show) {
-    activeTab.value = val
-    if (val === 'request') nextTick(initializeGoogleButton)
+    emailInput.value?.focus()
+    initializeGoogleButton()
   }
 })
 
@@ -288,21 +209,14 @@ async function submit() {
   if (!email.value) return
   loading.value = true; errorMsg.value = ''
   try {
-    await authService.requestKey(email.value.trim())
+    const result = await authService.requestKey(email.value.trim())
     sent.value = true
+    emailHasActiveKey.value = !!result.data.has_active_key
   } catch(e) {
     errorMsg.value = e.response?.data?.detail || e.message
   } finally {
     loading.value = false
   }
-}
-
-function saveKey() {
-  const trimmed = apiKey.value.trim()
-  if (!trimmed) { keyError.value = 'Please enter a key.'; return }
-  localStorage.setItem('api_key', trimmed)
-  emit('key-saved')
-  keySaved.value = true
 }
 
 function close() {
@@ -333,52 +247,6 @@ function close() {
   animation: modal-in 0.18s ease;
 }
 .sent-icon { font-size: 2.5rem; text-align: center; margin-bottom: .5rem; }
-
-.modal-tabs {
-  display: flex;
-  gap: .25rem;
-  background: var(--bg-muted, #f4f5f7);
-  border-radius: 10px;
-  padding: .25rem;
-  margin-bottom: 1.25rem;
-}
-.modal-tab {
-  flex: 1;
-  padding: .45rem 0;
-  border: none;
-  border-radius: 8px;
-  font-size: .875rem;
-  font-weight: 600;
-  cursor: pointer;
-  background: transparent;
-  color: var(--text-muted, #888);
-  transition: all .15s;
-}
-.modal-tab.active {
-  background: var(--bg-card, #fff);
-  color: var(--primary, #1585c8);
-  box-shadow: 0 1px 4px rgba(0,0,0,0.1);
-}
-
-.key-input-wrap {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-.key-input-wrap .input {
-  flex: 1;
-  padding-right: 2.5rem;
-}
-.key-toggle {
-  position: absolute;
-  right: .5rem;
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: 1rem;
-  padding: .2rem;
-  line-height: 1;
-}
 
 @keyframes modal-in {
   from { opacity: 0; transform: translateY(-16px) scale(0.97); }

@@ -74,10 +74,11 @@ def send_api_key_email(to_email: str, api_key: str, app_name: str = "GoETF.ch AP
 def send_confirmation_email(
     to_email: str,
     confirm_url: str,
-    is_replacement: bool,
+    has_active_key: bool,
+    api_key: str = None,
     app_name: str = "GoETF.ch API",
 ) -> None:
-    """Send a confirmation email with a button to claim (or replace) an API key."""
+    """Send a confirmation email, including a new inactive API key when needed."""
     resend_key = os.getenv("RESEND_API_KEY", "")
     from_addr  = os.getenv("RESEND_FROM_EMAIL", "")
 
@@ -87,48 +88,58 @@ def send_confirmation_email(
             "Set RESEND_API_KEY and RESEND_FROM_EMAIL on the backend service."
         )
 
-    if is_replacement:
-        subject      = f"{app_name} — Confirm API Key Reset"
-        warning_text = (
-            "⚠ WARNING: An API key already exists for this email address.\n"
-            "Clicking the button below will REPLACE your existing key.\n"
-            "Your old key will stop working immediately.\n\n"
+    if has_active_key:
+        subject = f"{app_name} — Confirm Your Sign-In"
+        key_text = "Your existing API key will remain unchanged.\n\n"
+        key_html = """
+  <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;
+              padding:.85rem 1rem;margin-bottom:1.25rem;color:#1e40af;font-size:.9rem">
+    An active API key already exists for this email address. Confirming will
+    sign in this browser without changing that key.
+  </div>"""
+        key_markup = ""
+        btn_label = "Confirm and Sign In"
+    else:
+        if not api_key:
+            raise ValueError("A new API key is required for an unverified email address.")
+        subject = f"{app_name} — Confirm Your API Key"
+        key_text = (
+            f"Your new API key is:\n\n  {api_key}\n\n"
+            "It will remain inactive until you click the confirmation button.\n\n"
         )
-        warning_html = """
+        key_html = """
   <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;
               padding:.85rem 1rem;margin-bottom:1.25rem;color:#9a3412;font-size:.9rem">
-    <strong>⚠ Warning:</strong> An API key already exists for this email address.<br>
-    Clicking the button below will <strong>replace your existing key</strong>.
-    Your old key will stop working immediately.
+    This new key will remain inactive until you confirm your email address.
   </div>"""
-        btn_label = "Yes, Replace My API Key"
-    else:
-        subject      = f"{app_name} — Confirm Your API Key Request"
-        warning_text = ""
-        warning_html = ""
-        btn_label    = "Get My API Key"
+        key_markup = f"""
+  <p>Your new API key:</p>
+  <pre style="background:#f4f4f5;border:1px solid #e4e4e7;border-radius:8px;padding:1rem 1.25rem;
+              font-size:1rem;letter-spacing:.04em;word-break:break-all">{api_key}</pre>"""
+        btn_label = "Confirm Email and Activate Key"
 
     body_text = (
-        f"You requested an API key for {app_name}.\n\n"
-        f"{warning_text}"
+        f"You requested access to {app_name}.\n\n"
+        f"{key_text}"
         f"Confirm by visiting:\n{confirm_url}\n\n"
         "This link expires in 30 minutes.\n"
-        "If you did not request this, ignore this email.\n"
+        "If you did not request this, ignore this email. A new key will not be activated.\n"
     )
 
     body_html = f"""<!DOCTYPE html>
 <html>
 <body style="font-family:sans-serif;color:#111;max-width:520px;margin:2rem auto;padding:0 1rem">
   <h2 style="margin-bottom:.25rem">{app_name}</h2>
-  <p style="color:#555;margin-top:.25rem">You requested an API key.</p>
-  {warning_html}
+  <p style="color:#555;margin-top:.25rem">You requested access to {app_name}.</p>
+  {key_html}
+  {key_markup}
   <p>Click the button below to confirm. The link expires in <strong>30 minutes</strong>.</p>
   <a href="{confirm_url}"
      style="display:inline-block;background:#16a34a;color:#fff;text-decoration:none;
             padding:.75rem 1.5rem;border-radius:8px;font-weight:600;font-size:1rem;
             margin:.5rem 0 1rem">{btn_label}</a>
   <p style="color:#888;font-size:.8rem">
-    If you did not request this, ignore this email — no key will be created.
+    If you did not request this, ignore this email. A new key will not be activated.
   </p>
 </body>
 </html>"""

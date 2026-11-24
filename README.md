@@ -190,9 +190,11 @@ Backend benötigt. Zur Einrichtung:
 Für den Login werden nur die Identitätsinformationen `openid`, `email` und
 `profile` verwendet; Gmail-Postfachzugriff wird nicht angefordert.
 
-Nach der E-Mail-Bestätigung wird der bestätigende Browser ebenfalls angemeldet.
-Der API-Key bleibt per E-Mail verfügbar, zum Beispiel für Python-Skripte, und
-muss für die Web-App nicht manuell eingegeben werden. `FRONTEND_URL` bestimmt
+Wenn ein Nutzer **Get Free API Key** auswählt, wird eine Bestätigungs-E-Mail
+versendet. Bei neuen Nutzern enthält sie einen zunächst inaktiven API-Key.
+Erst nach Klick auf den Bestätigungsbutton wird dieser aktiviert und der
+Browser angemeldet; der Key muss in der Web-App nicht manuell eingegeben
+werden. Bestehende aktive API-Keys bleiben unverändert. `FRONTEND_URL` bestimmt
 den Link zurück zur Website.
 
 ### 2. GET /etfs - Alle ETFs abrufen

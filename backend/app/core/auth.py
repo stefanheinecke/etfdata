@@ -3,9 +3,10 @@ import secrets
 from types import SimpleNamespace
 from datetime import datetime
 from fastapi import HTTPException, Header, Cookie, Depends
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 from app.db.database import get_db
-from app.schemas import APIKey, GoogleAccount, WebSession
+from app.schemas import APIKey, EmailWebSession, GoogleAccount, WebSession
 
 # Public demo key — read-only, full catalog access, low rate limit
 DEMO_API_KEY = "demo"
@@ -32,6 +33,16 @@ def get_google_account_for_session(session_token: str, db: Session):
         GoogleAccount.id == session.google_account_id
     ).first()
 
+def get_email_session(session_token: str, db: Session):
+    if not session_token:
+        return None
+
+    return db.query(EmailWebSession).filter(
+        EmailWebSession.token_hash == hash_api_key(session_token),
+        EmailWebSession.revoked_at.is_(None),
+        EmailWebSession.expires_at > datetime.utcnow(),
+    ).first()
+
 async def verify_api_key(
     x_api_key: str = Header(None),
     web_session: str = Cookie(None),
@@ -47,6 +58,19 @@ async def verify_api_key(
             email=account.email,
             key=None,
         )
+
+    email_session = get_email_session(web_session, db)
+    if email_session:
+        now = datetime.utcnow()
+        browser_api_key = db.query(APIKey).filter(
+            APIKey.email == email_session.email,
+            APIKey.is_active.is_(True),
+            or_(APIKey.expires_at.is_(None), APIKey.expires_at >= now),
+        ).order_by(APIKey.created_at.desc()).first()
+        if browser_api_key:
+            browser_api_key.last_used_at = now
+            db.commit()
+            return browser_api_key
 
     if web_session:
         browser_api_key = db.query(APIKey).filter(

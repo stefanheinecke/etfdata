@@ -7,9 +7,21 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.core.auth import get_google_account_for_session, hash_api_key, verify_api_key
+from app.core.auth import (
+    get_email_session,
+    get_google_account_for_session,
+    hash_api_key,
+    verify_api_key,
+)
 from app.api.routes import auth
-from app.schemas import APIKey, Base, GoogleAccount, PendingKeyRequest, WebSession
+from app.schemas import (
+    APIKey,
+    Base,
+    EmailWebSession,
+    GoogleAccount,
+    PendingKeyRequest,
+    WebSession,
+)
 
 
 @pytest.fixture
@@ -21,6 +33,7 @@ def auth_db():
     )
     Base.metadata.create_all(bind=engine, tables=[
         APIKey.__table__,
+        EmailWebSession.__table__,
         GoogleAccount.__table__,
         PendingKeyRequest.__table__,
         WebSession.__table__,
@@ -227,44 +240,52 @@ def test_google_session_remains_active_when_key_email_fails(auth_db, monkeypatch
     assert auth.get_web_session(api_key=authenticated_user, db=db)["email"] == "user@example.com"
 
 
-def test_email_confirmation_signs_in_browser_and_emails_api_key(
+def test_email_request_keeps_new_key_inactive_until_confirmation(
     auth_db,
     monkeypatch,
 ):
     db = auth_db
-    db.add(PendingKeyRequest(
-        token="confirmation-token",
-        email="user@example.com",
-        is_replacement=False,
-        expires_at=datetime.utcnow() + timedelta(minutes=30),
-    ))
-    db.commit()
-    sent_emails = []
+    sent_confirmations = []
     monkeypatch.setattr(
         auth,
-        "send_api_key_email",
-        lambda **kwargs: sent_emails.append(kwargs),
+        "send_confirmation_email",
+        lambda **kwargs: sent_confirmations.append(kwargs),
     )
     monkeypatch.setenv("FRONTEND_URL", "https://app.example.com")
     monkeypatch.setenv("SESSION_COOKIE_SECURE", "true")
 
-    response = auth.confirm_key("confirmation-token", db)
+    result = auth.request_key("User@Example.com", db)
+
+    raw_key = sent_confirmations[0]["api_key"]
+    token = sent_confirmations[0]["confirm_url"].rsplit("token=", 1)[1]
+    key_record = db.query(APIKey).one()
+    assert result["email"] == "user@example.com"
+    assert result["has_active_key"] is False
+    assert key_record.key == hash_api_key(raw_key)
+    assert key_record.is_active is False
+    assert db.query(PendingKeyRequest).count() == 1
+    with pytest.raises(HTTPException) as exc_info:
+        asyncio.run(verify_api_key(x_api_key=raw_key, web_session=None, db=db))
+    assert exc_info.value.status_code == 401
+
+    response = auth.confirm_key(token, db)
 
     cookie_header = response.headers["set-cookie"].lower()
-    raw_key = response.headers["set-cookie"].split(";", 1)[0].split("=", 1)[1]
+    session_token = response.headers["set-cookie"].split(";", 1)[0].split("=", 1)[1]
     assert response.status_code == 200
     assert "httponly" in cookie_header
     assert "secure" in cookie_header
     assert "samesite=none" in cookie_header
     assert "https://app.example.com" in response.body.decode()
-    assert len(sent_emails) == 1
-    assert sent_emails[0]["api_key"] == raw_key
     assert db.query(APIKey).one().key == hash_api_key(raw_key)
+    assert db.query(APIKey).one().is_active is True
+    assert db.query(PendingKeyRequest).count() == 0
+    assert get_email_session(session_token, db).email == "user@example.com"
 
     authenticated_user = asyncio.run(
         verify_api_key(
             x_api_key="previous-invalid-key",
-            web_session=raw_key,
+            web_session=session_token,
             db=db,
         )
     )
@@ -272,3 +293,70 @@ def test_email_confirmation_signs_in_browser_and_emails_api_key(
     session_data = auth.get_web_session(api_key=authenticated_user, db=db)
     assert session_data["has_api_key"] is True
     assert session_data["email"] == "user@example.com"
+
+    db.query(APIKey).one().is_active = False
+    db.commit()
+    with pytest.raises(HTTPException) as exc_info:
+        asyncio.run(
+            verify_api_key(x_api_key=None, web_session=session_token, db=db)
+        )
+    assert exc_info.value.status_code == 401
+
+    auth.logout_google_session(Response(), session_token, db)
+    assert get_email_session(session_token, db) is None
+
+
+def test_email_confirmation_preserves_an_existing_active_key(
+    auth_db,
+    monkeypatch,
+):
+    db = auth_db
+    key_hash = hash_api_key("existing-api-key")
+    db.add(APIKey(
+        key=key_hash,
+        name="user",
+        email="user@example.com",
+        rate_limit_per_minute=60,
+        is_active=True,
+    ))
+    db.commit()
+    sent_confirmations = []
+    monkeypatch.setattr(
+        auth,
+        "send_confirmation_email",
+        lambda **kwargs: sent_confirmations.append(kwargs),
+    )
+
+    result = auth.request_key("user@example.com", db)
+
+    assert result["has_active_key"] is True
+    assert sent_confirmations[0]["has_active_key"] is True
+    assert sent_confirmations[0]["api_key"] is None
+    assert db.query(APIKey).one().key == key_hash
+
+    token = sent_confirmations[0]["confirm_url"].rsplit("token=", 1)[1]
+    response = auth.confirm_key(token, db)
+    session_token = response.headers["set-cookie"].split(";", 1)[0].split("=", 1)[1]
+    authenticated_user = asyncio.run(
+        verify_api_key(x_api_key=None, web_session=session_token, db=db)
+    )
+    assert authenticated_user.email == "user@example.com"
+    assert db.query(APIKey).one().key == key_hash
+    assert db.query(APIKey).one().is_active is True
+
+
+def test_email_request_failure_does_not_create_inactive_key(
+    auth_db,
+    monkeypatch,
+):
+    db = auth_db
+    def fail_email_delivery(**_kwargs):
+        raise RuntimeError("Email is not configured.")
+
+    monkeypatch.setattr(auth, "send_confirmation_email", fail_email_delivery)
+    with pytest.raises(HTTPException) as exc_info:
+        auth.request_key("user@example.com", db)
+
+    assert exc_info.value.status_code == 503
+    assert db.query(APIKey).count() == 0
+    assert db.query(PendingKeyRequest).count() == 0

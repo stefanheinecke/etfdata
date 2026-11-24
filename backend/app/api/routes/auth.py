@@ -2,8 +2,8 @@
 Public auth routes — no admin secret required.
 
 Two-step API key flow:
-  1. POST /auth/request-key   — validate email, store token, send confirmation email
-  2. GET  /auth/confirm-key   — validate token, create/replace key, send key email, show HTML page
+  1. POST /auth/request-key   — create an inactive key if needed and send a confirmation email
+  2. GET  /auth/confirm-key   — activate the key and sign in the confirming browser
 """
 import html
 import os
@@ -22,14 +22,24 @@ from google.oauth2 import id_token
 
 from app.db.database import get_db
 from app.core.auth import (
-    create_api_key,
     generate_api_key,
-    get_google_account_for_session,
     hash_api_key,
     verify_api_key,
 )
-from app.core.email import send_confirmation_email, send_api_key_email, is_email_configured
-from app.schemas import APIKey, GoogleAccount, PendingKeyRequest, ContactMessage, Settings, WebSession
+from app.core.email import (
+    is_email_configured,
+    send_api_key_email,
+    send_confirmation_email,
+)
+from app.schemas import (
+    APIKey,
+    ContactMessage,
+    EmailWebSession,
+    GoogleAccount,
+    PendingKeyRequest,
+    Settings,
+    WebSession,
+)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -65,15 +75,14 @@ def _success_page(email: str) -> str:
         quote=True,
     )
     safe_email = html.escape(email)
-    return _page("Key Sent", f"""
-  <div class="icon">✉️</div>
-  <h1>API Key Sent!</h1>
-  <p>Your API key has been sent to <strong>{safe_email}</strong>.</p>
-  <p>Check your inbox (and spam folder) — it may take a minute to arrive.</p>
-  <p>This browser is now signed in. You can use the website without manually entering the key.</p>
+    return _page("Email Confirmed", f"""
+  <div class="icon">✅</div>
+  <h1>Email Confirmed</h1>
+  <p>The email address <strong>{safe_email}</strong> is confirmed.</p>
+  <p>This browser is now signed in. Any new API key associated with this request is active.</p>
   <p><a href="{frontend_url}">Continue to TrueETF</a></p>
   <p style="font-size:.85rem;color:#888;margin-top:1.25rem">
-    Keep your key safe. Do not share it publicly.
+    Existing active API keys are left unchanged.
   </p>""")
 
 
@@ -87,10 +96,12 @@ def _error_page(message: str) -> str:
 # ── Step 1: request ───────────────────────────────────────────────────────────
 
 @router.post("/request-key")
-def request_key(email: str, db: Session = Depends(get_db)):
+def request_key(
+    email: str,
+    db: Session = Depends(get_db),
+):
     """
-    Validate the email, store a one-time confirmation token, and send a
-    confirmation email. Returns immediately without creating an API key.
+    Send a confirmation email and create an inactive key if the email has none.
     """
     try:
         if not email or "@" not in email:
@@ -98,36 +109,62 @@ def request_key(email: str, db: Session = Depends(get_db)):
 
         email = email.strip().lower()[:255]
 
-        # Check whether a key already exists for this email
-        is_replacement = db.query(APIKey).filter(APIKey.email == email).first() is not None
+        has_active_key = _find_usable_api_key(db, email) is not None
+        db.query(PendingKeyRequest).filter(
+            PendingKeyRequest.email == email
+        ).delete()
 
-        # Remove any previous pending request for this email (re-request scenario)
-        db.query(PendingKeyRequest).filter(PendingKeyRequest.email == email).delete()
+        raw_key = None
+        if not has_active_key:
+            raw_key = generate_api_key()
+            inactive_key = db.query(APIKey).filter(
+                APIKey.email == email,
+                APIKey.is_active.is_(False),
+            ).order_by(APIKey.created_at.desc()).first()
+            if inactive_key:
+                inactive_key.key = hash_api_key(raw_key)
+                inactive_key.name = email.split("@")[0][:100]
+                inactive_key.created_at = datetime.utcnow()
+                inactive_key.expires_at = None
+            else:
+                db.add(APIKey(
+                    key=hash_api_key(raw_key),
+                    name=email.split("@")[0][:100],
+                    email=email,
+                    rate_limit_per_minute=60,
+                    is_active=False,
+                ))
 
-        # Store a fresh token valid for 30 minutes
-        token   = secrets.token_urlsafe(32)
+        token = secrets.token_urlsafe(32)
         expires = datetime.utcnow() + timedelta(minutes=30)
-        db.add(PendingKeyRequest(token=token, email=email,
-                                 is_replacement=is_replacement, expires_at=expires))
-        db.commit()
-
-        # Build the confirmation URL (backend endpoint — returns an HTML page)
-        base_url    = os.getenv("API_BASE_URL", "https://api.goetf.ch")
+        db.add(PendingKeyRequest(
+            token=token,
+            email=email,
+            is_replacement=has_active_key,
+            expires_at=expires,
+        ))
+        base_url = os.getenv("API_BASE_URL", "https://api.goetf.ch")
         confirm_url = f"{base_url}/auth/confirm-key?token={token}"
 
         try:
-            send_confirmation_email(to_email=email, confirm_url=confirm_url,
-                                    is_replacement=is_replacement)
-        except (RuntimeError, _requests.HTTPError) as exc:
-            db.query(PendingKeyRequest).filter(PendingKeyRequest.token == token).delete()
+            db.flush()
+            send_confirmation_email(
+                to_email=email,
+                confirm_url=confirm_url,
+                has_active_key=has_active_key,
+                api_key=raw_key,
+            )
             db.commit()
+        except (RuntimeError, _requests.RequestException) as exc:
+            db.rollback()
             detail = str(exc) if isinstance(exc, RuntimeError) else \
                      f"Email delivery failed: {exc.response.text if exc.response else exc}"
             raise HTTPException(status_code=503, detail=detail)
 
         return {
-            "message": "Confirmation email sent. Click the link in the email to receive your API key.",
+            "message": "A confirmation email was sent. Confirm your email to activate access.",
             "email": email,
+            "has_active_key": has_active_key,
         }
     except HTTPException:
         raise
@@ -142,8 +179,8 @@ def request_key(email: str, db: Session = Depends(get_db)):
 @router.get("/confirm-key", response_class=HTMLResponse)
 def confirm_key(token: str, db: Session = Depends(get_db)):
     """
-    Validate the one-time token, create or replace the API key, send the key
-    by email, and return an HTML page with the result.
+    Validate the one-time token, activate a pending API key, and sign in this
+    browser without replacing any existing active key.
     """
     pending = db.query(PendingKeyRequest).filter(
         PendingKeyRequest.token == token
@@ -162,38 +199,54 @@ def confirm_key(token: str, db: Session = Depends(get_db)):
             "Please request a new API key."
         ), status_code=400)
 
-    email          = pending.email
-    is_replacement = pending.is_replacement
-
-    # Consume the token immediately so it cannot be reused
-    db.delete(pending)
-    db.commit()
-
-    # Create or replace the key
-    if is_replacement:
-        existing = db.query(APIKey).filter(APIKey.email == email).first()
-        if existing:
-            raw_key      = generate_api_key()
-            existing.key = hash_api_key(raw_key)
+    email = pending.email
+    active_key = _find_usable_api_key(db, email)
+    raw_key = None
+    if not active_key:
+        if pending.is_replacement:
+            db.delete(pending)
             db.commit()
-            db_key = existing
-        else:
-            # Key was deleted between request and confirm — create fresh
-            raw_key, db_key = create_api_key(db, name=email.split("@")[0][:100], email=email)
-    else:
-        raw_key, db_key = create_api_key(db, name=email.split("@")[0][:100], email=email)
+            return HTMLResponse(_error_page(
+                "The existing API key is no longer active. Please request a new key."
+            ), status_code=409)
 
-    # Deliver the key
+        inactive_key = db.query(APIKey).filter(
+            APIKey.email == email,
+            APIKey.is_active.is_(False),
+        ).order_by(APIKey.created_at.desc()).first()
+        if inactive_key:
+            inactive_key.is_active = True
+        else:
+            # Support confirmation links issued before inactive keys were created at request time.
+            raw_key = generate_api_key()
+            db.add(APIKey(
+                key=hash_api_key(raw_key),
+                name=email.split("@")[0][:100],
+                email=email,
+                rate_limit_per_minute=60,
+                is_active=True,
+            ))
+
+    session_token = secrets.token_urlsafe(32)
+    db.add(EmailWebSession(
+        email=email,
+        token_hash=hash_api_key(session_token),
+        expires_at=datetime.utcnow() + timedelta(days=_GOOGLE_SESSION_DAYS),
+    ))
+    db.delete(pending)
+
     try:
-        send_api_key_email(to_email=email, api_key=raw_key)
-    except Exception as exc:
+        if raw_key:
+            send_api_key_email(to_email=email, api_key=raw_key)
+        db.commit()
+    except (RuntimeError, _requests.RequestException) as exc:
+        db.rollback()
         return HTMLResponse(_error_page(
-            f"Your key was created but could not be delivered: {exc}. "
-            "Please contact the administrator."
+            f"Your confirmation could not be completed: {exc}. Please try again."
         ), status_code=500)
 
     success_response = HTMLResponse(_success_page(email))
-    _set_web_session_cookie(success_response, raw_key)
+    _set_web_session_cookie(success_response, session_token)
     return success_response
 
 
@@ -386,6 +439,13 @@ def logout_google_session(
         ).first()
         if session:
             session.revoked_at = datetime.utcnow()
+            db.commit()
+        email_session = db.query(EmailWebSession).filter(
+            EmailWebSession.token_hash == hash_api_key(web_session),
+            EmailWebSession.revoked_at.is_(None),
+        ).first()
+        if email_session:
+            email_session.revoked_at = datetime.utcnow()
             db.commit()
 
     response.delete_cookie(
