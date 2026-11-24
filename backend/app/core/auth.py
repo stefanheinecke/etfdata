@@ -48,6 +48,19 @@ async def verify_api_key(
             key=None,
         )
 
+    if web_session:
+        browser_api_key = db.query(APIKey).filter(
+            APIKey.key == hash_api_key(web_session),
+            APIKey.is_active == True
+        ).first()
+        if browser_api_key and (
+            not browser_api_key.expires_at
+            or browser_api_key.expires_at >= datetime.utcnow()
+        ):
+            browser_api_key.last_used_at = datetime.utcnow()
+            db.commit()
+            return browser_api_key
+
     if not x_api_key:
         raise HTTPException(status_code=401, detail="API Key required")
 

@@ -1,4 +1,5 @@
 import asyncio
+from datetime import datetime, timedelta
 
 import pytest
 from fastapi import HTTPException, Response
@@ -8,7 +9,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.core.auth import get_google_account_for_session, hash_api_key, verify_api_key
 from app.api.routes import auth
-from app.schemas import APIKey, Base, GoogleAccount, WebSession
+from app.schemas import APIKey, Base, GoogleAccount, PendingKeyRequest, WebSession
 
 
 @pytest.fixture
@@ -21,6 +22,7 @@ def auth_db():
     Base.metadata.create_all(bind=engine, tables=[
         APIKey.__table__,
         GoogleAccount.__table__,
+        PendingKeyRequest.__table__,
         WebSession.__table__,
     ])
     db = sessionmaker(bind=engine)()
@@ -123,12 +125,13 @@ def test_google_session_authenticates_and_can_be_revoked(
     assert len(sent_emails) == 1
     stored_key = db.query(APIKey).one()
     assert stored_key.key == hash_api_key(sent_emails[0]["api_key"])
-    assert auth.get_web_session(session_token, db)["email"] == "user@example.com"
-    assert auth.get_web_session(session_token, db)["has_api_key"] is True
     authenticated_user = asyncio.run(
         verify_api_key(x_api_key=None, web_session=session_token, db=db)
     )
     assert authenticated_user.email == "user@example.com"
+    session_data = auth.get_web_session(api_key=authenticated_user, db=db)
+    assert session_data["email"] == "user@example.com"
+    assert session_data["has_api_key"] is True
 
     second_result = auth.google_session(
         auth.GoogleLoginRequest(credential="google-id-token"),
@@ -218,4 +221,54 @@ def test_google_session_remains_active_when_key_email_fails(auth_db, monkeypatch
     assert result["api_key_email_error"]
     assert db.query(APIKey).count() == 0
     session_token = response.headers["set-cookie"].split(";", 1)[0].split("=", 1)[1]
-    assert auth.get_web_session(session_token, db)["email"] == "user@example.com"
+    authenticated_user = asyncio.run(
+        verify_api_key(x_api_key=None, web_session=session_token, db=db)
+    )
+    assert auth.get_web_session(api_key=authenticated_user, db=db)["email"] == "user@example.com"
+
+
+def test_email_confirmation_signs_in_browser_and_emails_api_key(
+    auth_db,
+    monkeypatch,
+):
+    db = auth_db
+    db.add(PendingKeyRequest(
+        token="confirmation-token",
+        email="user@example.com",
+        is_replacement=False,
+        expires_at=datetime.utcnow() + timedelta(minutes=30),
+    ))
+    db.commit()
+    sent_emails = []
+    monkeypatch.setattr(
+        auth,
+        "send_api_key_email",
+        lambda **kwargs: sent_emails.append(kwargs),
+    )
+    monkeypatch.setenv("FRONTEND_URL", "https://app.example.com")
+    monkeypatch.setenv("SESSION_COOKIE_SECURE", "true")
+
+    response = auth.confirm_key("confirmation-token", db)
+
+    cookie_header = response.headers["set-cookie"].lower()
+    raw_key = response.headers["set-cookie"].split(";", 1)[0].split("=", 1)[1]
+    assert response.status_code == 200
+    assert "httponly" in cookie_header
+    assert "secure" in cookie_header
+    assert "samesite=none" in cookie_header
+    assert "https://app.example.com" in response.body.decode()
+    assert len(sent_emails) == 1
+    assert sent_emails[0]["api_key"] == raw_key
+    assert db.query(APIKey).one().key == hash_api_key(raw_key)
+
+    authenticated_user = asyncio.run(
+        verify_api_key(
+            x_api_key="previous-invalid-key",
+            web_session=raw_key,
+            db=db,
+        )
+    )
+    assert authenticated_user.email == "user@example.com"
+    session_data = auth.get_web_session(api_key=authenticated_user, db=db)
+    assert session_data["has_api_key"] is True
+    assert session_data["email"] == "user@example.com"

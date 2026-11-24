@@ -191,8 +191,8 @@ const showApiKeyModal = ref(false)
 const apiKeyModalTab = ref('request')
 const mobileMenuOpen = ref(false)
 const hasApiKey = ref(!!localStorage.getItem('api_key'))
-const hasGoogleSession = ref(false)
-const hasAuth = computed(() => hasApiKey.value || hasGoogleSession.value)
+const hasWebSession = ref(false)
+const hasAuth = computed(() => hasApiKey.value || hasWebSession.value)
 const currentUserEmail = ref('')
 const isAdminApiUser = ref(false)
 const pageRefreshKey = ref(0)
@@ -255,7 +255,7 @@ function onApiKeySaved() {
 }
 
 function onGoogleAuthenticated(user) {
-  hasGoogleSession.value = true
+  hasWebSession.value = true
   hasApiKey.value = !!user.has_api_key || !!localStorage.getItem('api_key')
   currentUserEmail.value = user.email || ''
   isAdminApiUser.value = !!user.is_admin
@@ -273,7 +273,7 @@ async function logout() {
   localStorage.removeItem('api_key')
   sessionStorage.removeItem('admin_secret')
   hasApiKey.value = false
-  hasGoogleSession.value = false
+  hasWebSession.value = false
   currentUserEmail.value = ''
   isAdminApiUser.value = false
   setAdminActive(false)
@@ -357,13 +357,13 @@ onMounted(async () => {
   }
   try {
     const res = await authService.session()
-    hasGoogleSession.value = true
+    hasWebSession.value = true
     hasApiKey.value = !!res.data.has_api_key || !!localStorage.getItem('api_key')
     currentUserEmail.value = res.data.email || ''
     isAdminApiUser.value = !!res.data.is_admin
   } catch (e) {
     if (e.response?.status !== 401) {
-      console.error('Could not restore Google session:', e)
+      console.error('Could not restore browser session:', e)
     }
   }
   // Re-verify stored admin secret on every load; clear it if it's no longer valid

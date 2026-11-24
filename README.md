@@ -190,6 +190,11 @@ Backend benötigt. Zur Einrichtung:
 Für den Login werden nur die Identitätsinformationen `openid`, `email` und
 `profile` verwendet; Gmail-Postfachzugriff wird nicht angefordert.
 
+Nach der E-Mail-Bestätigung wird der bestätigende Browser ebenfalls angemeldet.
+Der API-Key bleibt per E-Mail verfügbar, zum Beispiel für Python-Skripte, und
+muss für die Web-App nicht manuell eingegeben werden. `FRONTEND_URL` bestimmt
+den Link zurück zur Website.
+
 ### 2. GET /etfs - Alle ETFs abrufen
 
 ```bash

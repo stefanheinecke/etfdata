@@ -5,11 +5,12 @@ Two-step API key flow:
   1. POST /auth/request-key   — validate email, store token, send confirmation email
   2. GET  /auth/confirm-key   — validate token, create/replace key, send key email, show HTML page
 """
+import html
 import os
 import secrets
-import requests as _requests
 from datetime import datetime, timedelta
 
+import requests as _requests
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Response
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, EmailStr, Field
@@ -59,11 +60,18 @@ def _page(title: str, body: str) -> str:
 
 
 def _success_page(email: str) -> str:
+    frontend_url = html.escape(
+        os.getenv("FRONTEND_URL", "https://trueetf.com").strip().rstrip("/"),
+        quote=True,
+    )
+    safe_email = html.escape(email)
     return _page("Key Sent", f"""
   <div class="icon">✉️</div>
   <h1>API Key Sent!</h1>
-  <p>Your API key has been sent to <strong>{email}</strong>.</p>
+  <p>Your API key has been sent to <strong>{safe_email}</strong>.</p>
   <p>Check your inbox (and spam folder) — it may take a minute to arrive.</p>
+  <p>This browser is now signed in. You can use the website without manually entering the key.</p>
+  <p><a href="{frontend_url}">Continue to TrueETF</a></p>
   <p style="font-size:.85rem;color:#888;margin-top:1.25rem">
     Keep your key safe. Do not share it publicly.
   </p>""")
@@ -184,7 +192,9 @@ def confirm_key(token: str, db: Session = Depends(get_db)):
             "Please contact the administrator."
         ), status_code=500)
 
-    return HTMLResponse(_success_page(email))
+    success_response = HTMLResponse(_success_page(email))
+    _set_web_session_cookie(success_response, raw_key)
+    return success_response
 
 
 @router.get("/me")
@@ -261,6 +271,18 @@ def _session_cookie_samesite() -> str:
     return "none" if _session_cookie_secure() else "lax"
 
 
+def _set_web_session_cookie(response: Response, token: str) -> None:
+    response.set_cookie(
+        key=_GOOGLE_SESSION_COOKIE,
+        value=token,
+        max_age=_GOOGLE_SESSION_DAYS * 24 * 60 * 60,
+        httponly=True,
+        secure=_session_cookie_secure(),
+        samesite=_session_cookie_samesite(),
+        path="/",
+    )
+
+
 def _find_usable_api_key(db: Session, email: str):
     now = datetime.utcnow()
     return db.query(APIKey).filter(
@@ -324,15 +346,7 @@ def google_session(
                 "Please try Google sign-in again or request a key by email."
             )
 
-    response.set_cookie(
-        key=_GOOGLE_SESSION_COOKIE,
-        value=session_token,
-        max_age=_GOOGLE_SESSION_DAYS * 24 * 60 * 60,
-        httponly=True,
-        secure=_session_cookie_secure(),
-        samesite=_session_cookie_samesite(),
-        path="/",
-    )
+    _set_web_session_cookie(response, session_token)
     admin_email = os.getenv("ADMIN_EMAIL", "").strip().lower()
     return {
         "name": account.name,
@@ -346,19 +360,16 @@ def google_session(
 
 @router.get("/session")
 def get_web_session(
-    web_session: str = Cookie(None),
+    api_key: APIKey = Depends(verify_api_key),
     db: Session = Depends(get_db),
 ):
-    account = get_google_account_for_session(web_session, db)
-    if not account:
-        raise HTTPException(status_code=401, detail="No active Google session.")
-
     admin_email = os.getenv("ADMIN_EMAIL", "").strip().lower()
+    email = api_key.email
     return {
-        "name": account.name,
-        "email": account.email,
-        "is_admin": bool(admin_email and account.email == admin_email),
-        "has_api_key": _find_usable_api_key(db, account.email) is not None,
+        "name": api_key.name,
+        "email": email,
+        "is_admin": bool(admin_email and email and email.strip().lower() == admin_email),
+        "has_api_key": _find_usable_api_key(db, email) is not None if email else False,
     }
 
 
