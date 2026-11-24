@@ -139,7 +139,12 @@ const hasAuth = computed(() => hasApiKey.value || hasWebSession.value)
 const currentUserEmail = ref('')
 const isAdminApiUser = ref(false)
 const pageRefreshKey = ref(0)
+const EMAIL_CONFIRMATION_STORAGE_KEY = 'email_confirmation_expires_at'
+const EMAIL_CONFIRMATION_POLL_INTERVAL_MS = 3000
+const EMAIL_CONFIRMATION_TIMEOUT_MS = 30 * 60 * 1000
 let emailConfirmationPollTimer = null
+let emailConfirmationExpiresAt = 0
+let emailConfirmationErrorLogged = false
 let checkingEmailConfirmation = false
 
 function openApiKeyModal() {
@@ -221,10 +226,23 @@ function stopEmailConfirmationPolling() {
     window.clearInterval(emailConfirmationPollTimer)
     emailConfirmationPollTimer = null
   }
+  emailConfirmationExpiresAt = 0
+  emailConfirmationErrorLogged = false
+  sessionStorage.removeItem(EMAIL_CONFIRMATION_STORAGE_KEY)
 }
 
 async function checkEmailConfirmation() {
   if (checkingEmailConfirmation) return
+  if (
+    emailConfirmationPollTimer
+    && emailConfirmationExpiresAt
+    && Date.now() >= emailConfirmationExpiresAt
+  ) {
+    console.warn('Email confirmation polling stopped because the confirmation link expired.')
+    stopEmailConfirmationPolling()
+    return
+  }
+
   checkingEmailConfirmation = true
   try {
     const { data } = await authService.emailStatus()
@@ -232,12 +250,15 @@ async function checkEmailConfirmation() {
       stopEmailConfirmationPolling()
       onGoogleAuthenticated(data)
       showApiKeyModal.value = false
-    } else if (!data.pending) {
-      stopEmailConfirmationPolling()
+    } else if (data.pending) {
+      emailConfirmationErrorLogged = false
+      if (!emailConfirmationPollTimer) startEmailConfirmationPolling()
     }
   } catch (e) {
-    console.error('Could not check email confirmation status:', e)
-    stopEmailConfirmationPolling()
+    if (!emailConfirmationErrorLogged) {
+      console.error('Could not check email confirmation status; polling will retry:', e)
+      emailConfirmationErrorLogged = true
+    }
   } finally {
     checkingEmailConfirmation = false
   }
@@ -245,7 +266,18 @@ async function checkEmailConfirmation() {
 
 function startEmailConfirmationPolling() {
   if (emailConfirmationPollTimer) return
-  emailConfirmationPollTimer = window.setInterval(checkEmailConfirmation, 3000)
+  const storedExpiry = Number(sessionStorage.getItem(EMAIL_CONFIRMATION_STORAGE_KEY))
+  emailConfirmationExpiresAt = storedExpiry > Date.now()
+    ? storedExpiry
+    : Date.now() + EMAIL_CONFIRMATION_TIMEOUT_MS
+  sessionStorage.setItem(
+    EMAIL_CONFIRMATION_STORAGE_KEY,
+    String(emailConfirmationExpiresAt),
+  )
+  emailConfirmationPollTimer = window.setInterval(
+    checkEmailConfirmation,
+    EMAIL_CONFIRMATION_POLL_INTERVAL_MS,
+  )
   checkEmailConfirmation()
 }
 
@@ -353,7 +385,15 @@ onMounted(async () => {
       console.error('Could not restore browser session:', e)
     }
   }
-  startEmailConfirmationPolling()
+  const pendingEmailConfirmationExpiresAt = Number(
+    sessionStorage.getItem(EMAIL_CONFIRMATION_STORAGE_KEY),
+  )
+  if (pendingEmailConfirmationExpiresAt > Date.now()) {
+    startEmailConfirmationPolling()
+  } else {
+    sessionStorage.removeItem(EMAIL_CONFIRMATION_STORAGE_KEY)
+    checkEmailConfirmation()
+  }
 })
 
 onUnmounted(() => {
