@@ -1138,6 +1138,56 @@ const API_BASE_URL = (() => {
 
 console.log('🔧 Contact Form Debug - API_BASE_URL:', API_BASE_URL);
 
+async function applyWebSessionUiState() {
+  try {
+    const response = await fetch(`${API_BASE_URL}/auth/session`, {
+      credentials: 'include',
+    });
+    if (!response.ok) return;
+
+    const user = await response.json();
+    const topCta = document.querySelector('.navbar .nav-cta');
+    if (!topCta) return;
+
+    topCta.textContent = user.email || 'API Online';
+    topCta.removeAttribute('href');
+    topCta.removeAttribute('target');
+    topCta.setAttribute('aria-disabled', 'true');
+    topCta.classList.remove('btn-outline', 'btn-primary', 'btn-accent', 'btn-ghost-light');
+    topCta.classList.add('api-online-cta');
+
+    document.querySelectorAll('a[href="/api-key"]').forEach((link) => {
+      link.style.display = 'none';
+    });
+
+    const logoutButton = document.createElement('button');
+    logoutButton.type = 'button';
+    logoutButton.className = 'btn btn-outline nav-cta';
+    logoutButton.textContent = 'Log off';
+    logoutButton.style.cssText = 'background:#dc2626;color:#fff;border:0';
+    logoutButton.addEventListener('click', async () => {
+      try {
+        const logoutResponse = await fetch(`${API_BASE_URL}/auth/logout`, {
+          method: 'POST',
+          credentials: 'include',
+        });
+        if (!logoutResponse.ok) {
+          throw new Error(`Sign-out failed with status ${logoutResponse.status}`);
+        }
+        localStorage.removeItem('api_key');
+        window.location.reload();
+      } catch (error) {
+        console.error('Could not sign out:', error);
+      }
+    });
+    topCta.after(logoutButton);
+  } catch (error) {
+    console.error('Could not restore the browser session on the home page:', error);
+  }
+}
+
+applyWebSessionUiState();
+
 /* ── Live ETF Count ──────────────────────────────────────── */
 async function fetchAndSetEtfCount() {
   const el = document.getElementById('etfCount');
