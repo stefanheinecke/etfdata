@@ -209,8 +209,24 @@ function onGoogleAuthenticated(user, forceRefresh = true) {
   if (changed || forceRefresh) pageRefreshKey.value += 1
 }
 
-function onApiKeyModalClose() {
+function reloadAfterAuthentication() {
+  if (window.location.pathname.toLowerCase() === '/api-key') {
+    window.history.replaceState(window.history.state, '', '/')
+  }
+  window.location.reload()
+}
+
+async function onApiKeyModalClose() {
   showApiKeyModal.value = false
+  try {
+    const { data } = await authService.session()
+    onGoogleAuthenticated(data, false)
+    reloadAfterAuthentication()
+  } catch (e) {
+    if (e.response?.status !== 401) {
+      console.error('Could not refresh browser session after closing the sign-in dialog:', e)
+    }
+  }
 }
 
 function stopEmailConfirmationPolling() {
@@ -242,6 +258,7 @@ async function checkEmailConfirmation() {
       stopEmailConfirmationPolling()
       onGoogleAuthenticated(data)
       showApiKeyModal.value = false
+      reloadAfterAuthentication()
     } else if (data.pending) {
       emailConfirmationErrorLogged = false
       if (!emailConfirmationPollTimer) startEmailConfirmationPolling()
