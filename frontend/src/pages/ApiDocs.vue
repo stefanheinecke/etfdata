@@ -133,7 +133,8 @@
 import { ref, computed, inject, watch } from 'vue'
 import axios from 'axios'
 import { BRAND } from '../brand.js'
-const BASE = import.meta.env.VITE_API_URL || 'https://etfdata-production.up.railway.app'
+import { getApiBaseUrl } from '../services/apiBaseUrl.js'
+const BASE = getApiBaseUrl()
 // Illustrative host shown in code examples only; live "Try it" calls always use BASE above.
 const DOC_BASE = `https://api.${BRAND.domain}`
 

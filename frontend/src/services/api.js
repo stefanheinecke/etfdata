@@ -1,7 +1,7 @@
 import axios from 'axios'
-import { BRAND } from '../brand.js'
+import { getApiBaseUrl } from './apiBaseUrl.js'
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://etfdata-production.up.railway.app'
+const API_BASE_URL = getApiBaseUrl()
 
 function getApiKey() {
   return localStorage.getItem('api_key') || ''

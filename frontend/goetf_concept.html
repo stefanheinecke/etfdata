@@ -1130,10 +1130,10 @@ const API_BASE_URL = (() => {
     return '';
   }
   
-  // In production, always use Railway backend
-  const railwayUrl = 'https://etfdata-production.up.railway.app';
-  console.log('🔧 Using production backend:', railwayUrl);
-  return railwayUrl;
+  // Home.vue replaces this brand-neutral API host with the current branded domain.
+  const apiUrl = 'https://api.goetf.ch';
+  console.log('🔧 Using production backend:', apiUrl);
+  return apiUrl;
 })();
 
 console.log('🔧 Contact Form Debug - API_BASE_URL:', API_BASE_URL);

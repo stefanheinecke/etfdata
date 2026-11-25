@@ -11,6 +11,7 @@ import os
 import secrets
 from datetime import datetime, timedelta
 from typing import Optional
+from urllib.parse import urlsplit
 
 import requests as _requests
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Response
@@ -52,6 +53,28 @@ _APP_NAME = "GoETF.ch API"
 _GOOGLE_SESSION_COOKIE = "web_session"
 _GOOGLE_SESSION_DAYS = 7
 _PENDING_EMAIL_COOKIE = "pending_email_session"
+
+
+def _confirmation_api_base_url() -> str:
+    frontend_url = os.getenv("FRONTEND_URL", "https://trueetf.com").strip()
+    frontend_host = (urlsplit(frontend_url).hostname or "").lower()
+    if frontend_host == "goetf.ch" or frontend_host.endswith(".goetf.ch"):
+        brand_api_url = "https://api.goetf.ch"
+    else:
+        brand_api_url = "https://api.trueetf.com"
+
+    configured_url = os.getenv("API_BASE_URL", "").strip().rstrip("/")
+    if not configured_url:
+        return brand_api_url
+
+    configured_host = (urlsplit(configured_url).hostname or "").lower()
+    if configured_host in {
+        "etfdata-production.up.railway.app",
+        "api.goetf.ch",
+        "api.trueetf.com",
+    }:
+        return brand_api_url
+    return configured_url
 
 
 # ── HTML templates ────────────────────────────────────────────────────────────
@@ -154,7 +177,7 @@ def request_key(
             is_replacement=has_active_key,
             expires_at=expires,
         ))
-        base_url = os.getenv("API_BASE_URL", "https://api.goetf.ch")
+        base_url = _confirmation_api_base_url()
         confirm_url = f"{base_url}/auth/confirm-key?token={token}"
 
         try:

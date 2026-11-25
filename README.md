@@ -198,6 +198,12 @@ werden. Bestehende aktive API-Keys bleiben unverändert. Wird der Link auf einem
 anderen Gerät geöffnet, wird auch der ursprüngliche Browser angemeldet, sobald
 er die Bestätigung abfragt oder die Website erneut im selben Browser geöffnet
 wird. `FRONTEND_URL` bestimmt den Link zurück zur Website.
+Für Safari-Kompatibilität sollten Frontend und API dieselbe registrierbare
+Domain verwenden: `trueetf.com` mit `api.trueetf.com` bzw. `goetf.ch` mit
+`api.goetf.ch`. Diese API-Domains müssen auf den Backend-Service zeigen. Das
+Frontend leitet bekannte Railway-API-URLs auf die passende API-Domain um; die
+Bestätigungs-E-Mail verwendet ebenfalls die zur `FRONTEND_URL` passende API-
+Domain.
 Nach erfolgreicher Erstregistrierung per E-Mail-Bestätigung oder Google-Login
 wird die Adresse aus `settings.contact_email` einmalig benachrichtigt; erneute
 Logins lösen keine neue Registrierungsbenachrichtigung aus.

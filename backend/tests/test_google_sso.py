@@ -50,6 +50,33 @@ def auth_db():
         engine.dispose()
 
 
+@pytest.mark.parametrize(
+    ("frontend_url", "configured_api_url", "expected_api_url"),
+    [
+        (
+            "https://trueetf.com",
+            "https://etfdata-production.up.railway.app",
+            "https://api.trueetf.com",
+        ),
+        (
+            "https://www.goetf.ch",
+            "",
+            "https://api.goetf.ch",
+        ),
+    ],
+)
+def test_confirmation_api_base_url_uses_brand_domain(
+    monkeypatch,
+    frontend_url,
+    configured_api_url,
+    expected_api_url,
+):
+    monkeypatch.setenv("FRONTEND_URL", frontend_url)
+    monkeypatch.setenv("API_BASE_URL", configured_api_url)
+
+    assert auth._confirmation_api_base_url() == expected_api_url
+
+
 def test_admin_routes_accept_admin_api_key_and_reject_regular_key(auth_db):
     db = auth_db
     admin_account = GoogleAccount(
