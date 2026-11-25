@@ -258,8 +258,10 @@ async function checkEmailConfirmation() {
       const completedPendingConfirmation = !!emailConfirmationPollTimer
       stopEmailConfirmationPolling()
       onGoogleAuthenticated(data)
-      showApiKeyModal.value = false
-      if (completedPendingConfirmation) reloadAfterAuthentication()
+      if (completedPendingConfirmation) {
+        showApiKeyModal.value = false
+        reloadAfterAuthentication()
+      }
     } else if (data.pending) {
       emailConfirmationErrorLogged = false
       if (!emailConfirmationPollTimer) startEmailConfirmationPolling()
