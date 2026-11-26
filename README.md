@@ -208,6 +208,42 @@ Nach erfolgreicher Erstregistrierung per E-Mail-Bestätigung oder Google-Login
 wird die Adresse aus `settings.contact_email` einmalig benachrichtigt; erneute
 Logins lösen keine neue Registrierungsbenachrichtigung aus.
 
+#### Test- und Produktions-Deployments mit GHCR
+
+Der GitHub-Workflow `.github/workflows/build-and-deploy-test.yml` baut bei
+jedem Push auf `main` Backend- und Frontend-Images und veröffentlicht sie
+privat in GHCR. Jeder Build erhält einen unveränderlichen `sha-<commit>`-Tag.
+Anschließend wird dieser Image-Digest mit dem Tag `test` versehen und die
+Railway-Services in der `test`-Umgebung werden neu gestartet.
+
+Nach dem Test kann `.github/workflows/promote-production.yml` manuell gestartet
+und der getestete vollständige Commit-SHA angegeben werden. Der Workflow versieht
+denselben Image-Digest mit dem Tag `production` und deployt ihn in die
+`production`-Umgebung. Es ist kein separater Branch erforderlich.
+
+Einmalige Einrichtung:
+
+1. In Railway die Backend- und Frontend-Services in beiden Umgebungen auf
+   **Docker Image** umstellen. Die GHCR-Pfade lauten
+   `ghcr.io/stefanheinecke/etfdata-backend:test` bzw.
+   `ghcr.io/stefanheinecke/etfdata-frontend:test` für Test und entsprechend
+   mit `:production` für Produktion.
+2. Für private GHCR-Pakete in Railway je Service Registry-Zugangsdaten mit
+   einem GitHub-Token mit `read:packages` hinterlegen.
+3. In den GitHub-Umgebungen `test` und `production` jeweils ein Secret
+   `RAILWAY_TOKEN` (Railway-Projekttoken der passenden Umgebung) sowie Variablen
+   `RAILWAY_PROJECT_ID`, `RAILWAY_BACKEND_SERVICE_ID` und
+   `RAILWAY_FRONTEND_SERVICE_ID` anlegen.
+4. In den Railway-Frontend-Services `VITE_API_URL` und
+   `VITE_GOOGLE_CLIENT_ID` je Umgebung als Laufzeitvariablen setzen. Das
+   Frontend-Image schreibt diese beim Containerstart in `runtime-config.js`;
+   dadurch kann dasselbe Image in Test und Produktion unterschiedliche
+   API-Adressen und Google-Client-IDs verwenden.
+
+`worker` und `mcp-server` werden von diesen Workflows nicht gebaut. `astra/`
+ist kein eigener Dienst; benötigter Code daraus wird in das Backend-Image
+kopiert.
+
 Der Admin-Status wird pro API-Key in `api_keys.is_admin` gespeichert. Bei der
 Migration bestehender Daten wird `stefan.heinecke1@gmail.com` als Admin markiert;
 neu erstellte API-Keys für diese Adresse erhalten den Admin-Status ebenfalls.

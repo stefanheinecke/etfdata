@@ -1,3 +1,5 @@
-#!/bin/bash
-set -e
-exec serve -s dist -l ${PORT:-3000}
+#!/bin/sh
+set -eu
+
+node /app/write-runtime-config.cjs
+exec serve -s /app/dist -l "${PORT:-3000}"

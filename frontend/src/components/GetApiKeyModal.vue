@@ -100,7 +100,9 @@
 import { ref, watch, nextTick } from 'vue'
 import { authService } from '../services/api.js'
 
-const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
+const googleClientId = window.__ETF_RUNTIME_CONFIG__?.googleClientId
+  || import.meta.env.VITE_GOOGLE_CLIENT_ID
+  || ''
 let googleScriptPromise
 
 const props = defineProps({

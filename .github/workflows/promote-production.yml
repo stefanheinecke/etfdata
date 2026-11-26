@@ -1,0 +1,58 @@
+name: Promote tested images to production
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_sha:
+        description: Full 40-character commit SHA that has passed testing
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+      RAILWAY_PROJECT_ID: ${{ vars.RAILWAY_PROJECT_ID }}
+      RAILWAY_BACKEND_SERVICE_ID: ${{ vars.RAILWAY_BACKEND_SERVICE_ID }}
+      RAILWAY_FRONTEND_SERVICE_ID: ${{ vars.RAILWAY_FRONTEND_SERVICE_ID }}
+      IMAGE_SHA: ${{ inputs.image_sha }}
+    steps:
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Validate the selected image and promote its digest
+        shell: bash
+        run: |
+          if [[ ! "$IMAGE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "image_sha must be a full 40-character lowercase commit SHA."
+            exit 1
+          fi
+
+          docker buildx imagetools inspect "ghcr.io/${GITHUB_REPOSITORY}-backend:sha-${IMAGE_SHA}"
+          docker buildx imagetools inspect "ghcr.io/${GITHUB_REPOSITORY}-frontend:sha-${IMAGE_SHA}"
+
+          docker buildx imagetools create \
+            --tag "ghcr.io/${GITHUB_REPOSITORY}-backend:production" \
+            "ghcr.io/${GITHUB_REPOSITORY}-backend:sha-${IMAGE_SHA}"
+          docker buildx imagetools create \
+            --tag "ghcr.io/${GITHUB_REPOSITORY}-frontend:production" \
+            "ghcr.io/${GITHUB_REPOSITORY}-frontend:sha-${IMAGE_SHA}"
+
+      - name: Link Railway production environment
+        run: npx --yes @railway/cli@latest link --project "$RAILWAY_PROJECT_ID" --environment production
+
+      - name: Redeploy production backend and frontend
+        run: |
+          npx --yes @railway/cli@latest redeploy --service "$RAILWAY_BACKEND_SERVICE_ID" --yes
+          npx --yes @railway/cli@latest redeploy --service "$RAILWAY_FRONTEND_SERVICE_ID" --yes

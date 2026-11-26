@@ -68,8 +68,9 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { healthService } from '../services/api.js'
+import { getApiBaseUrl } from '../services/apiBaseUrl.js'
 
-const apiUrl = ref(import.meta.env.VITE_API_URL || 'http://localhost:8000')
+const apiUrl = ref(getApiBaseUrl())
 const apiKey = ref(localStorage.getItem('api_key') || '')
 const healthStatus = ref('unknown')
 const databaseStatus = ref('unknown')

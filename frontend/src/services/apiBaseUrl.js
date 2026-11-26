@@ -8,6 +8,9 @@ const knownCrossSiteApiHosts = new Set([
 ])
 
 export function getApiBaseUrl() {
+  const runtimeUrl = window.__ETF_RUNTIME_CONFIG__?.apiBaseUrl?.trim().replace(/\/+$/, '')
+  if (runtimeUrl) return runtimeUrl
+
   const configuredUrl = import.meta.env.VITE_API_URL?.trim().replace(/\/+$/, '')
   if (!configuredUrl) return brandApiUrl
 

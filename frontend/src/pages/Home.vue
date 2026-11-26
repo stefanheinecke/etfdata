@@ -11,6 +11,7 @@
 <script setup>
 import { computed } from 'vue'
 import conceptHtml from '../../goetf_concept.html?raw'
+import { getApiBaseUrl } from '../services/apiBaseUrl.js'
 import { BRAND, BRAND_PREFIX } from '../brand.js'
 
 // The marketing page is static HTML/JS rendered in an iframe. Branding is
@@ -22,7 +23,7 @@ const brandedHtml = computed(() => conceptHtml
   .replace('<title>GoETF —', `<title>${BRAND.name} —`)
   .replace('© 2026 GoETF.ch', `© 2026 ${BRAND.domain}`)
   .replace('<a href="mailto:info@goetf.ch">info@goetf.ch</a>', '<a href="#contactForm" class="footer-contact-link">Contact us</a>')
-  .replaceAll('https://api.goetf.ch', `https://api.${BRAND.domain}`)
+  .replaceAll('https://api.goetf.ch', getApiBaseUrl())
   .replace(/\bGoETF\b/g, BRAND.name))
 </script>
 
