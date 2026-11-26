@@ -1,5 +1,6 @@
 import os
 import time
+import logging
 from datetime import datetime
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
@@ -7,18 +8,71 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from sqlalchemy.orm import Session
-from sqlalchemy import text
+from sqlalchemy import or_, text
 
 from app.db.database import get_db, init_db, SessionLocal
 from app.models import HealthResponse
 from app.api.routes import etfs, analytics, admin, auth, scores
-from app.core.auth import verify_api_key, hash_api_key
+from app.core.auth import (
+    get_email_session,
+    get_google_account_for_session,
+    hash_api_key,
+    verify_api_key,
+)
 from app.schemas import APIKey, RequestLog
 
 # ---------------------------------------------------------------------------
 # Request logging middleware
 # ---------------------------------------------------------------------------
 _SKIP_LOG_PATHS = {"/health", "/"}
+
+
+def _active_api_key_for_email(db: Session, email: str):
+    now = datetime.utcnow()
+    return db.query(APIKey).filter(
+        APIKey.email == email,
+        APIKey.is_active.is_(True),
+        or_(APIKey.expires_at.is_(None), APIKey.expires_at >= now),
+    ).order_by(APIKey.created_at.desc()).first()
+
+
+def _request_log_identity(db: Session, api_key_header: str, web_session: str):
+    if web_session:
+        account = get_google_account_for_session(web_session, db)
+        if account:
+            api_key = _active_api_key_for_email(db, account.email)
+            return (
+                api_key.id if api_key else None,
+                api_key.name if api_key else account.name or account.email.split("@")[0],
+                account.email,
+            )
+
+        email_session = get_email_session(web_session, db)
+        if email_session:
+            api_key = _active_api_key_for_email(db, email_session.email)
+            return (
+                api_key.id if api_key else None,
+                api_key.name if api_key else email_session.email.split("@")[0],
+                email_session.email,
+            )
+
+        legacy_key = db.query(APIKey).filter(
+            APIKey.key == hash_api_key(web_session),
+            APIKey.is_active.is_(True),
+            or_(APIKey.expires_at.is_(None), APIKey.expires_at >= datetime.utcnow()),
+        ).first()
+        if legacy_key:
+            return legacy_key.id, legacy_key.name, legacy_key.email
+
+    if api_key_header:
+        api_key = db.query(APIKey).filter(
+            APIKey.key == hash_api_key(api_key_header)
+        ).first()
+        if api_key:
+            return api_key.id, api_key.name, api_key.email
+
+    return None, None, None
+
 
 class RequestLogMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
@@ -61,23 +115,13 @@ class RequestLogMiddleware(BaseHTTPMiddleware):
         if request.url.path not in _SKIP_LOG_PATHS:
             try:
                 api_key_header = request.headers.get("x-api-key")
-                api_key_id = None
-                api_key_name = None
-                email = None
-                if api_key_header:
-                    hashed = hash_api_key(api_key_header)
-                    db_log = SessionLocal()
-                    try:
-                        key_obj = db_log.query(APIKey).filter(APIKey.key == hashed).first()
-                        if key_obj:
-                            api_key_id = key_obj.id
-                            api_key_name = key_obj.name
-                            email = key_obj.email
-                    finally:
-                        db_log.close()
-
                 db_log = SessionLocal()
                 try:
+                    api_key_id, api_key_name, email = _request_log_identity(
+                        db_log,
+                        api_key_header,
+                        request.cookies.get("web_session"),
+                    )
                     log = RequestLog(
                         api_key_id=api_key_id,
                         api_key_name=api_key_name,
@@ -95,7 +139,11 @@ class RequestLogMiddleware(BaseHTTPMiddleware):
                 finally:
                     db_log.close()
             except Exception:
-                pass  # never break the response on logging errors
+                logging.getLogger(__name__).exception(
+                    "Could not write request log for %s %s",
+                    request.method,
+                    request.url.path,
+                )
 
         return response
 

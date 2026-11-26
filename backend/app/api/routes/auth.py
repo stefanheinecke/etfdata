@@ -509,6 +509,12 @@ def _notify_contact_of_new_registration(db: Session, user_email: str, method: st
             user_email=user_email,
             registration_method=method,
         )
+        logger.info(
+            "Sent new-user registration notification to %s for %s (%s).",
+            contact_email,
+            user_email,
+            method,
+        )
     except (RuntimeError, _requests.RequestException):
         logger.exception("Could not send new-user registration notification.")
 
@@ -521,7 +527,10 @@ def google_session(
 ):
     """Verify a Google ID token and start a server-side web session."""
     claims = _verified_google_claims(payload.credential)
-    is_new_user = db.query(APIKey.id).filter(APIKey.email == claims["email"]).first() is None
+    is_new_user = db.query(APIKey.id).filter(
+        APIKey.email == claims["email"],
+        APIKey.is_active.is_(True),
+    ).first() is None
     account = db.query(GoogleAccount).filter(
         GoogleAccount.google_sub == claims["google_sub"]
     ).first()

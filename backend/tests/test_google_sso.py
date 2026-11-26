@@ -16,6 +16,7 @@ from app.core.auth import (
 from app.api.routes import admin
 from app.api.routes import auth
 from app.core import email as email_service
+from app.main import _request_log_identity
 from app.schemas import (
     APIKey,
     Base,
@@ -75,6 +76,59 @@ def test_confirmation_api_base_url_uses_brand_domain(
     monkeypatch.setenv("API_BASE_URL", configured_api_url)
 
     assert auth._confirmation_api_base_url() == expected_api_url
+
+
+def test_request_log_identity_includes_email_for_web_sessions(auth_db):
+    db = auth_db
+    google_email = "google-user@example.com"
+    email_login = "email-user@example.com"
+    google_session_token = "google-session-token"
+    email_session_token = "email-session-token"
+    account = GoogleAccount(
+        google_sub="google-sub",
+        email=google_email,
+        name="Google User",
+    )
+    db.add(account)
+    db.flush()
+    google_key = APIKey(
+        key=hash_api_key("google-api-key"),
+        name="google-user",
+        email=google_email,
+        is_active=True,
+    )
+    email_key = APIKey(
+        key=hash_api_key("email-api-key"),
+        name="email-user",
+        email=email_login,
+        is_active=True,
+    )
+    db.add_all([
+        google_key,
+        email_key,
+        WebSession(
+            google_account_id=account.id,
+            token_hash=hash_api_key(google_session_token),
+            expires_at=datetime.utcnow() + timedelta(days=1),
+        ),
+        EmailWebSession(
+            email=email_login,
+            token_hash=hash_api_key(email_session_token),
+            expires_at=datetime.utcnow() + timedelta(days=1),
+        ),
+    ])
+    db.commit()
+
+    assert _request_log_identity(db, None, google_session_token) == (
+        google_key.id,
+        "google-user",
+        google_email,
+    )
+    assert _request_log_identity(db, None, email_session_token) == (
+        email_key.id,
+        "email-user",
+        email_login,
+    )
 
 
 def test_admin_routes_accept_admin_api_key_and_reject_regular_key(auth_db):
@@ -396,6 +450,54 @@ def test_google_session_remains_active_when_key_email_fails(auth_db, monkeypatch
         verify_api_key(x_api_key=None, web_session=session_token, db=db)
     )
     assert auth.get_web_session(api_key=authenticated_user, db=db)["email"] == "user@example.com"
+
+
+def test_google_registration_notifies_when_only_an_inactive_key_exists(
+    auth_db,
+    monkeypatch,
+):
+    db = auth_db
+    email = "new-user@example.com"
+    db.add(Settings(key="contact_email", value="owner@example.com"))
+    db.add(APIKey(
+        key=hash_api_key("inactive-key"),
+        name="new-user",
+        email=email,
+        is_active=False,
+    ))
+    db.commit()
+    monkeypatch.setattr(
+        auth,
+        "_verified_google_claims",
+        lambda _credential: {
+            "google_sub": "google-user-id",
+            "email": email,
+            "name": "New User",
+        },
+    )
+    monkeypatch.setattr(auth, "send_api_key_email", lambda **_kwargs: None)
+    notifications = []
+    monkeypatch.setattr(
+        auth,
+        "send_new_user_notification_email",
+        lambda **kwargs: notifications.append(kwargs),
+    )
+
+    auth.google_session(
+        auth.GoogleLoginRequest(credential="google-id-token"),
+        Response(),
+        db,
+    )
+
+    assert notifications == [{
+        "to_email": "owner@example.com",
+        "user_email": email,
+        "registration_method": "Google",
+    }]
+    assert db.query(APIKey).filter(
+        APIKey.email == email,
+        APIKey.is_active.is_(True),
+    ).count() == 1
 
 
 def test_email_request_keeps_new_key_inactive_until_confirmation(
